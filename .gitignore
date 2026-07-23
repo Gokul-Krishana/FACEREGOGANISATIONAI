@@ -1,0 +1,42 @@
+# Python bytecode cache (source of the stale cache issue!)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project-specific
+data/*.db
+data/test_*.db
+logs/
+outputs/
+unknown_faces/
+attendance/*.csv
+
+# Stray/corrupted files
+notebooks/nul
+nul
+
+# Model files (large)
+models/.insightface/
+
+# Database files
+*.db-journal
+*.db-wal
+*.db-shm
