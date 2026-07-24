@@ -70,7 +70,12 @@ class EmployeeRepo:
     @staticmethod
     def get_by_name(session: Session, name: str) -> Optional[Employee]:
         """Look up an employee by their display name."""
-        return session.query(Employee).filter(Employee.name == name).first()
+        normalized = name.strip().lower()
+        return (
+            session.query(Employee)
+            .filter(Employee.name.ilike(normalized))
+            .first()
+        )
 
     @staticmethod
     def search(session: Session, query: str) -> List[Employee]:
