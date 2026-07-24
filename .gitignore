@@ -29,6 +29,10 @@ outputs/
 unknown_faces/
 attendance/*.csv
 
+# Streamlit runtime logs
+streamlit_log.txt
+streamlit_err.txt
+
 # Stray/corrupted files
 notebooks/nul
 nul
