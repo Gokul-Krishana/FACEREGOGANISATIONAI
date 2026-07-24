@@ -48,7 +48,8 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.page_link("pages/01_Dashboard.py", label="📊  Dashboard", icon="📊")
+# ── Main Navigation ─────────────────────────────────────────
+st.sidebar.page_link("pages/01_Dashboard.py", label="🏠  Dashboard", icon="🏠")
 st.sidebar.page_link("pages/02_Employees.py", label="👥  Employees", icon="👥")
 st.sidebar.page_link("pages/03_Enroll.py", label="📸  Enroll", icon="📸")
 st.sidebar.page_link("pages/04_Live.py", label="📹  Live Recognition", icon="📹")
@@ -56,60 +57,43 @@ st.sidebar.page_link("pages/05_Attendance.py", label="📋  Attendance", icon="�
 st.sidebar.page_link("pages/06_Unknown.py", label="🔴  Unknown Faces", icon="🔴")
 st.sidebar.page_link("pages/07_Analytics.py", label="📈  Analytics", icon="📈")
 st.sidebar.page_link("pages/08_Settings.py", label="⚙️  Settings", icon="⚙️")
+st.sidebar.page_link("pages/09_Health.py", label="🩺  System Health", icon="🩺")
+st.sidebar.page_link("pages/10_About.py", label="ℹ️  About", icon="ℹ️")
 
 st.sidebar.divider()
 
-# Run auto-cleanup on startup
-from database.database import init_db
-init_db()
-
-from services.unknown_face_service import UnknownFaceService
-import config.config as cfg
-
+# ── Auto-initialization ─────────────────────────────────────
 try:
+    from database.database import init_db
+    init_db()
+except Exception as e:
+    st.sidebar.error(f"DB init failed: {e}")
+
+# ── Auto-cleanup → Silently handle errors ───────────────────
+try:
+    from services.unknown_face_service import UnknownFaceService
     deleted = UnknownFaceService.auto_cleanup()
     if deleted:
-        st.sidebar.info(f"Auto-cleaned {deleted} old unknown faces")
+        st.sidebar.info(f"🧹 Auto-cleaned {deleted} old unknown faces")
+except Exception:
+    pass  # Cleanup is best-effort
+
+# ── Sidebar Footer ──────────────────────────────────────────
+st.sidebar.divider()
+st.sidebar.caption("**Face Recognition AI v1.0**")
+
+# Try to show enrolled count
+try:
+    from app.enrollment import FaceEnrollment
+    _enr = FaceEnrollment()
+    st.sidebar.caption(f"🧠 {_enr.count()} embeddings in FAISS")
 except Exception:
     pass
 
-st.sidebar.caption(f"Recognition threshold: {cfg.RECOGNITION_THRESHOLD}")
-st.sidebar.caption(f"Enrolled: ? — Unknown retention: {cfg.UNKNOWN_FACE_RETENTION_DAYS}d")
+import config.config as cfg
+st.sidebar.caption(f"⚙️ Threshold: {cfg.RECOGNITION_THRESHOLD}")
+st.sidebar.caption(f"📷 Source: {cfg.CAMERA_SOURCE_TYPE}")
 
-# ── Main content ─────────────────────────────────────────────
-st.title("🟢 Face Recognition AI")
-st.markdown("### Real-time face recognition & attendance system")
-
-from database.database import get_session
-from database.repository import EmployeeRepo, UnknownFaceRepo, AttendanceRepo
-from services.attendance_service import AttendanceService
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    with get_session() as s:
-        emp_count = EmployeeRepo.count(s)
-    st.metric("Total Employees", emp_count)
-
-with col2:
-    stats = AttendanceService.get_statistics()
-    st.metric("Today's Attendance", stats.get("today_count", 0))
-
-with col3:
-    with get_session() as s:
-        unknown_count = UnknownFaceRepo.count_unreviewed(s)
-    st.metric("Unknown Faces", unknown_count)
-
-with col4:
-    st.metric("System Status", "🟢 Online")
-
-st.markdown("---")
-st.markdown(
-    """
-    ### Quick Actions
-    - **Enroll** a new employee via the sidebar
-    - **Review** unknown faces in the gallery
-    - **Check** today's attendance records
-    - **Configure** recognition settings
-    """
-)
+# ── Redirect to the first page ─────────────────────────────
+# The main content area is empty — the dashboard page handles everything
+st.switch_page("pages/01_Dashboard.py")

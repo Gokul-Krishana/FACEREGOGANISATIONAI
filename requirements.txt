@@ -1,0 +1,36 @@
+# ============================================================
+# Face Recognition AI — Python Dependencies
+# ============================================================
+# Install with:  pip install -r requirements.txt
+# ============================================================
+
+# ── Core ────────────────────────────────────────────────────
+streamlit>=1.28.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pandas>=2.0.0
+Pillow>=10.0.0
+
+# ── AI Models ───────────────────────────────────────────────
+torch>=2.0.0
+ultralytics>=8.0.0          # YOLO11 person detection
+insightface>=0.7.3          # RetinaFace + ArcFace
+faiss-cpu>=1.7.0            # FAISS vector search (CPU)
+
+# ── Camera ──────────────────────────────────────────────────
+streamlit-webrtc>=0.47.0    # Browser WebRTC camera
+requests>=2.28.0            # HTTP camera streams
+
+# ── Database ────────────────────────────────────────────────
+sqlalchemy>=2.0.0
+alembic>=1.12.0
+
+# ── Configuration ───────────────────────────────────────────
+ruamel.yaml>=0.17.0         # YAML with comment preservation
+
+# ── Dashboard / UI ──────────────────────────────────────────
+plotly>=5.18.0              # Interactive charts
+
+# ── Development & Testing ───────────────────────────────────
+pytest>=7.0.0
+pytest-cov>=4.0.0
