@@ -37,6 +37,7 @@ from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+import pandas as pd
 import streamlit as st
 
 # ── Ensure project root is on path ──────────────────────────────
@@ -616,6 +617,19 @@ def _render_camera_column(feed: Optional[ThreadedCameraFeed], col, emoji: str, l
             st.caption("No detections yet")
 
 
+@st.cache_data(ttl=3)
+def _get_today_attendance_df() -> pd.DataFrame:
+    """Return today's attendance as a DataFrame for the live dashboard."""
+    records = AttendanceService.get_today()
+    rows = []
+    for record in records:
+        rows.append(AttendanceService.to_dict(record))
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=["id", "employee_id", "employee_name", "timestamp", "confidence", "camera_id"])
+    return df.sort_values("timestamp", ascending=False)
+
+
 # ═══════════════════════════════════════════════════════════════
 #  Page — UI
 # ═══════════════════════════════════════════════════════════════
@@ -871,8 +885,8 @@ if st.session_state.dual_active:
     st.divider()
     st.markdown("### 📊 Combined Status")
 
-    s1 = tfeed1.pipeline.status() if tfeed1.is_connected else {}
-    s2 = tfeed2.pipeline.status() if tfeed2.is_connected else {}
+    s1 = tfeed1.pipeline.status() if tfeed1 is not None and tfeed1.is_connected else {}
+    s2 = tfeed2.pipeline.status() if tfeed2 is not None and tfeed2.is_connected else {}
 
     m1, m2, m3, m4 = st.columns(4)
     with m1:
@@ -894,6 +908,44 @@ if st.session_state.dual_active:
     # ── Auto-refresh ─────────────────────────────────────────
     # Background threads keep capturing and processing independently
     time.sleep(0.06)  # ~16 FPS refresh rate for UI updates
+    st.divider()
+    st.markdown("### 📅 Today’s Attendance")
+    today_df = _get_today_attendance_df()
+
+    top_left, top_right = st.columns([3, 1])
+    with top_left:
+        st.caption("Records are saved in SQLite and can be downloaded as CSV.")
+    with top_right:
+        csv_data = (
+            today_df.to_csv(index=False)
+            if not today_df.empty
+            else "id,employee_id,employee_name,timestamp,confidence,camera_id\n"
+        )
+        st.download_button(
+            "📥 Download CSV",
+            data=csv_data,
+            file_name=f"attendance_{time.strftime('%Y-%m-%d')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    if today_df.empty:
+        st.info("No attendance records yet. Stand in front of the camera until your face is recognized.")
+    else:
+        display_df = today_df.rename(
+            columns={
+                "employee_id": "Emp ID",
+                "employee_name": "Name",
+                "timestamp": "Time",
+                "confidence": "Confidence",
+                "camera_id": "Camera",
+            }
+        )[["Emp ID", "Name", "Time", "Confidence", "Camera"]]
+        display_df["Confidence"] = display_df["Confidence"].map(
+            lambda x: f"{float(x):.1%}" if pd.notna(x) else "—"
+        )
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
     st.rerun()
 
 else:
