@@ -25,7 +25,7 @@ if _project_root not in sys.path:
 import streamlit as st
 import pandas as pd
 
-from database.database import get_session, engine
+from database.database import get_session
 from database.repository import EmployeeRepo, AttendanceRepo, UnknownFaceRepo
 from services.attendance_service import AttendanceService
 from services.employee_service import EmployeeService
@@ -39,23 +39,24 @@ st.set_page_config(page_title="System Health", page_icon="🩺", layout="wide")
 from sqlalchemy import text as _sa_text
 
 
-@st.cache_resource(ttl=5)
+@st.cache_resource(ttl=10)
 def check_database() -> dict:
     """Check if the database is reachable and responsive."""
     try:
         with get_session() as session:
             session.execute(_sa_text("SELECT 1"))
             emp_count = EmployeeRepo.count(session)
-            return {"status": "ok", "employees": emp_count, "latency_ms": 0}
+            return {"status": "ok", "employees": emp_count}
     except Exception as e:
-        return {"status": "error", "message": str(e), "latency_ms": 0}
+        return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_camera() -> dict:
-    """Check if a camera device is available."""
+    """Check if a camera device is available (cached to avoid repeated open/close)."""
     import cv2
     try:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if cap.isOpened():
             ret, frame = cap.read()
             cap.release()
@@ -67,8 +68,9 @@ def check_camera() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_yolo() -> dict:
-    """Check if YOLO model file exists and can be loaded."""
+    """Check if YOLO model file exists and can be loaded (cached 10s)."""
     try:
         from app.face_detector import FaceDetector
         model_path = Path(cfg.YOLO_MODEL_PATH)
@@ -85,8 +87,9 @@ def check_yolo() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_arcface() -> dict:
-    """Check if InsightFace (RetinaFace + ArcFace) is loaded."""
+    """Check if InsightFace is loaded (cached 10s)."""
     try:
         from app.recognizer import FaceRecognizer
         recognizer = FaceRecognizer()
@@ -100,8 +103,9 @@ def check_arcface() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_faiss() -> dict:
-    """Check if FAISS index is loaded and queryable."""
+    """Check if FAISS index is loaded (cached 10s)."""
     try:
         from app.enrollment import FaceEnrollment
         enrollment = FaceEnrollment()
@@ -116,8 +120,9 @@ def check_faiss() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_recognition_pipeline() -> dict:
-    """Run an end-to-end recognition test (no face expected)."""
+    """Run an end-to-end recognition test (cached 10s)."""
     try:
         from app.face_detector import FaceDetector
         from app.recognizer import FaceRecognizer
@@ -141,8 +146,9 @@ def check_recognition_pipeline() -> dict:
         return {"status": "error", "message": str(e)}
 
 
+@st.cache_resource(ttl=10)
 def check_disk_space() -> dict:
-    """Check available disk space for storing face images."""
+    """Check available disk space (cached 10s)."""
     import shutil
     try:
         total, used, free = shutil.disk_usage(cfg.ROOT_DIR)
@@ -203,17 +209,48 @@ with refresh_col1:
         st.cache_resource.clear()
         st.rerun()
 
-st.divider()
+# ── Run all health checks (each wrapped individually to prevent one failure from blocking others) ──
+_status_placeholder = st.empty()
+_status_placeholder.caption("Running diagnostics...")
+_checks = [
+    ("Database", check_database),
+    ("Camera", check_camera),
+    ("YOLO", check_yolo),
+    ("ArcFace", check_arcface),
+    ("FAISS", check_faiss),
+    ("Pipeline", check_recognition_pipeline),
+    ("Disk", check_disk_space),
+]
+db_health = {}
+cam_health = {}
+yolo_health = {}
+arcface_health = {}
+faiss_health = {}
+pipeline_health = {}
+disk_health = {}
 
-# ── Run all health checks ──────────────────────────────────────
-with st.spinner("Running system diagnostics..."):
-    db_health = check_database()
-    cam_health = check_camera()
-    yolo_health = check_yolo()
-    arcface_health = check_arcface()
-    faiss_health = check_faiss()
-    pipeline_health = check_recognition_pipeline()
-    disk_health = check_disk_space()
+for _name, _fn in _checks:
+    try:
+        _result = _fn()
+    except Exception as _exc:
+        _result = {"status": "error", "message": f"{_name} check crashed: {_exc}"}
+    if _name == "Database":
+        db_health = _result
+    elif _name == "Camera":
+        cam_health = _result
+    elif _name == "YOLO":
+        yolo_health = _result
+    elif _name == "ArcFace":
+        arcface_health = _result
+    elif _name == "FAISS":
+        faiss_health = _result
+    elif _name == "Pipeline":
+        pipeline_health = _result
+    elif _name == "Disk":
+        disk_health = _result
+
+# Clear the "Running diagnostics..." placeholder now that checks are done
+_status_placeholder.empty()
 
 # ── Overall Status Banner ──────────────────────────────────────
 all_ok = all(
@@ -387,4 +424,8 @@ with st.expander("🔧 Troubleshooting Guide"):
 # ── Auto-refresh logic ─────────────────────────────────────────
 if auto_refresh:
     time.sleep(10)
-    st.rerun()
+    try:
+        st.rerun()
+    except Exception:
+        # Silently ignore rerun errors (e.g. when navigating away during refresh)
+        pass
