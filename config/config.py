@@ -126,6 +126,24 @@ CAMERA_URL: str = _get("camera", "url", default="http://192.168.1.100:8080/video
 # Auto-connect to the configured camera at startup
 CAMERA_AUTO_CONNECT: bool = _get("camera", "auto_connect", default=False)
 
+# ── AMFR (Adaptive Multi-Factor Recognition) ──────────────────
+FACE_QUALITY_MIN_SCORE: float = _get("amfr", "face_quality_min_score", default=0.35)
+LIVENESS_MIN_SCORE: float = _get("amfr", "liveness_min_score", default=0.30)
+LIVENESS_SPOOF_THRESHOLD: float = _get("amfr", "liveness_spoof_threshold", default=0.15)
+
+AMFR_HIGH_CONFIDENCE_THRESHOLD: float = _get("amfr", "high_confidence_threshold", default=0.70)
+AMFR_BORDERLINE_THRESHOLD: float = _get("amfr", "borderline_threshold", default=0.40)
+
+AMFR_WEIGHT_ARCFACE: float = _get("amfr", "weight_arcface", default=0.45)
+AMFR_WEIGHT_LIVENESS: float = _get("amfr", "weight_liveness", default=0.35)
+AMFR_WEIGHT_QUALITY: float = _get("amfr", "weight_quality", default=0.20)
+
+# ── Deep Liveness (CNN-based anti-spoofing) ────────────────────
+DEEP_LIVENESS_ENABLED: bool = _get("deep_liveness", "enabled", default=True)
+DEEP_LIVENESS_THRESHOLD: float = _get("deep_liveness", "threshold", default=0.50)
+DEEP_LIVENESS_FALLBACK: bool = _get("deep_liveness", "use_fallback", default=True)
+DEEP_LIVENESS_AUTO_DOWNLOAD: bool = _get("deep_liveness", "auto_download", default=True)
+
 # ── Unknown Face Retention ───────────────────────────────────
 UNKNOWN_FACE_RETENTION_DAYS: int = _get("unknown_faces", "retention_days", default=30)
 

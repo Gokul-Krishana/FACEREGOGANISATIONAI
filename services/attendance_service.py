@@ -80,31 +80,24 @@ class AttendanceService:
         return True
 
     @classmethod
-    def get_today(cls) -> List[Attendance]:
+    def get_today(cls, limit: Optional[int] = None, skip: int = 0) -> List[Attendance]:
         """Return today's attendance records."""
         with get_session() as session:
-            records = AttendanceRepo.get_today(session)
-            # Eager-load employee relationship to avoid DetachedInstanceError
-            for r in records:
-                _ = r.employee  # Force lazy load while session is open
+            records = AttendanceRepo.get_today(session, limit=limit, skip=skip)
             return records
 
     @classmethod
-    def get_by_date(cls, target_date: date) -> List[Attendance]:
+    def get_by_date(cls, target_date: date, limit: Optional[int] = None, skip: int = 0) -> List[Attendance]:
         """Return attendance records for a specific date."""
         with get_session() as session:
-            records = AttendanceRepo.get_by_date(session, target_date)
-            for r in records:
-                _ = r.employee
+            records = AttendanceRepo.get_by_date(session, target_date, limit=limit, skip=skip)
             return records
 
     @classmethod
-    def get_by_employee(cls, employee_id: int) -> List[Attendance]:
+    def get_by_employee(cls, employee_id: int, limit: Optional[int] = None, skip: int = 0) -> List[Attendance]:
         """Return attendance history for a specific employee."""
         with get_session() as session:
-            records = AttendanceRepo.get_by_employee(session, employee_id)
-            for r in records:
-                _ = r.employee
+            records = AttendanceRepo.get_by_employee(session, employee_id, limit=limit, skip=skip)
             return records
 
     @classmethod

@@ -1,8 +1,8 @@
 """
-Live Face Detection & Recognition — Real-time Pipeline
-=========================================================
+Live Face Detection & Recognition — Real-time Pipeline (AMFR Enabled)
+======================================================================
 
-Ties together the full inference chain:
+Ties together the full inference chain with AMFR anti-spoofing:
 
     Webcam frame
         ↓
@@ -10,10 +10,18 @@ Ties together the full inference chain:
     │  YOLO (person)  │  ← face_detector.py
     └───────┬────────┘
             ↓ (crop per person)
-    ┌────────────────┐
-    │ RetinaFace      │  ← recognizer.py
-    └───────┬────────┘
-            ↓ (face crop)
+    ┌──────────────────────┐
+    │ RetinaFace (detect)   │  ← recognizer.py
+    └───────┬──────────────┘
+            ↓ (face with landmarks)
+    ┌──────────────────────┐
+    │ FaceQuality          │  ← face_quality.py  NEW!
+    └───────┬──────────────┘
+            ↓
+    ┌──────────────────────┐
+    │ Liveness (anti-spoof) │  ← liveness_detector.py  NEW!
+    └───────┬──────────────┘
+            ↓
     ┌────────────────┐
     │  ArcFace (emb)  │  ← recognizer.py
     └───────┬────────┘
@@ -21,7 +29,11 @@ Ties together the full inference chain:
     ┌────────────────┐
     │  FAISS search   │  ← enrollment.py
     └───────┬────────┘
-            ↓ (name or "Unknown")
+            ↓
+    ┌──────────────────────┐
+    │  AMFR Engine (risk)   │  ← amfr_engine.py  NEW!
+    └───────┬──────────────┘
+            ↓ (ACCEPT / BORDERLINE / UNKNOWN / SPOOF)
     ┌────────────────┐
     │  Attendance     │  ← attendance.py
     └────────────────┘
@@ -46,6 +58,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import config.config as cfg
+from app.amfr_engine import AMFREngine, AMFRDecision
 from app.face_detector import FaceDetector
 from app.recognizer import FaceRecognizer
 from app.enrollment import FaceEnrollment
@@ -58,7 +71,7 @@ from services.employee_service import EmployeeService
 
 
 class LiveDetection:
-    """End‑to‑end real‑time face recognition pipeline.
+    """End‑to‑end real‑time face recognition pipeline with AMFR.
 
     Usage::
 
@@ -69,11 +82,12 @@ class LiveDetection:
     """
 
     def __init__(self) -> None:
-        """Initialise all sub‑modules."""
+        """Initialise all sub‑modules including AMFR engine."""
         self.detector = FaceDetector()
         self.recognizer = FaceRecognizer()
         self.enrollment = FaceEnrollment()
         self.attendance = AttendanceTracker()
+        self.amfr = AMFREngine()
 
         # Pipeline controls
         self.conf_threshold = cfg.YOLO_CONFIDENCE
@@ -101,13 +115,13 @@ class LiveDetection:
     # ── Frame Processing ──────────────────────────────────────
 
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Run the full pipeline on a single frame.
+        """Run the full AMFR pipeline on a single frame.
 
         Args:
             frame: BGR image from camera or file.
 
         Returns:
-            Annotated frame with bounding boxes and labels.
+            Annotated frame with bounding boxes, AMFR badges, and labels.
         """
         self._frame_count += 1
 
@@ -118,51 +132,120 @@ class LiveDetection:
 
         # ── Skip frames for performance ──────────────────────
         if self._frame_count % self.frame_skip != 0:
-            # Reuse previous detections to avoid flickering
             return self._draw_overlay(frame, self._last_recognised)
 
         # Step 1 — YOLO person detection
         detections = self.detector.detect(frame, conf_threshold=self.conf_threshold)
 
-        recognised: List[dict] = []
+        # Per-person intermediate data
+        embeddings: List[Optional[np.ndarray]] = []
+        faiss_results: List[List[Dict]] = []
+        face_data: List[Optional[Dict]] = []
+        yolo_detections: List[Dict] = []
+
         for det in detections:
             bbox = det["bbox"]
-
-            # Step 2 — Crop person region
             person_crop = self.detector.crop_person(frame, bbox)
             if person_crop.size == 0:
                 continue
 
-            # Step 3 — RetinaFace detection → ArcFace embedding
+            yolo_detections.append(det)
+
+            # Step 2 — RetinaFace detection (detailed face with landmarks)
+            face = self.recognizer.detect_face(person_crop)
+            face_data.append(face)
+
+            # Step 3 — ArcFace embedding
             embedding = self.recognizer.extract_embedding(person_crop)
-            if embedding is None:
-                recognised.append({"bbox": bbox, "name": "No Face", "confidence": 0.0})
-                continue
+            embeddings.append(embedding)
 
-            # Step 4 — FAISS nearest-neighbour search
-            matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
-
-            # ── Debug: always show the closest FAISS match ──
-            self._debug_faiss(embedding)
-
-            if matches:
-                name = matches[0]["name"]
-                conf = matches[0]["confidence"]
-                print(f"  ✅ MATCH: {name} | confidence={conf:.2%} | distance={matches[0]['distance']:.4f} | threshold={self.recog_threshold}")
-                # Mark attendance once per session (CSV + SQLite)
-                if name not in self._marked_this_session:
-                    self.attendance.mark(name, conf)
-                    # Also log to SQLite so the dashboard can query it
-                    self._log_attendance_db(name, conf)
-                    self._marked_this_session.add(name)
-                recognised.append({"bbox": bbox, "name": name, "confidence": conf})
+            # Step 4 — FAISS similarity search
+            if embedding is not None:
+                matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
+                faiss_results.append(matches)
             else:
-                print(f"  ❌ NO MATCH — closest known face was rejected by threshold")
-                # Save unknown face snapshot (with cooldown to avoid flooding)
-                self._save_unknown_face(person_crop)
-                recognised.append({"bbox": bbox, "name": "Unknown", "confidence": 0.0})
+                faiss_results.append([])
 
-        # Cache for next skipped frame
+        # Step 5 — AMFR decision engine
+        # Combines: face quality + liveness + arcface similarity + tracking consistency
+        amfr_results = self.amfr.process_frame(
+            frame=frame,
+            detections=yolo_detections,
+            embeddings=embeddings,
+            faiss_results=faiss_results,
+            face_data=face_data,
+        )
+
+        # Step 6 — Act on AMFR decisions and log attendance
+        recognised: List[Dict] = []
+        for amfr_detection in amfr_results:
+            bbox = amfr_detection["bbox"]
+            decision = amfr_detection["amfr_decision"]
+            name = amfr_detection["name"]
+            risk_score = amfr_detection["risk_score"]
+            liveness_score = amfr_detection["liveness_score"]
+            quality_score = amfr_detection["quality_score"]
+
+            if decision == AMFRDecision.ACCEPT.value:
+                # ── High confidence + live → mark attendance ──
+                print(f"  ✅ AMFR ACCEPT: {name} | risk={risk_score:.2%} | liveness={liveness_score:.2%}")
+                if name not in self._marked_this_session:
+                    self.attendance.mark(name, risk_score)
+                    self._log_attendance_db(name, risk_score)
+                    self._marked_this_session.add(name)
+                recognised.append({
+                    "bbox": bbox,
+                    "name": name,
+                    "confidence": risk_score,
+                    "amfr_decision": decision,
+                    "risk_score": risk_score,
+                    "liveness_score": liveness_score,
+                    "quality_score": quality_score,
+                })
+
+            elif decision == AMFRDecision.BORDERLINE.value:
+                # ── Uncertain — needs more frames ─────────────
+                print(f"  ⚠️  AMFR BORDERLINE: {name}? | risk={risk_score:.2%} | collecting more frames")
+                recognised.append({
+                    "bbox": bbox,
+                    "name": f"{name}?",
+                    "confidence": risk_score,
+                    "amfr_decision": decision,
+                    "risk_score": risk_score,
+                    "liveness_score": liveness_score,
+                    "quality_score": quality_score,
+                })
+
+            elif decision == AMFRDecision.REJECT_SPOOF.value:
+                # ── Spoof detected! ───────────────────────────
+                print(f"  🚨 AMFR SPOOF REJECTED | liveness={liveness_score:.2%} | risk={risk_score:.2%}")
+                recognised.append({
+                    "bbox": bbox,
+                    "name": "SPOOF",
+                    "confidence": 0.0,
+                    "amfr_decision": decision,
+                    "risk_score": risk_score,
+                    "liveness_score": liveness_score,
+                    "quality_score": quality_score,
+                })
+
+            else:  # LOW_CONFIDENCE / No Face
+                # ── Unknown person ─────────────────────────────
+                print(f"  ❌ AMFR UNKNOWN | risk={risk_score:.2%} | quality={quality_score:.2%}")
+                person_crop = self.detector.crop_person(frame, bbox)
+                if person_crop.size > 0 and (time.time() - getattr(self, '_last_unknown_save', 0)) > self._unknown_save_cooldown:
+                    self._save_unknown_face(person_crop)
+                    self._last_unknown_save = time.time()
+                recognised.append({
+                    "bbox": bbox,
+                    "name": "Unknown",
+                    "confidence": risk_score,
+                    "amfr_decision": decision,
+                    "risk_score": risk_score,
+                    "liveness_score": liveness_score,
+                    "quality_score": quality_score,
+                })
+
         self._last_recognised = recognised
         return self._draw_overlay(frame, recognised)
 
@@ -378,57 +461,69 @@ class LiveDetection:
     # ── Status ────────────────────────────────────────────────
 
     def status(self) -> dict:
-        """Return a snapshot of the current system state."""
+        """Return a snapshot of the current system state including AMFR."""
+        amfr_state = self.amfr.status() if hasattr(self, 'amfr') and self.amfr else {}
         return {
             "fps": round(self._fps, 1),
             "frame_count": self._frame_count,
             "enrolled": self.enrollment.status(),
             "attendance": self.attendance.statistics(),
             "session_marked": len(self._marked_this_session),
+            "amfr": amfr_state,
         }
 
     # ── Internals ─────────────────────────────────────────────
 
     def _draw_overlay(self, frame: np.ndarray, recognised: List[dict]) -> np.ndarray:
-        """Draw rich info cards, bounding boxes, and HUD on the frame."""
+        """Draw rich info cards with AMFR badges, bounding boxes, and HUD."""
         for item in recognised:
             x1, y1, x2, y2 = item["bbox"]
             name = item["name"]
             conf = item["confidence"]
+            decision = item.get("amfr_decision", "")
+            liveness = item.get("liveness_score", 0.0)
+            risk = item.get("risk_score", 0.0)
 
-            is_known = name not in ("Unknown", "No Face")
-
-            if is_known:
+            # ── Color and card lines by AMFR decision ────────
+            if decision == AMFRDecision.ACCEPT.value:
                 color = (0, 200, 0)  # Green
-                # Look up employee record to get employee ID (cached per session)
                 if name not in self._employee_cache:
                     emp = EmployeeService.get_by_name(name) if name else None
                     self._employee_cache[name] = emp.employee_id if emp else None
                 emp_id = self._employee_cache.get(name)
-                emp_id_str = f"ID: {emp_id}" if emp_id else ""
                 attendance_str = "[OK] Attendance Marked" if name in self._marked_this_session else ""
-                card_lines = [name, emp_id_str, f"Confidence: {conf:.1%}", attendance_str]
-                card_lines = [l for l in card_lines if l]  # remove empty lines
+                card_lines = [
+                    f"[LIVE] {name}",
+                    f"ID: {emp_id}" if emp_id else "",
+                    f"Risk: {risk:.1%}  Live: {liveness:.1%}",
+                    attendance_str,
+                ]
+                card_lines = [l for l in card_lines if l]
+            elif decision == AMFRDecision.BORDERLINE.value:
+                color = (0, 200, 200)  # Yellow
+                card_lines = [f"{name} (borderline)", f"Risk: {risk:.1%}", "Collecting more frames..."]
+            elif decision == AMFRDecision.REJECT_SPOOF.value:
+                color = (0, 0, 200)  # Red
+                card_lines = ["🚨 SPOOF DETECTED", f"Liveness: {liveness:.1%}", "Rejected + Alerted"]
             elif name == "No Face":
                 color = (0, 165, 255)  # Orange
                 card_lines = ["No Face Detected"]
             else:
-                color = (0, 0, 200)  # Red
-                card_lines = ["Unknown", f"Confidence: {conf:.1%}", "Saved to Gallery"]
+                color = (128, 128, 128)  # Grey (unknown/low confidence)
+                card_lines = ["Unknown", f"Risk: {risk:.1%}", f"Quality: {item.get('quality_score', 0):.1%}"]
 
-            # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            # Draw rich info card below the bounding box
             self._draw_info_card(frame, x1, y2, card_lines, color)
 
         # ── HUD ───────────────────────────────────────────────
         enrolled = self.enrollment.count()
         today_count = len(self.attendance.today())
+        amfr_tracks = len(self.amfr.get_all_tracks()) if hasattr(self, 'amfr') and self.amfr else 0
         hud_lines = [
             f"FPS: {self._fps:.1f}",
             f"Enrolled: {enrolled}",
             f"Today: {today_count}",
+            f"AMFR tracks: {amfr_tracks}",
             "[Q]uit  [E]nroll  [R]eset",
         ]
         for i, line in enumerate(hud_lines):

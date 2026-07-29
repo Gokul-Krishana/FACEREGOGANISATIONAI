@@ -49,7 +49,7 @@ def get_home_stats() -> dict:
             unknown_stats = UnknownFaceRepo.get_statistics(session)
             cameras = CameraRepo.get_active(session)
             recent_logs = RecognitionLogRepo.get_recent(session, limit=10)
-            today_attendance = AttendanceRepo.get_today(session)
+            today_attendance = AttendanceRepo.get_today(session, limit=10)
 
             return {
                 "total_employees": total_employees,
@@ -72,10 +72,10 @@ def get_recent_attendance_df(limit: int = 10) -> pd.DataFrame:
     """Return recent attendance records as a DataFrame."""
     try:
         with get_session() as session:
-            records = AttendanceRepo.get_today(session)
+            records = AttendanceRepo.get_today(session, limit=limit)
             rows = []
-            for r in records[:limit]:
-                emp = EmployeeRepo.get_by_id(session, r.employee_id)
+            for r in records:
+                emp = r.employee
                 rows.append({
                     "Time": r.timestamp.strftime("%I:%M:%S %p"),
                     "Employee": emp.name if emp else "Unknown",

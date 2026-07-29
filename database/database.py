@@ -48,16 +48,29 @@ import config.config as cfg
 from database.models import Base
 
 # ── Database URL ──────────────────────────────────────────────
-# Default: SQLite at <project_root>/data/face_recognition.db
-DB_DIR = cfg.ROOT_DIR / "data"
-DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "face_recognition.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+# In production, this will be loaded from environment variables (PostgreSQL).
+# In development, it falls back to SQLite.
+
+import os
+
+DB_TYPE = os.getenv("DB_TYPE", "sqlite").lower()
+
+if DB_TYPE == "postgres":
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL must be set for PostgreSQL mode")
+    connect_args = {}
+else:
+    DB_DIR = cfg.ROOT_DIR / "data"
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH = DB_DIR / "face_recognition.db"
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    connect_args = {"check_same_thread": False}
 
 engine = create_engine(
     DATABASE_URL,
     echo=False,               # Set to True to see all SQL queries
-    connect_args={"check_same_thread": False},  # Needed for Streamlit multi-threading
+    connect_args=connect_args,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

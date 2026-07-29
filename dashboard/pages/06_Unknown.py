@@ -60,9 +60,7 @@ with col4:
 with st.expander("🗑️ Bulk Actions", expanded=False):
     bulk_col1, bulk_col2 = st.columns([1, 3])
     with bulk_col1:
-        # Count total unknown faces before delete
-        all_faces = UnknownFaceService.get_all()
-        total_count = len(all_faces)
+        total_count = stats["total"]
         if total_count > 0:
             if st.button(f"🗑️ Delete All ({total_count})", type="primary", use_container_width=True):
                 with st.spinner(f"Deleting all {total_count} unknown faces..."):

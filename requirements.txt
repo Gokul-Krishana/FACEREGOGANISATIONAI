@@ -1,36 +1,39 @@
-# ============================================================
-# Face Recognition AI — Python Dependencies
-# ============================================================
+# Face Recognition AI -- College Deployment Dependencies
 # Install with:  pip install -r requirements.txt
-# ============================================================
 
-# ── Core ────────────────────────────────────────────────────
+# – Core
 streamlit>=1.28.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 pandas>=2.0.0
 Pillow>=10.0.0
 
-# ── AI Models ───────────────────────────────────────────────
+# – AI Models
 torch>=2.0.0
 ultralytics>=8.0.0          # YOLO11 person detection
 insightface>=0.7.3          # RetinaFace + ArcFace
 faiss-cpu>=1.7.0            # FAISS vector search (CPU)
+psycopg2-binary>=2.9.0      # PostgreSQL adapter
+redis>=4.4.0                 # Redis cache
+onnxruntime>=1.15.0          # ONNX Runtime for deep-learning liveness inference
 
-# ── Camera ──────────────────────────────────────────────────
-streamlit-webrtc>=0.47.0    # Browser WebRTC camera
-requests>=2.28.0            # HTTP camera streams
+# – Security/Infrastructure
+fastapi>=0.100.0
+uvicorn[standard]>=0.21.5
+python-multipart>=0.0.6         # File upload parsing
+python-magic>=0.4.27            # Magic bytes file type detection
+slowapi>=0.1.9                  # Rate limiting
+secure>=0.3.0                   # Security headers
+python-dotenv>=1.0.0
+httpx>=0.27.0                   # HTTP client for OIDC
+pyotp>=2.9.0                   # TOTP for MFA
 
-# ── Database ────────────────────────────────────────────────
-sqlalchemy>=2.0.0
-alembic>=1.12.0
+# – Additional
+plotly>=5.18.0
+prometheus-client>=0.19.0
+ydata-profiling>=2.0.0          # Data profiling (renamed from pandas-profiling)
 
-# ── Configuration ───────────────────────────────────────────
-ruamel.yaml>=0.17.0         # YAML with comment preservation
-
-# ── Dashboard / UI ──────────────────────────────────────────
-plotly>=5.18.0              # Interactive charts
-
-# ── Development & Testing ───────────────────────────────────
-pytest>=7.0.0
-pytest-cov>=4.0.0
+# – Production
+python-json-logger>=2.0.0        # Structured JSON logging
+gunicorn>=21.2.0                 # Production WSGI server (for Streamlit)
+hiredis>=2.3.0                   # Faster Redis parser (optional)
