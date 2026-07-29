@@ -1,29 +1,31 @@
 """
-Live Recognition Feed — Dual Camera Mode
-=========================================
+Live Recognition Feed — Dual Camera Mode (AMFR-Enabled)
+=========================================================
 
-Supports **two simultaneous phone cameras** side by side:
+Supports **two simultaneous phone cameras** with full AMFR pipeline:
 
     🅰️ Camera 1 (Android)                     🅱️ Camera 2 (iPhone)
-    ┌──────────────────────────┐     ┌──────────────────────────┐
-    │ 📷 Live Feed             │     │ 📷 Live Feed             │
-    │ Name: Gokul              │     │ Name: Unknown            │
-    │ Confidence: 96.3%        │     │ Saved to Gallery         │
-    │ [OK] Attendance Marked   │     │                          │
-    └──────────────────────────┘     └──────────────────────────┘
+    ┌──────────────────────────────┐     ┌──────────────────────────────┐
+    │ 📷 Live Feed                 │     │ 📷 Live Feed                 │
+    │ Name: Gokul                  │     │ Name: Unknown                │
+    │ Student ID: EMP001           │     │ Quality: 34.2%               │
+    │ Confidence: 96.3%            │     │ Risk: 12.1%                  │
+    │ Face Quality: 87.5%          │     │ Decision: LOW_CONFIDENCE     │
+    │ Liveness: 94.1% [LIVE]       │     │                              │
+    │ AMFR Score: 0.87             │     │                              │
+    │ Decision: ACCEPT             │     │                              │
+    │ Track ID: T000000-abc123     │     │                              │
+    │ ✅ Attendance Marked         │     │                              │
+    └──────────────────────────────┘     └──────────────────────────────┘
 
-Camera Sources per channel:
-    - 📱 Android (USB via DroidCam)
-    - 📱 Android (Wi-Fi via IP Webcam)
-    - 📱 iPhone (USB via EpocCam)
-    - 📱 iPhone (Wi-Fi via EpocCam)
-    - 💻 Laptop Webcam (channel 1 only, via WebRTC)
+Pipeline (AMFR-enabled, per camera):
+    Camera Frame → YOLO11 → RetinaFace → FaceQuality → Liveness
+    → ArcFace → FAISS → AMFR (risk score + decision) → Attendance → PostgreSQL
 
-Pipeline (per camera):
-    Camera Frame → YOLO11 → RetinaFace → ArcFace → FAISS → Overlay
-
-Heavy models (YOLO, InsightFace, FAISS) are **shared across both cameras**
-to minimise memory and loading time.
+Heavy models (YOLO, InsightFace, FAISS, Liveness CNN) are **shared**
+via ``RecognitionService`` to minimise memory and loading time.
+Recognition runs in background threads; the Streamlit UI reads the latest
+results non-blocking.
 """
 
 from __future__ import annotations
@@ -46,16 +48,12 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import config.config as cfg
-from app.face_detector import FaceDetector
-from app.recognizer import FaceRecognizer
-from app.enrollment import FaceEnrollment
+from app.amfr_engine import AMFRDecision
+from services.recognition_service import RecognitionService
 from camera.base import CameraSource
 from camera.selector import create_camera
 from camera.discovery import scan_network, DiscoveredCamera
-from services.employee_service import EmployeeService
 from services.attendance_service import AttendanceService
-from database.database import get_session
-from database.repository import AttendanceRepo
 
 # ── Page Config ────────────────────────────────────────────────
 st.set_page_config(page_title="Live Recognition", page_icon="📹", layout="wide")
@@ -67,31 +65,30 @@ st.set_page_config(page_title="Live Recognition", page_icon="📹", layout="wide
 
 @dataclass
 class SharedModelResources:
-    """Container for heavy deep-learning models loaded once and shared."""
+    """Container for heavy deep-learning models loaded once and shared.
 
-    detector: FaceDetector
-    recognizer: FaceRecognizer
-    enrollment: FaceEnrollment
+    Creates a **single** ``RecognitionService`` that holds the expensive
+    YOLO, InsightFace, FAISS, and AMFR objects.  Each ``CameraPipeline``
+    calls ``RecognitionService.with_shared_models()`` to get its own
+    service instance with independent per-camera state but shared models.
+    """
+
+    service: RecognitionService
 
     @staticmethod
     def load() -> SharedModelResources:
-        """Load (or retrieve cached) models — YOLO, InsightFace, FAISS.
+        """Load (or retrieve cached) recognition models once.
 
-        On first call the models are loaded from disk; subsequent calls
-        return the same cached instances, so two camera feeds share
-        the same underlying YOLO / InsightFace / FAISS objects.
+        On first call the entire AI pipeline is loaded from disk;
+        subsequent calls return the same cached singleton.  Camera
+        pipelines use ``with_shared_models()`` to create independent
+        copies that share only the expensive AI models.
         """
         if not hasattr(SharedModelResources, "_cache"):
-            print("[ModelCache] Loading shared models (YOLO, InsightFace, FAISS)...")
-            detector = FaceDetector()
-            recognizer = FaceRecognizer()
-            enrollment = FaceEnrollment()
-            SharedModelResources._cache = SharedModelResources(
-                detector=detector,
-                recognizer=recognizer,
-                enrollment=enrollment,
-            )
-            print(f"[ModelCache] Models loaded — {enrollment.count()} enrolled faces")
+            print("[ModelCache] Loading shared AI models (YOLO, InsightFace, FAISS, AMFR)...")
+            service = RecognitionService()
+            SharedModelResources._cache = SharedModelResources(service=service)
+            print(f"[ModelCache] Models loaded — {service.enrollment.count()} enrolled faces")
         return SharedModelResources._cache
 
 
@@ -102,9 +99,12 @@ class SharedModelResources:
 class CameraPipeline:
     """Recognition pipeline for a **single** camera feed.
 
-    Shares the heavy YOLO / InsightFace / FAISS objects via
-    ``SharedModelResources`` but keeps its own mutable state
-    (frame counter, session tracking, FPS calculation, etc.).
+    Delegates to the ``RecognitionService`` which runs the full AMFR
+    pipeline: YOLO → RetinaFace → FaceQuality → Liveness → ArcFace
+    → FAISS → AMFR → Attendance logging.
+
+    Shares the heavy AI objects via ``SharedModelResources`` but keeps
+    its own mutable state (frame counter, session tracking, FPS, etc.).
 
     Usage:
 
@@ -114,33 +114,35 @@ class CameraPipeline:
 
     def __init__(self, resources: Optional[SharedModelResources] = None):
         self._res = resources or SharedModelResources.load()
+        # Create a per-pipeline service with shared models for thread safety
+        self._service = RecognitionService.with_shared_models(self._res.service)
 
-        # Read-only references to shared models
-        self.detector = self._res.detector
-        self.recognizer = self._res.recognizer
-        self.enrollment = self._res.enrollment
-
-        # Mutable per-camera state
-        self.conf_threshold = cfg.YOLO_CONFIDENCE
-        self.recog_threshold = cfg.RECOGNITION_THRESHOLD
+        # Mutable per-camera state (each pipeline has its own)
         self.frame_skip = cfg.FRAME_SKIP
         self._frame_count = 0
         self._last_recognised: List[Dict] = []
         self._marked_this_session: set = set()
-        self._employee_cache: Dict[str, Optional[str]] = {}
-        self._last_unknown_save = 0.0
-        self._unknown_save_cooldown = 3.0
         self._fps = 0.0
         self._prev_time = time.time()
         self._lock = threading.Lock()
-        # Track unknown frames to avoid flooding with near-identical saves
+        self._last_unknown_save = 0.0
+        self._unknown_save_cooldown = 3.0
         self._saved_unknown_this_frame = False
 
+        # Camera health tracking
+        self._health_check_interval = 10.0  # seconds
+        self._last_health_check = 0.0
+        self._camera_health = {"status": "UNKNOWN", "fps": 0}
+
     def process(self, frame: np.ndarray) -> Tuple[np.ndarray, List[Dict]]:
-        """Run the full recognition pipeline on one frame.
+        """Run the full AMFR pipeline on one frame via RecognitionService.
+
+        The heavy AI runs inside ``RecognitionService.process_frame_detailed()``
+        which handles: YOLO → RetinaFace → FaceQuality → Liveness →
+        ArcFace → FAISS → AMFR → Attendance logging.
 
         Returns:
-            (annotated_frame, results_list)
+            (annotated_frame, results_list_with_amfr_fields)
         """
         with self._lock:
             self._frame_count += 1
@@ -150,162 +152,54 @@ class CameraPipeline:
             self._fps = 0.9 * self._fps + 0.1 / (now - self._prev_time + 1e-6)
             self._prev_time = now
 
-            # Skip frames
-            if self._frame_count % self.frame_skip != 0:
-                return self._draw_overlay(frame, self._last_recognised), self._last_recognised
+            # Camera health check (periodic)
+            if now - self._last_health_check > self._health_check_interval:
+                self._update_camera_health()
+                self._last_health_check = now
 
-            self._saved_unknown_this_frame = False
+            # Delegate to RecognitionService for the full AMFR pipeline
+            annotated, results = self._service.process_frame_detailed(frame)
 
-            # Step 1 — YOLO person detection
-            detections = self.detector.detect(frame, conf_threshold=self.conf_threshold)
-            results: List[Dict] = []
-
-            for det in detections:
-                bbox = det["bbox"]
-                person_crop = self.detector.crop_person(frame, bbox)
-                if person_crop.size == 0:
-                    continue
-
-                # Step 2 — RetinaFace → ArcFace embedding
-                embedding = self.recognizer.extract_embedding(person_crop)
-                if embedding is None:
-                    results.append({
-                        "bbox": bbox, "name": "No Face", "confidence": 0.0,
-                        "is_known": False, "emp_id": None,
-                    })
-                    continue
-
-                # Step 3 — FAISS search
-                matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
-
-                if matches:
-                    name = matches[0]["name"]
-                    conf = matches[0]["confidence"]
-                    emp = EmployeeService.get_by_name(name) if name else None
-                    emp_id = emp.employee_id if emp else None
-                    self._maybe_mark_attendance(name, emp.id if emp else None, conf)
-                    results.append({
-                        "bbox": bbox, "name": name, "confidence": conf,
-                        "is_known": True, "emp_id": emp_id,
-                    })
-                else:
-                    self._maybe_save_unknown(person_crop)
-                    results.append({
-                        "bbox": bbox, "name": "Unknown", "confidence": 0.0,
-                        "is_known": False, "emp_id": None,
-                    })
+            # Track which names we've marked for session reset tracking
+            for r in results:
+                if r.get("is_known") and r.get("name"):
+                    self._marked_this_session.add(r["name"])
 
             self._last_recognised = results
-            return self._draw_overlay(frame, results), results
+            return annotated, results
 
-    def _maybe_mark_attendance(self, name: str, employee_id: Optional[int], confidence: float) -> None:
-        if name not in self._marked_this_session and employee_id:
-            AttendanceService.mark(employee_id=employee_id, confidence=confidence, employee_name=name)
-            self._marked_this_session.add(name)
-
-    def _maybe_save_unknown(self, face_img: np.ndarray) -> None:
-        now = time.time()
-        if now - self._last_unknown_save < self._unknown_save_cooldown:
-            return
-        if self._saved_unknown_this_frame:
-            return  # only one unknown save per frame
-        self._last_unknown_save = now
-        self._saved_unknown_this_frame = True
-        try:
-            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
-            filename = f"unknown_{timestamp}.jpg"
-            save_path = cfg.UNKNOWN_FACES_DIR / filename
-            if cv2.imwrite(str(save_path), face_img):
-                with get_session() as session:
-                    from database.repository import UnknownFaceRepo
-                    UnknownFaceRepo.create(session, image_path=str(save_path), confidence=0.0)
-        except Exception:
-            pass
-
-    def _draw_overlay(self, frame: np.ndarray, recognised: List[Dict]) -> np.ndarray:
-        for item in recognised:
-            x1, y1, x2, y2 = item["bbox"]
-            name = item["name"]
-            conf = item["confidence"]
-            is_known = item.get("is_known", False)
-            emp_id = item.get("emp_id")
-
-            if is_known:
-                color = (0, 255, 0)
-            elif name == "No Face":
-                color = (0, 165, 255)
-            else:
-                color = (0, 0, 255)
-
-            label = f"{name} ({conf:.2f})" if conf > 0 else name
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 8, y1), color, -1)
-            cv2.putText(frame, label, (x1 + 4, y1 - 4),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-            if is_known and emp_id:
-                card_lines = [
-                    f"ID: {emp_id}",
-                    f"Conf: {conf:.1%}",
-                    "✅ Marked" if name in self._marked_this_session else "Ready",
-                ]
-                self._draw_info_card(frame, x1, y2, card_lines, color)
-
-        # HUD
-        enrolled = self.enrollment.count()
-        lines = [
-            f"FPS: {self._fps:.1f}",
-            f"Enrolled: {enrolled}",
-            f"Marked: {len(self._marked_this_session)}",
-        ]
-        for i, line in enumerate(lines):
-            y = 25 + i * 22
-            cv2.putText(frame, line, (10, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-        return frame
-
-    @staticmethod
-    def _draw_info_card(frame: np.ndarray, bbox_left: int, bbox_bottom: int,
-                        lines: List[str], color: Tuple[int, int, int]) -> None:
-        if not lines:
-            return
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale, thickness = 0.45, 1
-        line_height, padding_x, padding_y, indicator_r = 20, 10, 6, 5
-
-        max_w = max(cv2.getTextSize(l, font, font_scale, thickness)[0][0] for l in lines)
-        left_indent = padding_x + indicator_r * 2 + 6
-        card_w = max_w + left_indent + padding_x
-        card_h = len(lines) * line_height + padding_y * 2
-        h_f, w_f = frame.shape[:2]
-        card_x = min(bbox_left, max(0, w_f - card_w - 5))
-        card_y = bbox_bottom + 5
-        if card_y + card_h > h_f - 5:
-            card_y = max(5, bbox_bottom - card_h - 10)
-
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (card_x, card_y), (card_x + card_w, card_y + card_h), (25, 25, 25), -1)
-        cv2.addWeighted(overlay, 0.88, frame, 0.12, 0, frame)
-        cv2.rectangle(frame, (card_x, card_y), (card_x + card_w, card_y + card_h), color, 1)
-        cx, cy = card_x + padding_x + indicator_r, card_y + padding_y + line_height // 2
-        cv2.circle(frame, (cx, cy), indicator_r, color, -1)
-        tx = card_x + padding_x + indicator_r * 2 + 8
-        for i, line in enumerate(lines):
-            ty = card_y + padding_y + (i + 1) * line_height - 6
-            cv2.putText(frame, line, (tx, ty), font, font_scale, (255, 255, 255), thickness)
+    def _update_camera_health(self) -> None:
+        """Check camera health (FPS trend, frame drops)."""
+        fps_ok = self._fps > 2.0
+        self._camera_health = {
+            "status": "HEALTHY" if fps_ok else "WARNING",
+            "fps": round(self._fps, 1),
+            "frame_count": self._frame_count,
+        }
+        if self._fps < 1.0:
+            self._camera_health["status"] = "CRITICAL"
 
     def status(self) -> Dict:
+        """Return a snapshot including AMFR engine state."""
+        svc_status = self._service.status()
         return {
             "fps": round(self._fps, 1),
             "frame_count": self._frame_count,
-            "enrolled": self.enrollment.count(),
+            "enrolled": svc_status.get("enrolled", 0),
             "session_marked": len(self._marked_this_session),
+            "amfr": svc_status.get("amfr", {}),
+            "camera_health": self._camera_health,
+            "attendance_stats": svc_status.get("attendance", {}),
         }
 
     def reset_session(self) -> None:
+        """Reset attendance markers and AMFR engine for a new session."""
         self._marked_this_session.clear()
-        self._employee_cache.clear()
+        self._service.reset_tracking()
+
+    @property
+    def service(self) -> RecognitionService:
+        return self._service
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -582,8 +476,19 @@ def _render_camera_config(prefix: str, label: str, default_source: str, default_
 
 
 def _render_camera_column(feed: Optional[ThreadedCameraFeed], col, emoji: str, label: str):
-    """Render a single camera column — reads the latest frame from the
-    background thread without blocking."""
+    """Render a single camera column with full AMFR per-person info cards.
+
+    Shows for each detected person:
+        - Name
+        - Student / Employee ID
+        - Confidence %
+        - Face Quality %
+        - Liveness score/status
+        - AMFR score (risk_score)
+        - AMFR decision
+        - Track ID
+        - Attendance status
+    """
     with col:
         st.markdown(f"### {emoji} {label}")
 
@@ -599,20 +504,103 @@ def _render_camera_column(feed: Optional[ThreadedCameraFeed], col, emoji: str, l
         if annotated is not None:
             rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
             frame_placeholder.image(rgb, channels="RGB", use_container_width=True)
-            st.success(f"🟢 {feed.name}")
+
+            # Camera health indicator
+            health = feed.pipeline.status().get("camera_health", {})
+            hstatus = health.get("status", "UNKNOWN")
+            hfps = health.get("fps", 0)
+            if hstatus == "HEALTHY":
+                st.success(f"🟢 {feed.name} — FPS: {hfps:.1f}")
+            elif hstatus == "WARNING":
+                st.warning(f"🟡 {feed.name} — FPS: {hfps:.1f} (low)")
+            elif hstatus == "CRITICAL":
+                st.error(f"🔴 {feed.name} — FPS: {hfps:.1f} (critical)")
+            else:
+                st.info(f"⚪ {feed.name} — connecting...")
         else:
             st.warning(f"🟡 Waiting for first frame... ({feed.name})")
 
-        # Show per-camera results from threaded capture
+        # Show per-detection AMFR info cards
         if results:
+            st.markdown("**Detections:**")
             for r in results:
-                n, c, k = r["name"], r["confidence"], r.get("is_known", False)
-                if k:
-                    st.success(f"✅ **{n}** — {c:.1%}")
-                elif n == "No Face":
-                    st.warning(f"⚠️ {n}")
-                else:
-                    st.error(f"🔴 {n}")
+                name = r.get("name", "?")
+                decision = r.get("amfr_decision", "")
+                is_known = r.get("is_known", False)
+                track_id = r.get("track_id", "—")
+                emp_id = r.get("emp_id", "—")
+                risk_score = r.get("risk_score", 0.0)
+                quality_score = r.get("quality_score", 0.0)
+                liveness_score = r.get("liveness_score", 0.5)
+                arcface_dist = r.get("arcface_distance", 999.0)
+
+                # ── Decide color and badge ────────────────────
+                if decision == AMFRDecision.ACCEPT.value:
+                    badge = "🟢"
+                    with st.container(border=True):
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.markdown(f"**{badge} {name}**")
+                            if emp_id and emp_id != "—":
+                                st.caption(f"ID: {emp_id}")
+                        with col2:
+                            st.markdown(f"<span style='color:green'>ACCEPT</span>", unsafe_allow_html=True)
+
+                        cols = st.columns(3)
+                        with cols[0]:
+                            st.metric("Confidence", f"{risk_score:.1%}")
+                            st.metric("Face Quality", f"{quality_score:.1%}")
+                        with cols[1]:
+                            live_status = "🟢 LIVE" if liveness_score > 0.5 else "⚠️"
+                            st.metric("Liveness", f"{liveness_score:.1%}")
+                            st.markdown(f"**{live_status}**")
+                        with cols[2]:
+                            st.metric("AMFR Score", f"{risk_score:.3f}")
+                            st.caption(f"Track: {track_id[:12] if track_id != '—' else '—'}")
+                        st.success("✅ Attendance Marked")
+
+                elif decision == AMFRDecision.BORDERLINE.value:
+                    with st.container(border=True):
+                        col1, col2 = st.columns([2, 1])
+                        with col1:
+                            st.markdown(f"**🟡 {name}?**")
+                        with col2:
+                            st.markdown("<span style='color:orange'>BORDERLINE</span>", unsafe_allow_html=True)
+
+                        cols = st.columns(3)
+                        with cols[0]:
+                            st.metric("Confidence", f"{risk_score:.1%}")
+                            st.metric("Face Quality", f"{quality_score:.1%}")
+                        with cols[1]:
+                            st.metric("Liveness", f"{liveness_score:.1%}")
+                        with cols[2]:
+                            st.metric("AMFR Score", f"{risk_score:.3f}")
+                            st.caption(f"Track: {track_id[:12] if track_id != '—' else '—'}")
+                        st.info("⏳ Collecting more frames...")
+
+                elif decision == AMFRDecision.REJECT_SPOOF.value:
+                    with st.container(border=True):
+                        st.markdown(f"**🔴 SPOOF DETECTED**")
+                        cols = st.columns(2)
+                        with cols[0]:
+                            st.metric("Liveness", f"{liveness_score:.1%}")
+                        with cols[1]:
+                            st.metric("Face Quality", f"{quality_score:.1%}")
+                        st.error("🚨 Security Alert Logged")
+
+                elif decision == AMFRDecision.LOW_CONFIDENCE.value or name == "No Face":
+                    with st.container(border=True):
+                        if name == "No Face":
+                            st.markdown(f"**⚠️ {name}**")
+                        else:
+                            st.markdown(f"**⚪ {name}**")
+                            st.caption(f"Risk: {risk_score:.1%}, Quality: {quality_score:.1%}")
+                        st.info("📸 Unknown — saved to gallery")
+
+                else:  # PENDING or unknown
+                    with st.container(border=True):
+                        st.markdown(f"**⚪ {name}**")
+                        st.caption(f"Decision: {decision}, Risk: {risk_score:.1%}")
         else:
             st.caption("No detections yet")
 
@@ -620,7 +608,7 @@ def _render_camera_column(feed: Optional[ThreadedCameraFeed], col, emoji: str, l
 @st.cache_data(ttl=3)
 def _get_today_attendance_df() -> pd.DataFrame:
     """Return today's attendance as a DataFrame for the live dashboard."""
-    records = AttendanceService.get_today()
+    records = AttendanceService.get_today(limit=200)
     rows = []
     for record in records:
         rows.append(AttendanceService.to_dict(record))
@@ -809,11 +797,12 @@ with st.sidebar:
     st.divider()
 
     # Pre-load models indicator
-    st.markdown("### 🧠 Model Status")
+    st.markdown("### 🧠 Model Status (AMFR)")
     try:
         res = SharedModelResources.load()
-        st.success(f"✅ YOLO + InsightFace + FAISS loaded")
-        st.caption(f"{res.enrollment.count()} enrolled faces in DB")
+        st.success(f"✅ RecognitionService loaded (YOLO + InsightFace + FAISS + AMFR)")
+        enrolled = res.service.enrollment.count()
+        st.caption(f"{enrolled} enrolled faces | AMFR active")
     except Exception as e:
         st.error(f"❌ Model load failed: {e}")
 
@@ -888,22 +877,36 @@ if st.session_state.dual_active:
     s1 = tfeed1.pipeline.status() if tfeed1 is not None and tfeed1.is_connected else {}
     s2 = tfeed2.pipeline.status() if tfeed2 is not None and tfeed2.is_connected else {}
 
+    # AMFR stats from camera 1 (shared engine)
+    amfr_state = s1.get("amfr", {}) or s2.get("amfr", {})
+    camera1_health = s1.get("camera_health", {})
+    camera2_health = s2.get("camera_health", {})
+
     m1, m2, m3, m4 = st.columns(4)
     with m1:
         fps1 = s1.get("fps", 0)
         fps2 = s2.get("fps", 0)
         st.metric("FPS (Cam1 / Cam2)", f"{fps1:.1f} / {fps2:.1f}")
+        c1h = camera1_health.get("status", "—")
+        c2h = camera2_health.get("status", "—")
+        st.caption(f"Health: {c1h} / {c2h}")
     with m2:
         e = s1.get("enrolled", 0) or s2.get("enrolled", 0)
         st.metric("Enrolled Faces", e)
+        at = amfr_state.get("active_tracks", 0)
+        st.caption(f"AMFR tracks: {at}")
     with m3:
         mk1 = s1.get("session_marked", 0)
         mk2 = s2.get("session_marked", 0)
         st.metric("Marked Today", f"{mk1} + {mk2}")
+        spf = amfr_state.get("spoof_detected", 0)
+        st.caption(f"Spoof alerts: {spf}")
     with m4:
         fc1 = s1.get("frame_count", 0)
         fc2 = s2.get("frame_count", 0)
         st.metric("Frames Processed", f"{fc1} + {fc2}")
+        am = amfr_state.get("attendance_marked", 0)
+        st.caption(f"AMFR accepted: {am}")
 
     # ── Auto-refresh ─────────────────────────────────────────
     # Background threads keep capturing and processing independently
@@ -976,51 +979,84 @@ else:
     st.info("👈 Configure both cameras in the sidebar, then click **▶️ Start Dual Cameras**")
     st.divider()
 
-    # Model status
-    st.markdown("### 🧠 Recognition Model Status")
+    # Model status with AMFR components
+    st.markdown("### 🧠 Recognition Model Status (AMFR)")
     try:
         res = SharedModelResources.load()
-        col1, col2, col3 = st.columns(3)
-        col1.success(f"✅ **YOLO** — Person detection")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.success(f"✅ **YOLO11** — Person detection")
         col2.success(f"✅ **InsightFace** — RetinaFace + ArcFace")
-        col3.success(f"✅ **FAISS** — {res.enrollment.count()} embeddings")
+        col3.success(f"✅ **FAISS** — {res.service.enrollment.count()} embeddings")
+        col4.success(f"✅ **AMFR** — {res.service.amfr.status().get('active_tracks', 0)} tracks")
     except Exception as e:
         st.error(f"❌ Model loading failed: {e}")
 
 
 # ── How it Works ──────────────────────────────────────────────
 st.divider()
-with st.expander("ℹ️ How Dual Camera Mode Works"):
+with st.expander(    "ℹ️ How Dual Camera + AMFR Works"):
     st.markdown("""
-    **Architecture:**
+    **Architecture (AMFR-Enabled):**
 
     ```
     Camera 1 (Android)     Camera 2 (iPhone)
          │                       │
          ▼                       ▼
-    ┌──────────────┐     ┌──────────────┐
-    │  Pipeline 1  │     │  Pipeline 2  │
-    │ (own state)  │     │ (own state)  │
-    └──────┬───────┘     └──────┬───────┘
-           │                    │
-           └──── Shared ───────┘
-           YOLO + InsightFace + FAISS
+    ┌──────────────────┐  ┌──────────────────┐
+    │  Pipeline 1       │  │  Pipeline 2       │
+    │ (own state)       │  │ (own state)       │
+    │ FPS, counters     │  │ FPS, counters     │
+    └──────┬───────────┘  └──────┬───────────┘
+           │                     │
+           └─── Shared RecognitionService ───┘
+           YOLO → RetinaFace → FaceQuality →
+           Liveness → ArcFace → FAISS → AMFR
            (loaded once in memory)
     ```
 
+    **Full AMFR Pipeline (per person):**
+
+    ```
+    YOLO person detection
+      ↓
+    RetinaFace (face detection + landmarks)
+      ↓
+    FACE QUALITY (blur, brightness, size, pose, contrast)
+      ↓
+    LIVENESS DETECTION (texture LBP, blink EAR, motion, screen edges, CNN)
+      ↓
+    ArcFace embedding (512-D normalized)
+      ↓
+    FAISS similarity search (L2 distance)
+      ↓
+    AMFR ENGINE (risk score + decision)
+      ↓
+    ACCEPT | BORDERLINE | LOW_CONFIDENCE | REJECT_SPOOF
+      ↓
+    Attendance (PostgreSQL) / Unknown Gallery / Security Log
+    ```
+
+    **Decision Rules:**
+    - **ACCEPT** (risk ≥ 70%) → Mark PRESENT in attendance
+    - **BORDERLINE** (risk ≥ 40%) → Collect more frames
+    - **LOW_CONFIDENCE** → Display UNKNOWN, save to gallery
+    - **REJECT_SPOOF** (liveness < 15%) → Reject, log security alert
+
     **Benefits:**
-    - Heavy models (328 MB YOLO, 500 MB+ InsightFace) loaded **once**
-    - Each camera has its own FPS counter, session tracking, and attendance markers
-    - Independent operation — one camera can fail without affecting the other
-    - Unknown faces from both cameras saved to the same gallery
+    - Heavy models (YOLO, InsightFace, FAISS, Liveness CNN) loaded **once**
+    - Each camera has its own FPS, tracking, and attendance markers
+    - Independent — one camera can fail without affecting the other
+    - Per-track liveness detectors keep blink/motion state independent
 
     **Per-Camera Colors:**
-    - 🟢 **Green** — Known employee recognised
-    - 🔴 **Red** — Unknown person (saved to Unknown Faces gallery)
-    - 🟠 **Orange** — Person detected but no face found
+    - 🟢 **Green** — ACCEPT: Known live person, attendance marked
+    - 🟡 **Yellow** — BORDERLINE: Uncertain, collecting frames
+    - 🔴 **Red** — SPOOF: Rejected, security alert logged
+    - ⚪ **Grey** — LOW_CONFIDENCE: Unknown person saved
+    - 🟠 **Orange** — No Face detected in bounding box
 
     **Performance:**
-    - Each camera processes every Nth frame (configurable via `frame_skip`)
-    - FPS displayed per camera in the status bar
-    - If both cameras are slow, increase `frame_skip` in settings
+    - Recognition runs in background threads; UI never blocks on AI
+    - FPS and camera health displayed per camera
+    - Frame skip configurable via recognition.frame_skip in settings</pre>
     """)

@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────
+# .dockerignore — Keep the build context lean and secure
+# ─────────────────────────────────────────────────────────────────────
+# This prevents secrets, dev files, and unnecessary bloat from
+# entering the Docker build context, which both speeds up builds
+# and reduces the attack surface of the final image.
+
+# ── Version control ─────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+.gitmodules
+.kilo
+
+# ── Environment / Secrets ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+**/.env
+**/secrets*
+**/*.key
+**/*.pem
+**/*.cert
+
+# ── Development tooling ─────────────────────────────────────────────
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# ── Notebooks / Docs ────────────────────────────────────────────────
+notebooks/
+*.ipynb
+README.md
+LICENSE
+*.md
+docs/
+
+# ── Tests ───────────────────────────────────────────────────────────
+tests/
+*.test.py
+*_test.py
+conftest.py
+test_*.py
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# ── Build artifacts ─────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+*.tar.gz
+
+# ── Logs / Temp / Outputs (created at runtime) ──────────────────────
+logs/
+*.log
+outputs/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ── OS / System ─────────────────────────────────────────────────────
+*.so
+*.dylib
+*.dll
+*.exe

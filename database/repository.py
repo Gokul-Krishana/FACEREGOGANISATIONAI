@@ -17,17 +17,130 @@ Usage::
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from dataclasses import dataclass
+import uuid
 from typing import List, Optional
 
-from sqlalchemy import desc
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session, selectinload
 
 from database.models import (
-    Attendance, AuditLog, Camera, Employee, RecognitionLog, UnknownFace,
+    Attendance,
+    AuditLog,
+    Camera,
+    Employee,
+    RecognitionLog,
+    Student,
+    UnknownFace,
 )
 
 
+@dataclass
+class PageResult:
+    """Lightweight pagination envelope used by the API and UI."""
+
+    items: list
+    total: int
+    skip: int
+    limit: int
+
+    @property
+    def has_more(self) -> bool:
+        return self.skip + len(self.items) < self.total
+
+
+def _bounded_search_pattern(value: str) -> str:
+    """Prefer prefix search so the database can use indexes when possible."""
+    cleaned = value.strip()
+    return f"{cleaned}%"
+
+
+def _paginate(query, skip: int, limit: int) -> PageResult:
+    total = query.order_by(None).count()
+    items = query.offset(skip).limit(limit).all()
+    return PageResult(items=items, total=total, skip=skip, limit=limit)
+
+
 # ── Employee Repository ───────────────────────────────────────
+
+class StudentRepo:
+    """CRUD and search operations for the ``students`` table."""
+
+    @staticmethod
+    def create(
+        session: Session,
+        student_id: str,
+        name: str,
+        email: Optional[str] = None,
+        department_id: Optional[int] = None,
+        is_active: bool = True,
+    ) -> Student:
+        student = Student(
+            student_id=student_id,
+            name=name,
+            email=email,
+            department_id=department_id,
+            is_active=is_active,
+        )
+        session.add(student)
+        session.commit()
+        session.refresh(student)
+        return student
+
+    @staticmethod
+    def get_by_id(session: Session, student_pk: int) -> Optional[Student]:
+        return session.get(Student, student_pk)
+
+    @staticmethod
+    def get_by_student_id(session: Session, student_id: str) -> Optional[Student]:
+        return (
+            session.query(Student)
+            .filter(Student.student_id == student_id)
+            .first()
+        )
+
+    @staticmethod
+    def get_all(session: Session, limit: int = 100, skip: int = 0) -> List[Student]:
+        return (
+            session.query(Student)
+            .order_by(Student.student_id, Student.id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
+    def search(
+        session: Session,
+        query: str,
+        limit: int = 100,
+        skip: int = 0,
+        department_id: Optional[int] = None,
+        is_active: Optional[bool] = None,
+    ) -> PageResult:
+        term = query.strip()
+        q = session.query(Student)
+
+        if term:
+            pattern = _bounded_search_pattern(term)
+            q = q.filter(
+                or_(
+                    Student.name.ilike(pattern),
+                    Student.student_id.ilike(pattern),
+                )
+            )
+        if department_id is not None:
+            q = q.filter(Student.department_id == department_id)
+        if is_active is not None:
+            q = q.filter(Student.is_active == is_active)
+
+        q = q.order_by(Student.student_id, Student.id)
+        return _paginate(q, skip=skip, limit=limit)
+
+    @staticmethod
+    def count(session: Session) -> int:
+        return session.query(func.count(Student.id)).scalar() or 0
+
 
 class EmployeeRepo:
     """CRUD operations for the ``employees`` table."""
@@ -65,7 +178,12 @@ class EmployeeRepo:
 
     @staticmethod
     def get_all(session: Session) -> List[Employee]:
-        return session.query(Employee).order_by(Employee.name).all()
+        return (
+            session.query(Employee)
+            .order_by(Employee.name, Employee.id)
+            .limit(500)
+            .all()
+        )
 
     @staticmethod
     def get_by_name(session: Session, name: str) -> Optional[Employee]:
@@ -79,17 +197,27 @@ class EmployeeRepo:
 
     @staticmethod
     def search(session: Session, query: str) -> List[Employee]:
-        pattern = f"%{query}%"
-        return (
-            session.query(Employee)
-            .filter(
-                Employee.name.ilike(pattern)
-                | Employee.employee_id.ilike(pattern)
-                | Employee.department.ilike(pattern)
+        return EmployeeRepo.search_paginated(session, query=query, limit=100).items
+
+    @staticmethod
+    def search_paginated(
+        session: Session,
+        query: str,
+        limit: int = 100,
+        skip: int = 0,
+    ) -> PageResult:
+        q = session.query(Employee)
+        if query.strip():
+            pattern = _bounded_search_pattern(query)
+            q = q.filter(
+                or_(
+                    Employee.name.ilike(pattern),
+                    Employee.employee_id.ilike(pattern),
+                    Employee.department.ilike(pattern),
+                )
             )
-            .order_by(Employee.name)
-            .all()
-        )
+        q = q.order_by(Employee.name, Employee.id)
+        return _paginate(q, skip=skip, limit=limit)
 
     @staticmethod
     def delete(session: Session, employee_id: str) -> bool:
@@ -102,7 +230,7 @@ class EmployeeRepo:
 
     @staticmethod
     def count(session: Session) -> int:
-        return session.query(Employee).count()
+        return session.query(func.count(Employee.id)).scalar() or 0
 
 
 # ── Attendance Repository ─────────────────────────────────────
@@ -128,43 +256,81 @@ class AttendanceRepo:
         return record
 
     @staticmethod
-    def get_by_date(session: Session, target_date: date) -> List[Attendance]:
+    def get_by_date(
+        session: Session,
+        target_date: date,
+        limit: Optional[int] = None,
+        skip: int = 0,
+    ) -> List[Attendance]:
         start = datetime.combine(target_date, datetime.min.time())
         end = datetime.combine(target_date, datetime.max.time())
-        return (
+        query = (
             session.query(Attendance)
             .filter(Attendance.timestamp.between(start, end))
+            .options(selectinload(Attendance.employee))
             .order_by(desc(Attendance.timestamp))
-            .all()
         )
+        if skip:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     @staticmethod
-    def get_today(session: Session) -> List[Attendance]:
-        return AttendanceRepo.get_by_date(session, date.today())
+    def get_today(session: Session, limit: Optional[int] = None, skip: int = 0) -> List[Attendance]:
+        return AttendanceRepo.get_by_date(session, date.today(), limit=limit, skip=skip)
 
     @staticmethod
-    def get_by_employee(session: Session, employee_id: int) -> List[Attendance]:
-        return (
+    def get_by_employee(
+        session: Session,
+        employee_id: int,
+        limit: Optional[int] = None,
+        skip: int = 0,
+    ) -> List[Attendance]:
+        query = (
             session.query(Attendance)
             .filter(Attendance.employee_id == employee_id)
+            .options(selectinload(Attendance.employee))
             .order_by(desc(Attendance.timestamp))
-            .all()
         )
+        if skip:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     @staticmethod
     def is_marked_today(session: Session, employee_id: int) -> bool:
-        today_records = AttendanceRepo.get_today(session)
-        return any(r.employee_id == employee_id for r in today_records)
+        start = datetime.combine(date.today(), datetime.min.time())
+        end = datetime.combine(date.today(), datetime.max.time())
+        return (
+            session.query(func.count(Attendance.id))
+            .filter(
+                Attendance.employee_id == employee_id,
+                Attendance.timestamp.between(start, end),
+            )
+            .scalar()
+            or 0
+        ) > 0
 
     @staticmethod
     def get_statistics(session: Session) -> dict:
-        today_records = AttendanceRepo.get_today(session)
-        today_count = len(today_records)
-        unique_today = len(set(r.employee_id for r in today_records))
-        total = session.query(Attendance).count()
-        unique_all = (
-            session.query(Attendance.employee_id).distinct().count()
+        start = datetime.combine(date.today(), datetime.min.time())
+        end = datetime.combine(date.today(), datetime.max.time())
+        today_count = (
+            session.query(func.count(Attendance.id))
+            .filter(Attendance.timestamp.between(start, end))
+            .scalar()
+            or 0
         )
+        unique_today = (
+            session.query(func.count(func.distinct(Attendance.employee_id)))
+            .filter(Attendance.timestamp.between(start, end))
+            .scalar()
+            or 0
+        )
+        total = session.query(func.count(Attendance.id)).scalar() or 0
+        unique_all = session.query(func.count(func.distinct(Attendance.employee_id))).scalar() or 0
         return {
             "today_count": today_count,
             "unique_today": unique_today,
@@ -203,6 +369,7 @@ class RecognitionLogRepo:
     def get_recent(session: Session, limit: int = 50) -> List[RecognitionLog]:
         return (
             session.query(RecognitionLog)
+            .options(selectinload(RecognitionLog.employee))
             .order_by(desc(RecognitionLog.timestamp))
             .limit(limit)
             .all()
@@ -215,6 +382,7 @@ class RecognitionLogRepo:
         return (
             session.query(RecognitionLog)
             .filter(RecognitionLog.timestamp.between(start, end))
+            .options(selectinload(RecognitionLog.employee))
             .order_by(desc(RecognitionLog.timestamp))
             .all()
         )
@@ -247,21 +415,35 @@ class UnknownFaceRepo:
         return session.query(UnknownFace).filter(UnknownFace.id == face_id).first()
 
     @staticmethod
-    def get_unreviewed(session: Session) -> List[UnknownFace]:
-        return (
+    def get_unreviewed(
+        session: Session,
+        limit: Optional[int] = None,
+        skip: int = 0,
+    ) -> List[UnknownFace]:
+        query = (
             session.query(UnknownFace)
             .filter(UnknownFace.reviewed == False)
+            .options(selectinload(UnknownFace.camera))
             .order_by(desc(UnknownFace.timestamp))
-            .all()
         )
+        if skip:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     @staticmethod
-    def get_all(session: Session) -> List[UnknownFace]:
-        return (
+    def get_all(session: Session, limit: Optional[int] = None, skip: int = 0) -> List[UnknownFace]:
+        query = (
             session.query(UnknownFace)
+            .options(selectinload(UnknownFace.camera))
             .order_by(desc(UnknownFace.timestamp))
-            .all()
         )
+        if skip:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     @staticmethod
     def get_filtered(
@@ -288,7 +470,13 @@ class UnknownFaceRepo:
         if min_confidence is not None:
             q = q.filter(UnknownFace.confidence >= min_confidence)
 
-        return q.order_by(desc(UnknownFace.timestamp)).limit(limit).offset(offset).all()
+        return (
+            q.options(selectinload(UnknownFace.camera))
+            .order_by(desc(UnknownFace.timestamp))
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
 
     @staticmethod
     def get_statistics(session: Session) -> dict:
@@ -470,7 +658,12 @@ class CameraRepo:
         camera_index: int,
         location: Optional[str] = None,
     ) -> Camera:
-        cam = Camera(name=name, camera_index=camera_index, location=location)
+        cam = Camera(
+            name=name,
+            camera_index=camera_index,
+            camera_id=f"CAM-{uuid.uuid4().hex[:12]}",
+            location=location,
+        )
         session.add(cam)
         session.commit()
         session.refresh(cam)
@@ -516,7 +709,7 @@ class AuditLogRepo:
         log = AuditLog(
             action=action,
             description=description,
-            operator=operator,
+            actor=operator,
             employee_id=employee_id,
         )
         session.add(log)

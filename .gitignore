@@ -33,14 +33,47 @@ attendance/*.csv
 streamlit_log.txt
 streamlit_err.txt
 
+# Frontend dev logs
+frontend-dev.err.log
+frontend-dev.out.log
+frontend-webpack.err.log
+frontend-webpack.out.log
+
 # Stray/corrupted files
 notebooks/nul
 nul
 
 # Model files (large)
 models/.insightface/
+models/liveness/
 
 # Database files
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Next.js frontend (Streamlit is primary)
+frontend/
+
+# Node modules
+node_modules/
+
+# Benchmark outputs
+outputs/
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Uploads
+uploads/
+

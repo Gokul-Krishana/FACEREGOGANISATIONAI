@@ -159,13 +159,13 @@ if "att_cam_mode" not in st.session_state:
 
 # ── Helper Functions ────────────────────────────────────────────
 @st.cache_data(ttl=5)
-def get_attendance_data(target_date: date):
+def get_attendance_data(target_date: date, limit: int = 200, skip: int = 0):
     """Get attendance records for a specific date."""
     with get_session() as session:
-        records = AttendanceRepo.get_by_date(session, target_date)
+        records = AttendanceRepo.get_by_date(session, target_date, limit=limit, skip=skip)
         data = []
         for r in records:
-            emp = EmployeeRepo.get_by_id(session, r.employee_id)
+            emp = r.employee
             data.append({
                 "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
                 "Name": emp.name if emp else "Unknown",

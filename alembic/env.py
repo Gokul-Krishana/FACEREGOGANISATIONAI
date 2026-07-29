@@ -24,6 +24,12 @@ if _project_root not in sys.path:
 # ── Alembic Config ───────────────────────────────────────────
 config = context.config
 
+# Support DATABASE_URL environment variable for PostgreSQL in production
+import os
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

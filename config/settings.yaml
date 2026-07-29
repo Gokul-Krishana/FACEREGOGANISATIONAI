@@ -32,6 +32,29 @@ enrollment:
   min_face_size: 100                # Minimum face pixel width for enrollment
   capture_count: 1                  # Number of face captures per enrollment
 
+# ── AMFR (Adaptive Multi-Factor Recognition) ───────────────
+amfr:
+  # Minimum scores for quality liveness confidence
+  face_quality_min_score: 0.35       # Below this → face is too poor for reliable recognition
+  liveness_min_score: 0.30           # Below this → likely synthetic/spoof
+  liveness_spoof_threshold: 0.15     # Below this → HARD REJECT + security alert
+
+  # AMFR decision thresholds (composite risk score 0-1)
+  high_confidence_threshold: 0.70    # Above this → ACCEPT (mark attendance)
+  borderline_threshold: 0.40         # Above this → BORDERLINE (collect more frames)
+
+  # AMFR composite score weights (must sum to ~1.0)
+  weight_arcface: 0.45               # ArcFace FAISS similarity
+  weight_liveness: 0.35              # Liveness/anti-spoofing score
+  weight_quality: 0.20               # Face quality assessment
+
+# ── Deep Liveness (CNN-based anti-spoofing) ────────────────────
+deep_liveness:
+  enabled: true                      # Enable the deep-learning anti-spoofing model
+  threshold: 0.50                    # Minimum score to consider a face LIVE (0-1)
+  use_fallback: true                 # Use the built-in lightweight CNN if ONNX model unavailable
+  auto_download: true                # Auto-download the MiniFASNet ONNX model on first use
+
 unknown_faces:
   retention_days: 30                # Auto-delete unknown faces older than this (0 = never)
 

@@ -41,15 +41,23 @@ st.set_page_config(page_title="Analytics", page_icon="📈", layout="wide")
 
 # ── Helper Functions ────────────────────────────────────────────
 @st.cache_data(ttl=30)
-def load_attendance_df(days: int = 30) -> pd.DataFrame:
-    """Load attendance records as DataFrame."""
+def load_attendance_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
+    """Load a bounded attendance slice as DataFrame."""
     with get_session() as session:
         cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
         records = (
-            session.query(Attendance)
-            .join(Employee)
+            session.query(
+                Attendance.id,
+                Attendance.timestamp,
+                Attendance.employee_id,
+                Attendance.confidence,
+                Employee.name.label("employee_name"),
+                Employee.department.label("department"),
+            )
+            .join(Employee, Employee.id == Attendance.employee_id)
             .filter(Attendance.timestamp >= cutoff)
             .order_by(desc(Attendance.timestamp))
+            .limit(limit)
             .all()
         )
         data = []
@@ -59,32 +67,38 @@ def load_attendance_df(days: int = 30) -> pd.DataFrame:
                 "hour": r.timestamp.hour,
                 "timestamp": r.timestamp,
                 "employee_id": r.employee_id,
-                "employee_name": r.employee.name if r.employee else "Unknown",
-                "department": r.employee.department if r.employee else "—",
+                "employee_name": r.employee_name or "Unknown",
+                "department": r.department or "—",
                 "confidence": r.confidence,
             })
         return pd.DataFrame(data)
 
 
 @st.cache_data(ttl=30)
-def load_recognition_df(days: int = 30) -> pd.DataFrame:
-    """Load recognition log records as DataFrame."""
+def load_recognition_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
+    """Load a bounded recognition slice as DataFrame."""
     with get_session() as session:
         cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
         records = (
-            session.query(RecognitionLog)
+            session.query(
+                RecognitionLog.timestamp,
+                RecognitionLog.is_known,
+                RecognitionLog.confidence,
+                Employee.name.label("employee_name"),
+            )
+            .outerjoin(Employee, Employee.id == RecognitionLog.employee_id)
             .filter(RecognitionLog.timestamp >= cutoff)
             .order_by(desc(RecognitionLog.timestamp))
+            .limit(limit)
             .all()
         )
         data = []
         for r in records:
-            emp_name = r.employee.name if r.employee else None
             data.append({
                 "timestamp": r.timestamp,
                 "is_known": r.is_known,
                 "confidence": r.confidence,
-                "employee_name": emp_name,
+                "employee_name": r.employee_name,
             })
         return pd.DataFrame(data)
 

@@ -1,0 +1,1 @@
+"""FastAPI application for Face Recognition AI - College Deployment."""

@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────────────
+# Frontend CI — Next.js TypeScript Build & Quality
+# ─────────────────────────────────────────────────────────────────────
+# Runs on every push and pull request that touches frontend files.
+#
+# Jobs:
+#   1. lint  — ESLint (Next.js config with TypeScript rules)
+#   2. build — TypeScript type-check + Next.js production build
+# ─────────────────────────────────────────────────────────────────────
+
+name: Frontend CI
+
+on:
+  push:
+    branches: [master, main, develop]
+    paths:
+      - "frontend/**"
+      - "!frontend/README.md"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "frontend/**"
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Run ESLint
+        run: npm run lint -- --max-warnings 50
+        # --max-warnings 50 prevents CI from failing on minor style issues
+        # while still catching real errors. Adjust this threshold as the
+        # codebase matures towards zero warnings.
+
+  typecheck:
+    name: Type Check (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+  build:
+    name: Build (Next.js)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Create .env.local for build
+        run: |
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Cache .next build
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next
+          key: next-build-${{ github.sha }}
+          restore-keys: |
+            next-build-
