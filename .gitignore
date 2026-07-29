@@ -77,3 +77,14 @@ coverage.xml
 # Uploads
 uploads/
 
+
+# Type checking cache
+.mypy_cache/
+
+# Python packaging artifacts
+*.egg-info/
+dist/
+build/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
