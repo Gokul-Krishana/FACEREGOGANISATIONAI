@@ -149,6 +149,10 @@ class TestFaceEnrollment:
         assert status["total_embeddings"] == 1
         assert status["unique_persons"] == 1
         assert "Alice" in status["persons"]
+        # Verify index info is present (from the rich status implementation)
+        assert "index" in status
+        assert "type" in status["index"]
+        assert status["index"]["type"] in ("hnsw", "ivf", "flat")
 
     def test_metadata_format(self, temp_dir, sample_embedding):
         """Metadata JSON should be human-readable."""
