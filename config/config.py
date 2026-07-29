@@ -144,6 +144,14 @@ DEEP_LIVENESS_THRESHOLD: float = _get("deep_liveness", "threshold", default=0.50
 DEEP_LIVENESS_FALLBACK: bool = _get("deep_liveness", "use_fallback", default=True)
 DEEP_LIVENESS_AUTO_DOWNLOAD: bool = _get("deep_liveness", "auto_download", default=True)
 
+# ── FAISS Vector Search (tuned from benchmarks) ────────────────
+FAISS_INDEX_TYPE: str = _get("faiss", "index_type", default="hnsw")
+FAISS_HNSW_M: int = _get("faiss", "hnsw", "M", default=64)
+FAISS_HNSW_EF_CONSTRUCTION: int = _get("faiss", "hnsw", "ef_construction", default=200)
+FAISS_HNSW_EF_SEARCH: int = _get("faiss", "hnsw", "ef_search", default=128)
+FAISS_IVF_NLIST: int = _get("faiss", "ivf", "nlist", default=200)
+FAISS_IVF_NPROBE: int = _get("faiss", "ivf", "nprobe", default=256)
+
 # ── Unknown Face Retention ───────────────────────────────────
 UNKNOWN_FACE_RETENTION_DAYS: int = _get("unknown_faces", "retention_days", default=30)
 

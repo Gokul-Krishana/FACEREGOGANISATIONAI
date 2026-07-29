@@ -30,8 +30,14 @@ import config.config as cfg
 class FaceEnrollment:
     """FAISS‑based face embedding store.
 
+    Supports three index types configured via ``config/settings.yaml``:
+
+    - **flat** — ``IndexFlatL2`` brute-force exact search (best recall)
+    - **hnsw**  — ``IndexHNSWFlat`` approximate ANN (best speed/recall)
+    - **ivf**   — ``IndexIVFFlat`` inverted file index (good at scale)
+
     Attributes:
-        index: FAISS ``IndexFlatL2`` for brute-force L2 search.
+        index: FAISS index (type depends on configuration).
         metadata: List of ``{"name": str, "id": int}`` entries.
         dimension: Embedding dimensionality (512 for ArcFace).
     """
@@ -53,11 +59,46 @@ class FaceEnrollment:
 
         if self.index_path.exists() and self.metadata_path.exists():
             self.index = faiss.read_index(str(self.index_path))
+            # Restore HNSW search parameters (not persisted by faiss.write_index)
+            if hasattr(self.index, 'hnsw'):
+                self.index.hnsw.efSearch = cfg.FAISS_HNSW_EF_SEARCH
             with open(self.metadata_path, "r") as f:
                 self.metadata: List[Dict] = json.load(f)
         else:
-            self.index = faiss.IndexFlatL2(self.dimension)
+            self.index = self._create_index()
             self.metadata: List[Dict] = []
+
+    def _create_index(self) -> faiss.Index:
+        """Create a new FAISS index based on the configured index type.
+
+        Returns:
+            A FAISS index configured with the tuned parameters from
+            ``config/settings.yaml``.
+        """
+        index_type = cfg.FAISS_INDEX_TYPE.lower()
+
+        if index_type == "hnsw":
+            index = faiss.IndexHNSWFlat(
+                self.dimension,
+                cfg.FAISS_HNSW_M,
+            )
+            index.hnsw.efConstruction = cfg.FAISS_HNSW_EF_CONSTRUCTION
+            index.hnsw.efSearch = cfg.FAISS_HNSW_EF_SEARCH
+            return index
+
+        elif index_type == "ivf":
+            quantizer = faiss.IndexFlatL2(self.dimension)
+            index = faiss.IndexIVFFlat(
+                quantizer,
+                self.dimension,
+                cfg.FAISS_IVF_NLIST,
+            )
+            index.nprobe = cfg.FAISS_IVF_NPROBE
+            return index
+
+        else:
+            # Default: flat brute-force (exact search)
+            return faiss.IndexFlatL2(self.dimension)
 
     # ── Public API ────────────────────────────────────────────
 
@@ -154,7 +195,7 @@ class FaceEnrollment:
     def clear(self) -> None:
         """Remove **all** enrolled faces."""
         self.metadata = []
-        self.index = faiss.IndexFlatL2(self.dimension)
+        self.index = self._create_index()
         self._save()
 
     # ── Queries ───────────────────────────────────────────────
@@ -170,14 +211,6 @@ class FaceEnrollment:
     def unique_count(self) -> int:
         """Number of unique persons enrolled."""
         return len(self.all_persons())
-
-    def status(self) -> Dict:
-        """Return a summary dict of the enrollment state."""
-        return {
-            "total_embeddings": self.count(),
-            "unique_persons": self.unique_count(),
-            "persons": self.all_persons(),
-        }
 
     # ── Persistence ───────────────────────────────────────────
 
@@ -198,8 +231,28 @@ class FaceEnrollment:
             reconstructed.
         """
         old_count = self.index.ntotal
-        self.index = faiss.IndexFlatL2(self.dimension)
+        self.index = self._create_index()
         self._save()
         if old_count > 0:
             print(f"⚠️  FAISS index rebuilt — {old_count} embedding(s) lost. "
                   f"Metadata for {len(self.metadata)} person(s) preserved.")
+
+    def status(self) -> Dict:
+        """Return a summary dict of the enrollment state."""
+        index_type = cfg.FAISS_INDEX_TYPE.lower()
+        index_info: Dict = {"type": index_type}
+        if index_type == "hnsw":
+            index_info["M"] = cfg.FAISS_HNSW_M
+            index_info["ef_construction"] = cfg.FAISS_HNSW_EF_CONSTRUCTION
+            index_info["ef_search"] = cfg.FAISS_HNSW_EF_SEARCH
+        elif index_type == "ivf":
+            index_info["nlist"] = cfg.FAISS_IVF_NLIST
+            index_info["nprobe"] = cfg.FAISS_IVF_NPROBE
+        else:
+            index_info["type"] = "flat"
+        return {
+            "total_embeddings": self.count(),
+            "unique_persons": self.unique_count(),
+            "persons": self.all_persons(),
+            "index": index_info,
+        }

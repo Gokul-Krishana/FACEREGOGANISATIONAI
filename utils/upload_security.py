@@ -25,7 +25,6 @@ Usage::
 from __future__ import annotations
 
 import io
-import magic
 import os
 import uuid
 from pathlib import Path
@@ -131,22 +130,12 @@ def validate_image_upload(
 def _detect_format(file_data: bytes) -> Optional[str]:
     """Detect image format from magic bytes.
 
-    Uses libmagic if available (``python-magic``), falls back to
-    a simple magic-byte lookup.
+    Uses a direct magic-byte lookup (no libmagic dependency). The
+    ``python-magic`` package was removed because it causes segfaults
+    on Windows due to ``libmagic`` C-library conflicts. The magic-bytes
+    dictionary combined with Pillow's ``Image.verify()`` provides
+    sufficient validation for enrollment image uploads.
     """
-    # Try python-magic first (more reliable)
-    try:
-        mime = magic.from_buffer(file_data, mime=True)
-        if mime in _ALLOWED_MIME_TYPES:
-            return {
-                "image/jpeg": ".jpg",
-                "image/png": ".png",
-                "image/webp": ".webp",
-            }.get(mime)
-    except Exception:
-        pass  # Fall through to magic-byte check
-
-    # Fallback: check magic bytes directly
     for magic_bytes, ext in _MAGIC_BYTES.items():
         if file_data[:len(magic_bytes)] == magic_bytes:
             return ext

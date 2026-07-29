@@ -32,6 +32,25 @@ enrollment:
   min_face_size: 100                # Minimum face pixel width for enrollment
   capture_count: 1                  # Number of face captures per enrollment
 
+# ── FAISS Vector Search (tuned from benchmarks) ──────────────
+faiss:
+  # Index type: flat | hnsw | ivf
+  #   flat   — Exact brute-force (best recall, slowest at scale)
+  #   hnsw   — Approximate ANN (best speed/recall trade-off)
+  #   ivf    — Inverted file index (good for very large datasets)
+  index_type: hnsw
+
+  # HNSW parameters (tuned via scripts/benchmarks/tune_hnsw.py)
+  hnsw:
+    M: 64                              # Number of connections per layer (higher = better recall, more memory)
+    ef_construction: 200               # Build-time search width (higher = better graph, slower build)
+    ef_search: 128                     # Query-time search width (higher = better recall, slower search)
+
+  # IVF parameters (tuned via scripts/benchmarks/tune_ivf.py)
+  ivf:
+    nlist: 200                         # Number of Voronoi cells
+    nprobe: 256                        # Cells to search at query time (higher = better recall)
+
 # ── AMFR (Adaptive Multi-Factor Recognition) ───────────────
 amfr:
   # Minimum scores for quality liveness confidence
