@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base Python image with system deps ────────────────────
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 LABEL org.opencontainers.image.title="Face Recognition AI - College Deployment"
 LABEL org.opencontainers.image.description="Multi-factor face recognition attendance system with AMFR anti-spoofing"
