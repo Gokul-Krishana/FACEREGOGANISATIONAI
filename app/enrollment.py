@@ -192,6 +192,70 @@ class FaceEnrollment:
             "# TODO: implement proper deletion with separate .npy embedding store"
         )
 
+    def remove_by_name(self, name: str) -> bool:
+        """Remove all embeddings for a given name from the index.
+
+        Since FAISS does not support native deletion, this rebuilds
+        the index from scratch keeping only entries that do NOT match
+        *name*.  This is O(N) in the number of embeddings.
+
+        Args:
+            name: The name (employee_id string) to remove.
+
+        Returns:
+            ``True`` if any entries were removed, ``False`` if the
+            name was not found in the metadata.
+        """
+        # Count entries for this name before removal
+        before = sum(1 for m in self.metadata if m["name"] == name)
+        if before == 0:
+            return False
+
+        # Keep only entries that DON'T match this name
+        kept_metadata = [m for m in self.metadata if m["name"] != name]
+        kept_count = len(kept_metadata)
+
+        if kept_count == 0:
+            # Removed everything — clear the index
+            self.metadata = []
+            self.index = self._create_index()
+        else:
+            # Rebuild the index from scratch with frozen embeddings.
+            # Since we don't store raw embeddings, we must reload from
+            # the FAISS index itself. FAISS doesn't support selective
+            # extraction, so we rebuild by searching for each kept ID.
+            #
+            # For HNSW/Flat indexes, we can reconstruct vectors:
+            new_index = self._create_index()
+            kept_ids = [i for i, m in enumerate(self.metadata) if m["name"] != name]
+
+            if hasattr(self.index, 'reconstruct'):
+                # index.reconstruct() works for IndexFlat, IndexHNSW, IndexIVF
+                for kid in kept_ids:
+                    vec = self.index.reconstruct(kid)
+                    new_index.add(vec.reshape(1, -1))
+                self.index = new_index
+            else:
+                # Fallback: clear everything
+                logger = __import__('logging').getLogger(__name__)
+                logger.warning(
+                    "FAISS index type %s does not support reconstruction. "
+                    "Clearing all embeddings.",
+                    type(self.index).__name__,
+                )
+                self.index = self._create_index()
+
+            # Re-number metadata IDs to match new index positions
+            self.metadata = []
+            for i, old_m in enumerate(kept_metadata):
+                self.metadata.append({"name": old_m["name"], "id": i})
+
+        self._save()
+        removed = before - (len(self.metadata) - kept_count)
+        logger = __import__('logging').getLogger(__name__)
+        logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, name)
+        return True
+
     def clear(self) -> None:
         """Remove **all** enrolled faces."""
         self.metadata = []

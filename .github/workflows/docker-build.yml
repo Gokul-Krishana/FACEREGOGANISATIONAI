@@ -1,16 +1,15 @@
 # ─────────────────────────────────────────────────────────────────────
-# Docker Build — Image Verification
+# Docker CI — Build, Scan & Verify
 # ─────────────────────────────────────────────────────────────────────
-# Builds the Docker image to verify the Dockerfile + dependencies
-# compile correctly. This is a BUILD-ONLY check — images are not
-# pushed to any registry (that should be done via a separate deploy
-# workflow triggered by release tags).
+# Builds the Docker image, scans for vulnerabilities, and verifies
+# that critical modules import correctly.
 #
-# Uses Docker layer caching via GitHub Actions cache to speed up
-# repeated builds (the `pip install` layer caches well).
+# On push to master/main, also pushes to GitHub Container Registry.
+# On pull requests, build-only check (no registry push).
+# Uses Docker layer caching via GitHub Actions cache.
 # ─────────────────────────────────────────────────────────────────────
 
-name: Docker Build
+name: Docker CI
 
 on:
   push:
@@ -38,20 +37,30 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  IMAGE_TAG: ci-${{ github.sha }}
 
 jobs:
-  build:
-    name: Build Docker Image
+  build-and-scan:
+    name: Build & Scan
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read  # Only need to checkout the repo
+      contents: read
+      packages: write  # Needed for pushing to GHCR
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -67,32 +76,67 @@ jobs:
           context: .
           file: Dockerfile
           target: production
-          push: false  # Build only — don't push
-          load: true   # Load into local Docker daemon for inspection
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') }}
+          load: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE_NAME) || '' }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
       - name: Move Docker cache
         run: |
-          # Preserve cache layers for next run
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      - name: Verify image
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          # Ignore unpatched/unfixable vulnerabilities
+          ignore-unfixed: true
+        continue-on-error: true  # Report vulnerabilities but don't block CI
+
+      - name: Upload Trivy results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: container-image
+
+      - name: Verify image — critical module imports
         run: |
-          # Verify the image was built and contains key files
+          echo "🔍 Verifying Docker image..."
           docker run --rm \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             python -c "
 import sys
 sys.path.insert(0, '/app')
-# Verify critical modules can be imported
-from api.main import app
-print(f'FastAPI app loaded: {app.title}')
-from app.deep_liveness import DeepLivenessDetector
-print('Deep liveness module available')
-from app.amfr_engine import AMFREngine
-print('AMFR engine available')
-print('image verification passed')
+
+checks = [
+    ('FastAPI app', lambda: __import__('api.main', fromlist=['app']).app),
+    ('Deep liveness', lambda: __import__('app.deep_liveness', fromlist=['DeepLivenessDetector']).DeepLivenessDetector()),
+    ('AMFR engine', lambda: __import__('app.amfr_engine', fromlist=['AMFREngine']).AMFREngine()),
+    ('Face detector', lambda: __import__('app.face_detector', fromlist=['FaceDetector']).FaceDetector()),
+    ('FAISS enrollment', lambda: __import__('app.enrollment', fromlist=['FaceEnrollment']).FaceEnrollment()),
+]
+
+all_ok = True
+for name, fn in checks:
+    try:
+        fn()
+        print(f'  ✅ {name}')
+    except Exception as e:
+        print(f'  ❌ {name}: {e}')
+        all_ok = False
+
+if all_ok:
+    print('✅ All critical modules verified successfully')
+else:
+    print('❌ Some modules failed to load')
+    sys.exit(1)
 "

@@ -108,9 +108,8 @@ class EmployeeService:
     def delete(employee_id: str, operator: str = "system") -> bool:
         """Delete an employee by their ``employee_id``.
 
-        .. note::
-            This only removes the database record. The FAISS embedding
-            is **not** removed (see ``FaceEnrollment.remove()``).
+        Also removes the corresponding embedding from FAISS so the
+        deleted employee's face will no longer be recognised.
 
         Returns:
             ``True`` if deleted, ``False`` if not found.
@@ -123,6 +122,22 @@ class EmployeeService:
             success = EmployeeRepo.delete(session, employee_id)
 
         if success:
+            # Remove from FAISS too, so deleted employee no longer recognised
+            # FAISS stores the display name, so pass emp_name (not employee_id)
+            try:
+                from app.enrollment import FaceEnrollment
+                enrollment = FaceEnrollment()
+                # Try display name first (FAISS stores this), fall back to employee_id
+                removed = enrollment.remove_by_name(emp_name)
+                if not removed:
+                    enrollment.remove_by_name(employee_id)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Failed to remove '%s' from FAISS after DB delete: %s",
+                    employee_id, exc,
+                )
+
             AuditService.log(
                 "DELETE_EMPLOYEE",
                 f"Deleted employee '{emp_name}' ({employee_id})",
