@@ -20,7 +20,7 @@ recognition:
   #   1.0-1.5  → Same person, different lighting/angle  ← Default range
   #   1.5-2.0  → Possibly different person
   #   > 2.0    → Almost certainly different person
-  recognition_threshold: 1.2
+  recognition_threshold: 1.5
   frame_skip: 4                     # Process every Nth frame (higher = faster, less CPU)
   cooldown_seconds: 60              # Don't re-mark attendance within this window
 
