@@ -46,8 +46,7 @@ from __future__ import annotations
 import sys
 import time
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from pathlib import Path        from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -253,67 +252,46 @@ class LiveDetection:
 
     @staticmethod
     def open_camera(camera_id: int = cfg.CAMERA_ID, source_type: Optional[str] = None,
-                    camera_url: Optional[str] = None) -> Optional[Union[cv2.VideoCapture, CameraSource]]:
-        """Open a camera based on the configured source type.
+                    camera_url: Optional[str] = None) -> Optional[CameraSource]:
+        """Open a camera via the unified CameraSource factory.
 
-        Supports ALL camera types via the unified ``CameraSource`` abstraction:
-        - 💻 Laptop Webcam
-        - 🔌 USB Auto (Plug & Play)
-        - 📱 Android (USB / Wi-Fi)
-        - 📱 iPhone (USB / Wi-Fi)
-        - 🌐 IP Camera (RTSP / HTTP)
+        All camera types (webcam, usb_auto, android_*, iphone_*, ip_camera)
+        go through the same ``create_camera()`` factory in ``camera/selector.py``.
 
-        Falls back to ``cv2.VideoCapture`` with DirectShow/MSMF backends
-        for the ``"webcam"`` type if the factory path fails.
+        The ``WebcamSource`` and ``USBAnySource`` classes in ``camera/webcam.py``
+        are the **sole** owners of ``cv2.VideoCapture`` — no other module should
+        open raw OpenCV camera devices.
 
         Args:
-            camera_id: Camera device index (used for webcam and USB phone cameras).
-            source_type: Override the configured camera source type (e.g. from CLI).
-            camera_url: Override the configured camera URL (e.g. from CLI).
+            camera_id: Camera device index (used for webcam/USB phone cameras).
+            source_type: Override configured camera source type (e.g. from CLI).
+            camera_url: Override configured camera URL (e.g. from CLI).
 
         Returns:
-            An opened camera object (``cv2.VideoCapture`` or ``CameraSource``),
-            or ``None`` if all connection attempts fail.
+            An opened ``CameraSource``, or ``None`` if connection fails.
         """
         source_type = source_type or cfg.CAMERA_SOURCE_TYPE
 
-        # ── All camera types use the CameraSource factory ──
-        # The factory handles webcam, usb_auto, android_*, iphone_*, ip_camera
-        print(f"[Camera] Opening source: {source_type}")
+        logger = __import__('logging').getLogger(__name__)
+        logger.info("Opening camera source: %s (device=%s, url=%s)",
+                     source_type, camera_id, camera_url or cfg.CAMERA_URL)
+
         kwargs = {
             "device_id": camera_id,
             "url": camera_url or cfg.CAMERA_URL,
         }
         cam = create_camera(source_type, **kwargs)
         if cam is None:
-            print(f"[FAIL] Could not create camera source: {source_type}")
-            # Fallback: try DirectShow for raw webcam
-            if source_type == "webcam":
-                backends = [
-                    (cv2.CAP_DSHOW, "DirectShow"),
-                    (cv2.CAP_MSMF, "Media Foundation"),
-                    (None, "Default"),
-                ]
-                for backend, name in backends:
-                    if backend is None:
-                        cap = cv2.VideoCapture(camera_id)
-                    else:
-                        cap = cv2.VideoCapture(camera_id, backend)
-                    if cap.isOpened():
-                        print(f"[OK] Webcam opened via {name} backend (device #{camera_id})")
-                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                        return cap
-                    print(f"[-] {name} backend failed for device #{camera_id}")
+            logger.error("Could not create camera source: %s", source_type)
             return None
 
         if cam.open():
             cam.set_resolution(640, 480)
             info = cam.info()
-            print(f"[OK] Camera connected: {cam.name}")
-            print(f"     Resolution: {info.get('resolution', 'N/A')}")
+            logger.info("Camera connected: %s (res=%s)", cam.name, info.get('resolution', 'N/A'))
             return cam
-        print(f"[FAIL] Could not open {source_type} camera")
+
+        logger.error("Could not open %s camera", source_type)
         return None
 
     # ── Webcam Loop ───────────────────────────────────────────

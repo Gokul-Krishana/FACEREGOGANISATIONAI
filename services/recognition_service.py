@@ -86,6 +86,10 @@ class RecognitionService:
         self._last_recognised: List[Dict] = []
         self._cooldown: Dict[str, float] = {}  # name -> last_mark_time
 
+        # Unknown face save cooldown (prevent flooding disk)
+        self._last_unknown_save: float = 0.0
+        self._unknown_save_cooldown: float = 3.0
+
         # FPS (per-pipeline, not shared)
         self._fps = 0.0
         self._prev_time = time.time()
@@ -167,6 +171,12 @@ class RecognitionService:
 
         # Step 1 — YOLO person detection
         detections = self.detector.detect(frame, conf_threshold=self.conf_threshold)
+        logger.debug("[PIPELINE frame=%d] YOLO detected %d person(s)", self._frame_count, len(detections))
+
+        # Early exit: no detections → skip the rest of pipeline
+        if not detections:
+            self._last_recognised = []
+            return self._draw_overlay(frame, []), []
 
         # Per-person intermediate data
         embeddings: List[Optional[np.ndarray]] = []
@@ -178,6 +188,7 @@ class RecognitionService:
             bbox = det["bbox"]
             person_crop = self.detector.crop_person(frame, bbox)
             if person_crop.size == 0:
+                logger.debug("  [PIPELINE] person crop is empty, skipping")
                 continue
 
             yolo_detections.append(det)
@@ -185,15 +196,30 @@ class RecognitionService:
             # Step 2 — RetinaFace detection (detailed face data)
             face = self.recognizer.detect_face(person_crop)
             face_data.append(face)
+            if face is not None:
+                logger.debug("  [PIPELINE] RetinaFace: face detected, det_score=%.3f", face.get("det_score", 0.0))
+            else:
+                logger.debug("  [PIPELINE] RetinaFace: NO face detected in person crop")
 
             # Step 3 — ArcFace embedding
             embedding = self.recognizer.extract_embedding(person_crop)
             embeddings.append(embedding)
+            if embedding is not None:
+                emb_norm = float(np.linalg.norm(embedding))
+                logger.debug("  [PIPELINE] ArcFace: embedding OK, norm=%.4f", emb_norm)
+            else:
+                logger.debug("  [PIPELINE] ArcFace: NO embedding (no face)")
 
             # Step 4 — FAISS similarity search
             if embedding is not None:
                 matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
                 faiss_results.append(matches)
+                if matches:
+                    logger.debug("  [PIPELINE] FAISS: matched '%s' confidence=%.4f distance=%.4f (threshold=%.2f)",
+                                matches[0]["name"], matches[0]["confidence"],
+                                matches[0].get("distance", 0), self.recog_threshold)
+                else:
+                    logger.debug("  [PIPELINE] FAISS: no match within threshold %.2f", self.recog_threshold)
             else:
                 faiss_results.append([])
 
@@ -217,16 +243,30 @@ class RecognitionService:
             quality_score = amfr_detection["quality_score"]
             arcface_distance = amfr_detection["arcface_distance"]
 
+            logger.debug("  [PIPELINE] AMFR decision: %s | name='%s' | risk=%.4f | liveness=%.4f | quality=%.4f | arcface_dist=%.4f",
+                        decision, name, risk_score, liveness_score, quality_score, arcface_distance)
+
             if decision == AMFRDecision.ACCEPT.value:
                 # ── High confidence + live — mark attendance ──
-                emp = EmployeeService.get_by_employee_id(name)
+                # FAISS metadata stores the name used during enrollment.
+                # Use get_by_name() to look up with display name first, then fallback to employee_id.
+                emp = EmployeeService.get_by_name(name)
+                if emp is None:
+                    # Fallback: try employee_id lookup (for legacy data)
+                    emp = EmployeeService.get_by_employee_id(name)
                 emp_id = emp.id if emp else None
+                emp_name = emp.name if emp else name
 
-                self._maybe_mark_attendance(
+                logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s emp_name='%s'",
+                            name, emp_id, emp_name)
+
+                attendance_marked = self._maybe_mark_attendance(
                     name=name,
                     employee_id=emp_id,
                     confidence=risk_score,
                 )
+                logger.debug("  [PIPELINE] Attendance: %s", "MARKED" if attendance_marked else "ALREADY_PRESENT/SKIPPED")
+
                 self._log_recognition(
                     employee_id=emp_id,
                     is_known=True,
@@ -236,19 +276,28 @@ class RecognitionService:
                 )
                 results.append({
                     "bbox": bbox,
-                    "name": name,
+                    "name": name,  # FAISS name (display name or employee_id string)
+                    "emp_name": emp_name,  # Database display name
+                    "emp_id": emp_id,  # Database primary key
                     "confidence": risk_score,
                     "is_known": True,
+                    "attendance_marked": attendance_marked,
                     "amfr_decision": decision,
                     "risk_score": risk_score,
                     "liveness_score": liveness_score,
                     "quality_score": quality_score,
                     "arcface_distance": arcface_distance,
+                    "track_id": amfr_detection.get("track_id"),
                 })
 
             elif decision == AMFRDecision.BORDERLINE.value:
                 # ── Uncertain — known name but needs more frames ──
-                # Log the event but don't mark attendance yet
+                emp = EmployeeService.get_by_name(name)
+                if emp is None:
+                    emp = EmployeeService.get_by_employee_id(name)
+                emp_id = emp.id if emp else None
+                logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s (BORDERLINE)", name, emp_id)
+
                 self._log_recognition(
                     employee_id=None,
                     is_known=True,
@@ -258,18 +307,23 @@ class RecognitionService:
                 )
                 results.append({
                     "bbox": bbox,
-                    "name": f"{name}?",
+                    "name": name,
+                    "emp_name": emp.name if emp else name,
+                    "emp_id": emp_id,
                     "confidence": risk_score,
                     "is_known": False,
+                    "attendance_marked": False,
                     "amfr_decision": decision,
                     "risk_score": risk_score,
                     "liveness_score": liveness_score,
                     "quality_score": quality_score,
                     "arcface_distance": arcface_distance,
+                    "track_id": amfr_detection.get("track_id"),
                 })
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 # ── Spoof detected — reject + security alert ──
+                logger.debug("  [PIPELINE] SPOOF rejected — liveness=%.4f below spoof threshold", liveness_score)
                 self._log_recognition(
                     employee_id=None,
                     is_known=False,
@@ -287,13 +341,17 @@ class RecognitionService:
                 results.append({
                     "bbox": bbox,
                     "name": "SPOOF",
+                    "emp_name": "SPOOF",
+                    "emp_id": None,
                     "confidence": 0.0,
                     "is_known": False,
+                    "attendance_marked": False,
                     "amfr_decision": decision,
                     "risk_score": risk_score,
                     "liveness_score": liveness_score,
                     "quality_score": quality_score,
                     "arcface_distance": arcface_distance,
+                    "track_id": amfr_detection.get("track_id"),
                 })
 
             else:  # LOW_CONFIDENCE / no face
@@ -311,13 +369,17 @@ class RecognitionService:
                 results.append({
                     "bbox": bbox,
                     "name": "Unknown",
+                    "emp_name": "Unknown",
+                    "emp_id": None,
                     "confidence": risk_score,
                     "is_known": False,
+                    "attendance_marked": False,
                     "amfr_decision": decision,
                     "risk_score": risk_score,
                     "liveness_score": liveness_score,
                     "quality_score": quality_score,
                     "arcface_distance": arcface_distance,
+                    "track_id": amfr_detection.get("track_id"),
                 })
 
         self._last_recognised = results
@@ -351,21 +413,36 @@ class RecognitionService:
 
     def _maybe_mark_attendance(
         self, name: str, employee_id: Optional[int], confidence: float
-    ) -> None:
-        """Mark attendance with cooldown to avoid spamming."""
+    ) -> bool:
+        """Mark attendance with cooldown to avoid spamming.
+
+        Returns:
+            ``True`` if attendance was newly marked,
+            ``False`` if already marked or cooldown active.
+        """
         now = time.time()
         last = self._cooldown.get(name, 0)
         cooldown = getattr(cfg, "COOLDOWN_SECONDS", 60)
 
         if name not in self._marked_this_session and (now - last) > cooldown:
             if employee_id:
-                AttendanceService.mark(
+                result = AttendanceService.mark(
                     employee_id=employee_id,
                     confidence=confidence,
                     employee_name=name,
                 )
-                self._marked_this_session.add(name)
-                self._cooldown[name] = now
+                if result:
+                    self._marked_this_session.add(name)
+                    self._cooldown[name] = now
+                    return True
+                else:
+                    # Already marked today per DB — add to session cache
+                    # so we don't hit the DB again on this frame
+                    self._marked_this_session.add(name)
+                    return False
+            return False
+        # Already in session set (cooldown active)
+        return False
 
     def _log_recognition(
         self,
@@ -390,12 +467,24 @@ class RecognitionService:
             logger.warning("Failed to log recognition event: %s", exc)
 
     def _handle_unknown_face(self, face_img: np.ndarray) -> None:
-        """Save an unknown face snapshot to disk and database."""
+        """Save an unknown face snapshot to disk and database.
+
+        Uses a cooldown (default 3 seconds) to avoid flooding the
+        filesystem with near-identical frames of the same person.
+        """
+        now = time.time()
+        if now - self._last_unknown_save < self._unknown_save_cooldown:
+            return
+        self._last_unknown_save = now
+
         try:
             timestamp = datetime.now()
             filename = f"unknown_{timestamp.strftime('%Y%m%d_%H%M%S_%f')}.jpg"
             save_path = cfg.UNKNOWN_FACES_DIR / filename
-            cv2.imwrite(str(save_path), face_img)
+            ok = cv2.imwrite(str(save_path), face_img)
+            if not ok:
+                logger.warning("Could not write unknown face to disk: %s", filename)
+                return
 
             with get_session() as session:
                 UnknownFaceRepo.create(

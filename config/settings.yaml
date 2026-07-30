@@ -20,8 +20,8 @@ recognition:
   #   1.0-1.5  → Same person, different lighting/angle  ← Default range
   #   1.5-2.0  → Possibly different person
   #   > 2.0    → Almost certainly different person
-  recognition_threshold: 1.0
-  frame_skip: 2                     # Process every Nth frame
+  recognition_threshold: 1.2
+  frame_skip: 4                     # Process every Nth frame (higher = faster, less CPU)
   cooldown_seconds: 60              # Don't re-mark attendance within this window
 
 database:
@@ -42,7 +42,7 @@ faiss:
 
   # HNSW parameters (tuned via scripts/benchmarks/tune_hnsw.py)
   hnsw:
-    M: 64                              # Number of connections per layer (higher = better recall, more memory)
+    M: 32                              # Number of connections per layer (higher = better recall, more memory)
     ef_construction: 200               # Build-time search width (higher = better graph, slower build)
     ef_search: 128                     # Query-time search width (higher = better recall, slower search)
 

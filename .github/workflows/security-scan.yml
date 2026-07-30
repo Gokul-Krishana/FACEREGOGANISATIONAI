@@ -1,0 +1,95 @@
+# ─────────────────────────────────────────────────────────────────────
+# Security Scan — Weekly Dependency & Secret Audit
+# ─────────────────────────────────────────────────────────────────────
+# Runs on schedule and on-demand to check for:
+#   - Python dependency vulnerabilities (pip-audit)
+#   - Accidental secret leakage (Gitleaks / truffleHog)
+#   - Infrastructure-as-code misconfigurations (checkov)
+#
+# Designed to NOT block PRs — reports are uploaded to GitHub Security
+# tab for manual review.
+# ─────────────────────────────────────────────────────────────────────
+
+name: Security Scan
+
+on:
+  schedule:
+    # Run weekly on Monday morning
+    - cron: "0 4 * * 1"
+  workflow_dispatch:  # Allow manual triggering
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  pip-audit:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run pip-audit
+        continue-on-error: true
+        run: |
+          pip-audit -r requirements.txt --desc on --format markdown | tee pip-audit-report.md
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.md
+
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for Gitleaks to scan
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  checkov:
+    name: IaC Scan (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v1.0.0
+        continue-on-error: true
+        with:
+          directory: .
+          framework: dockerfile,github_actions
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+      - name: Upload Checkov results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-results.sarif
+          category: infrastructure-as-code

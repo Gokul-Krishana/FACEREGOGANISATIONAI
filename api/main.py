@@ -1,3 +1,5 @@
+
+
 """
 FastAPI Application for Face Recognition AI - College Deployment.
 Provides secure API layer with:
@@ -878,6 +880,7 @@ async def logout(
 @app.get("/auth/me", response_model=UserResponse)
 @limiter.limit("30/minute")
 async def get_current_user_info(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Get the currently authenticated user's profile."""
@@ -1454,6 +1457,7 @@ async def create_student(
 @app.get("/students", response_model=PaginatedResponse)
 @limiter.limit("60/minute")
 async def list_students(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("students", ActionType.READ))],
     session: Session = Depends(get_session),
     q: Optional[str] = Query(None, description="Search by student name or student ID"),
@@ -1493,6 +1497,7 @@ async def list_students(
 @app.get("/students/{student_id}", response_model=StudentResponse)
 @limiter.limit("60/minute")
 async def get_student(
+    request: Request,
     student_id: int,
     current_user: Annotated[User, Depends(require_permission("students", ActionType.READ))],
     session: Session = Depends(get_session),
@@ -1540,6 +1545,7 @@ async def create_employee(
 @app.get("/employees", response_model=PaginatedResponse)
 @limiter.limit("60/minute")
 async def list_employees(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.READ))],
     session: Session = Depends(get_session),
     q: Optional[str] = Query(None, description="Search by employee name, ID, or department"),
@@ -1561,6 +1567,7 @@ async def list_employees(
 @app.get("/employees/{employee_id}", response_model=EmployeeResponse)
 @limiter.limit("60/minute")
 async def get_employee(
+    request: Request,
     employee_id: int,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.READ))],
     session: Session = Depends(get_session),
@@ -1663,6 +1670,7 @@ async def create_camera(
 @app.get("/cameras", response_model=PaginatedResponse)
 @limiter.limit("30/minute")
 async def list_cameras(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("cameras", ActionType.READ))],
     session: Session = Depends(get_session),
     q: Optional[str] = Query(None, description="Search by camera name, location, building, or room"),
@@ -1708,6 +1716,7 @@ async def list_cameras(
 @app.get("/cameras/{camera_id}")
 @limiter.limit("30/minute")
 async def get_camera(
+    request: Request,
     camera_id: int,
     current_user: Annotated[User, Depends(require_permission("cameras", ActionType.READ))],
     session: Session = Depends(get_session),
@@ -1815,6 +1824,7 @@ async def mark_attendance(
 @app.get("/attendance", response_model=PaginatedResponse)
 @limiter.limit("60/minute")
 async def get_attendance(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("attendance", ActionType.READ))],
     session: Session = Depends(get_session),
     student_id: Optional[int] = None,
@@ -1912,6 +1922,7 @@ class UnknownFaceResponse(BaseModel):
 @app.get("/unknown-faces", response_model=PaginatedResponse)
 @limiter.limit("30/minute")
 async def list_unknown_faces(
+    request: Request,
     current_user: Annotated[User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
     session: Session = Depends(get_session),
     reviewed: Optional[bool] = None,
@@ -1990,6 +2001,7 @@ async def review_unknown_face(
 @app.get("/analytics/attendance-summary")
 @limiter.limit("20/minute")
 async def attendance_summary(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("analytics", ActionType.READ))],
     session: Session = Depends(get_session),
     date_from: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15)"),
@@ -2031,6 +2043,7 @@ async def attendance_summary(
 @app.get("/analytics/camera-status")
 @limiter.limit("20/minute")
 async def camera_status(
+    request: Request,
     current_user: Annotated[User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
     session: Session = Depends(get_session),
 ):
@@ -2206,6 +2219,7 @@ async def create_job(
 @app.get("/jobs")
 @limiter.limit("30/minute")
 async def list_jobs(
+    request: Request,
     current_user: Annotated[User, Depends(require_role(RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
     job_status: Optional[str] = Query(None),
     limit: int = Query(50, le=200),
@@ -2219,6 +2233,7 @@ async def list_jobs(
 @app.get("/jobs/{job_id}")
 @limiter.limit("60/minute")
 async def get_job_status(
+    request: Request,
     job_id: str,
     current_user: Annotated[User, Depends(require_role(RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
 ):
@@ -2232,6 +2247,7 @@ async def get_job_status(
 @app.post("/jobs/{job_id}/cancel")
 @limiter.limit("10/minute")
 async def cancel_job(
+    request: Request,
     job_id: str,
     current_user: Annotated[User, Depends(require_role(RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
 ):
@@ -2309,6 +2325,7 @@ async def bulk_update_camera_status(
 @app.get("/bulk/attendance/export")
 @limiter.limit("5/minute")
 async def export_attendance(
+    request: Request,
     current_user: Annotated[User, Depends(require_permission("attendance", ActionType.READ))],
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
