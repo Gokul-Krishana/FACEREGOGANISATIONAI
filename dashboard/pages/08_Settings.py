@@ -72,6 +72,24 @@ with st.form("settings_form", clear_on_submit=False):
     )
     camera_source_type = camera_source_options[selected_source_label]
     
+    # Define help text dictionaries BEFORE they are used in the form fields below
+    cam_id_help = {
+        "webcam": "Camera device index (0 = default webcam)",
+        "usb_auto": "-1 = auto-scan all; 0+ = prefer a specific device",
+        "android_usb": "Camera device index for DroidCam (typically 1)",
+        "android_wifi": "Not used for Android Wi-Fi",
+        "iphone_usb": "Camera device index for EpocCam (typically 2)",
+        "iphone_wifi": "Not used for iPhone Wi-Fi",
+    }
+    camera_url_help = {
+        "webcam": "Not used for webcam",
+        "usb_auto": "Not used for USB Auto — auto-scans all device indices",
+        "android_usb": "DroidCam IP:Port for Wi-Fi fallback (e.g., 192.168.1.100:4747)",
+        "android_wifi": "IP Webcam video URL (e.g., http://192.168.1.100:8080/video)",
+        "iphone_usb": "Not used for iPhone USB",
+        "iphone_wifi": "EpocCam stream URL (e.g., http://192.168.1.101:8080/video)",
+    }
+
     col1, col2, col3 = st.columns(3)
     with col1:
         camera_id = st.number_input(
@@ -92,24 +110,6 @@ with st.form("settings_form", clear_on_submit=False):
             value=_get_live("camera", "height", default=480),
             min_value=240, max_value=2160, step=10,
         )
-    
-    # Camera URL for phone camera sources
-    camera_url_help = {
-        "webcam": "Not used for webcam",
-        "usb_auto": "Not used for USB Auto — auto-scans all device indices",
-        "android_usb": "DroidCam IP:Port for Wi-Fi fallback (e.g., 192.168.1.100:4747)",
-        "android_wifi": "IP Webcam video URL (e.g., http://192.168.1.100:8080/video)",
-        "iphone_usb": "Not used for iPhone USB",
-        "iphone_wifi": "EpocCam stream URL (e.g., http://192.168.1.101:8080/video)",
-    }
-    cam_id_help = {
-        "webcam": "Camera device index (0 = default webcam)",
-        "usb_auto": "-1 = auto-scan all; 0+ = prefer a specific device",
-        "android_usb": "Camera device index for DroidCam (typically 1)",
-        "android_wifi": "Not used for Android Wi-Fi",
-        "iphone_usb": "Camera device index for EpocCam (typically 2)",
-        "iphone_wifi": "Not used for iPhone Wi-Fi",
-    }
     
     # Only show URL field for phone camera types
     if camera_source_type in ("android_wifi", "android_usb", "iphone_wifi"):
