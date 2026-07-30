@@ -29,6 +29,9 @@ outputs/
 unknown_faces/
 attendance/*.csv
 
+# Log files
+*.log
+
 # Streamlit runtime logs
 streamlit_log.txt
 streamlit_err.txt
