@@ -17,6 +17,7 @@ from database.repository import (
     EmployeeRepo,
     CameraRepo,
     AuditLogRepo,
+    RecognitionLogRepo,
 )
 
 
@@ -202,3 +203,71 @@ class TestAuditLogRepo:
         assert len(enroll_logs) == 2
         delete_logs = AuditLogRepo.get_by_action(self.s, "DELETE")
         assert len(delete_logs) == 1
+
+
+class TestRecognitionLogRepo:
+    """Tests for RecognitionLogRepo — verifies the AMFR fields forwarded by
+    the live pipeline (liveness_confidence / is_spoof / track_id) persist.
+
+    Regression guard for the real-camera validation finding: recognition
+    events were silently failing to log because the repo rejected these
+    kwargs (``unexpected keyword argument 'liveness_confidence'``).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_slate(self, reset_db):
+        """Reset all tables before each test class."""
+        with get_session() as session:
+            self.s = session
+
+    def test_create_basic(self):
+        log = RecognitionLogRepo.create(
+            self.s,
+            is_known=True,
+            confidence=0.95,
+        )
+        assert log.id is not None
+        assert log.is_known is True
+        assert log.confidence == 0.95
+
+    def test_create_persists_liveness_confidence(self):
+        """liveness_confidence must be stored (the original TypeError fix)."""
+        log = RecognitionLogRepo.create(
+            self.s,
+            is_known=True,
+            confidence=0.9,
+            liveness_confidence=0.8,
+        )
+        assert log.liveness_confidence == 0.8
+
+    def test_create_persists_is_spoof(self):
+        log = RecognitionLogRepo.create(
+            self.s,
+            is_known=False,
+            confidence=0.0,
+            is_spoof=True,
+        )
+        assert log.is_spoof is True
+
+    def test_create_persists_track_id(self):
+        log = RecognitionLogRepo.create(
+            self.s,
+            is_known=False,
+            confidence=0.2,
+            track_id="T000123-abc",
+        )
+        assert log.track_id == "T000123-abc"
+
+    def test_create_all_amfr_fields_together(self):
+        """Full AMFR result must persist all fields simultaneously."""
+        log = RecognitionLogRepo.create(
+            self.s,
+            is_known=True,
+            confidence=0.93,
+            liveness_confidence=0.88,
+            is_spoof=False,
+            track_id="T000456-def",
+        )
+        assert log.liveness_confidence == 0.88
+        assert log.is_spoof is False
+        assert log.track_id == "T000456-def"

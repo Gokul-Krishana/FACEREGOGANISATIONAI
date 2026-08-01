@@ -44,7 +44,11 @@ st.title("🔴 Unknown Face Gallery")
 st.markdown("Review unrecognised faces, register them as employees, or dismiss them.")
 
 # ── Statistics Cards ─────────────────────────────────────────
-stats = UnknownFaceService.get_statistics()
+try:
+    stats = UnknownFaceService.get_statistics()
+except Exception as _exc:
+    st.error(f"⚠️ Could not load unknown-face statistics: {_exc}")
+    stats = {"today": 0, "this_week": 0, "pending_review": 0, "converted": 0, "total": 0}
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -101,21 +105,25 @@ elif filter_reviewed == "Converted":
     reviewed_filter = True  # We'll handle this separately below
 
 # ── Fetch Data ───────────────────────────────────────────────
-if filter_reviewed == "Converted":
-    # For converted, we get all and filter client-side
-    faces = UnknownFaceService.get_filtered(
-        start_date=filter_start or None,
-        end_date=filter_end or None,
-        limit=filter_limit,
-    )
-    faces = [f for f in faces if f.converted_to_employee]
-else:
-    faces = UnknownFaceService.get_filtered(
-        start_date=filter_start or None,
-        end_date=filter_end or None,
-        reviewed=reviewed_filter,
-        limit=filter_limit,
-    )
+try:
+    if filter_reviewed == "Converted":
+        # For converted, we get all and filter client-side
+        faces = UnknownFaceService.get_filtered(
+            start_date=filter_start or None,
+            end_date=filter_end or None,
+            limit=filter_limit,
+        )
+        faces = [f for f in faces if f.converted_to_employee]
+    else:
+        faces = UnknownFaceService.get_filtered(
+            start_date=filter_start or None,
+            end_date=filter_end or None,
+            reviewed=reviewed_filter,
+            limit=filter_limit,
+        )
+except Exception as _exc:
+    st.error(f"⚠️ Could not load unknown faces: {_exc}")
+    faces = []
 
 # ── Helper Functions (defined before use for Streamlit rerun safety) ──
 

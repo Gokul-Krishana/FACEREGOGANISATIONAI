@@ -93,6 +93,71 @@ class EmployeeService:
             return EmployeeRepo.get_by_name(session, name)
 
     @staticmethod
+    def update(
+        employee_id: str,
+        name: Optional[str] = None,
+        department: Optional[str] = None,
+        operator: str = "system",
+    ) -> Optional[Employee]:
+        """Update an employee's editable fields.
+
+        Only fields that are provided (not ``None``) are changed — a
+        partial update. The employee is looked up by ``employee_id``.
+
+        Args:
+            employee_id: Unique employee identifier (e.g. ``EMP001``).
+            name: New display name (optional).
+            department: New department (optional).
+            operator: Who performed this action.
+
+        Returns:
+            The updated ``Employee``, or ``None`` if not found.
+
+        Note:
+            When the display name changes, the FAISS metadata label is
+            renamed to match so recognition keeps resolving the employee
+            (a DB-only rename would silently break the match → attendance
+            path). FAISS rename failures are logged, never fatal.
+        """
+        fields: dict = {}
+        if name is not None:
+            fields["name"] = name
+        if department is not None:
+            fields["department"] = department
+        if not fields:
+            return None
+
+        with get_session() as session:
+            emp = EmployeeRepo.get_by_employee_id(session, employee_id)
+            if not emp:
+                return None
+            old_name = emp.name
+            updated = EmployeeRepo.update(session, emp.id, **fields)
+
+        if updated is not None and name is not None and name != old_name:
+            # Keep FAISS in sync so recognition keeps matching after a rename.
+            # The pipeline resolves employees by the FAISS enrollment name, so
+            # a DB-only rename would silently break recognition/attendance.
+            try:
+                from app.enrollment import FaceEnrollment
+                enrollment = FaceEnrollment()
+                enrollment.rename(old_name, name)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Failed to rename '%s' → '%s' in FAISS: %s",
+                    old_name, name, exc,
+                )
+
+        if updated is not None:
+            AuditService.log(
+                "UPDATE_EMPLOYEE",
+                f"Updated employee '{updated.name}' ({employee_id})",
+                operator=operator,
+            )
+        return updated
+
+    @staticmethod
     def get_all() -> List[Employee]:
         """Get all employees, sorted by name."""
         with get_session() as session:
@@ -122,21 +187,8 @@ class EmployeeService:
             success = EmployeeRepo.delete(session, employee_id)
 
         if success:
-            # Remove from FAISS too, so deleted employee no longer recognised
-            # FAISS stores the display name, so pass emp_name (not employee_id)
-            try:
-                from app.enrollment import FaceEnrollment
-                enrollment = FaceEnrollment()
-                # Try display name first (FAISS stores this), fall back to employee_id
-                removed = enrollment.remove_by_name(emp_name)
-                if not removed:
-                    enrollment.remove_by_name(employee_id)
-            except Exception as exc:
-                import logging
-                logging.getLogger(__name__).warning(
-                    "Failed to remove '%s' from FAISS after DB delete: %s",
-                    employee_id, exc,
-                )
+            # Keep FAISS in sync so the deleted employee is no longer recognised.
+            EmployeeService.remove_faiss_embedding(emp_name, fallback=employee_id)
 
             AuditService.log(
                 "DELETE_EMPLOYEE",
@@ -144,6 +196,36 @@ class EmployeeService:
                 operator=operator,
             )
         return success
+
+    @staticmethod
+    def remove_faiss_embedding(name: str, fallback: Optional[str] = None) -> bool:
+        """Remove an employee's embedding(s) from the FAISS index.
+
+        FAISS stores the display name, so ``name`` is tried first; if no
+        entry matches, ``fallback`` (typically the ``employee_id``) is tried.
+        Never raises — FAISS failures are logged and do not block the caller
+        (the DB row is already gone by the time this is invoked).
+
+        Args:
+            name: Display name stored in the FAISS metadata.
+            fallback: Alternate name to try if ``name`` is not found.
+
+        Returns:
+            ``True`` if any embeddings were removed, ``False`` otherwise.
+        """
+        try:
+            from app.enrollment import FaceEnrollment
+            enrollment = FaceEnrollment()
+            removed = enrollment.remove_by_name(name)
+            if not removed and fallback:
+                removed = enrollment.remove_by_name(fallback)
+            return removed
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to remove '%s' from FAISS: %s", name, exc,
+            )
+            return False
 
     @staticmethod
     def count() -> int:

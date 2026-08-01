@@ -92,12 +92,15 @@ def _process_enrollment(frame: np.ndarray, emp_id: str, name: str, dept: str | N
             operator="dashboard",
         )
     except ValueError as exc:
-        # Rollback FAISS
+        # Rollback FAISS — remove ONLY the new embedding. Never clear() the
+        # whole index: that would delete every enrolled face and the original
+        # code's "re-add others" step was never implemented.
         st.error(str(exc))
         st.warning("Rolling back FAISS...")
-        enrollment.clear()
-        # Re-add all other employees (simple approach: clear and re-add)
-        # For now, just log the issue
+        try:
+            enrollment.remove_by_name(name)
+        except Exception as rollback_exc:
+            st.warning(f"FAISS rollback incomplete: {rollback_exc}")
         return
     except Exception as exc:
         st.error(f"Failed to create employee record: {exc}")

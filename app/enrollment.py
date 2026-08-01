@@ -256,6 +256,67 @@ class FaceEnrollment:
         logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, name)
         return True
 
+    def rename(self, old_name: str, new_name: str) -> bool:
+        """Rename all embeddings for a person in the FAISS index.
+
+        Since FAISS does not support selective mutation, the index is
+        rebuilt from scratch keeping every vector but rewriting the
+        metadata label (same O(N) machinery as ``remove_by_name``).
+
+        Args:
+            old_name: Current name stored in the metadata.
+            new_name: Replacement name (must be non-empty).
+
+        Returns:
+            ``True`` if at least one entry was renamed, ``False`` if
+            ``old_name`` was not found (or ``new_name`` is empty).
+        """
+        if not new_name or not new_name.strip():
+            return False
+        new_name = new_name.strip()
+
+        before = sum(1 for m in self.metadata if m["name"] == old_name)
+        if before == 0:
+            return False
+
+        if self.index.ntotal == 0:
+            # Nothing to rebuild — just rewrite metadata labels
+            for m in self.metadata:
+                if m["name"] == old_name:
+                    m["name"] = new_name
+            for i, m in enumerate(self.metadata):
+                m["id"] = i
+            self._save()
+            return True
+
+        # Rebuild the index with all vectors, renamed metadata
+        new_index = self._create_index()
+        if hasattr(self.index, 'reconstruct'):
+            for i in range(self.index.ntotal):
+                vec = self.index.reconstruct(i)
+                new_index.add(vec.reshape(1, -1))
+            self.index = new_index
+        else:
+            logger = __import__('logging').getLogger(__name__)
+            logger.warning(
+                "FAISS index type %s does not support reconstruction. "
+                "Clearing all embeddings during rename.",
+                type(self.index).__name__,
+            )
+            self.index = self._create_index()
+
+        # Rewrite names in metadata
+        for m in self.metadata:
+            if m["name"] == old_name:
+                m["name"] = new_name
+        for i, m in enumerate(self.metadata):
+            m["id"] = i
+
+        self._save()
+        logger = __import__('logging').getLogger(__name__)
+        logger.info("Renamed %d embedding(s) '%s' → '%s' in FAISS", before, old_name, new_name)
+        return True
+
     def clear(self) -> None:
         """Remove **all** enrolled faces."""
         self.metadata = []

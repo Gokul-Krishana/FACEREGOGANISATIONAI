@@ -72,6 +72,45 @@ class TestEmployeeService:
         assert len(results) == 1
         assert results[0].name == "Alice"
 
+    def test_update_name_and_department(self):
+        EmployeeService.create(employee_id="EMP001", name="Alice", department="Engineering")
+        updated = EmployeeService.update(
+            employee_id="EMP001",
+            name="Alicia",
+            department="Science",
+            operator="test",
+        )
+        assert updated is not None
+        assert updated.name == "Alicia"
+        assert updated.department == "Science"
+        # Persisted to DB
+        emp = EmployeeService.get_by_employee_id("EMP001")
+        assert emp.name == "Alicia"
+        assert emp.department == "Science"
+
+    def test_update_partial_only_changes_provided_fields(self):
+        EmployeeService.create(employee_id="EMP001", name="Alice", department="Engineering")
+        updated = EmployeeService.update(employee_id="EMP001", department="Science")
+        assert updated is not None
+        assert updated.name == "Alice"  # unchanged
+        assert updated.department == "Science"
+
+    def test_update_not_found_returns_none(self):
+        updated = EmployeeService.update(employee_id="NONEXISTENT", name="X")
+        assert updated is None
+
+    def test_update_with_no_fields_returns_none(self):
+        EmployeeService.create(employee_id="EMP001", name="Alice")
+        updated = EmployeeService.update(employee_id="EMP001")
+        assert updated is None
+
+    def test_update_logs_audit(self):
+        EmployeeService.create(employee_id="EMP001", name="Alice", operator="admin")
+        EmployeeService.update(employee_id="EMP001", name="Alicia", operator="admin")
+        logs = AuditService.get_by_action("UPDATE_EMPLOYEE")
+        assert len(logs) >= 1
+        assert any("Alicia" in (log.description or "") for log in logs)
+
     def test_delete_existing(self):
         EmployeeService.create(employee_id="EMP001", name="Alice", operator="test")
         result = EmployeeService.delete("EMP001", operator="test")

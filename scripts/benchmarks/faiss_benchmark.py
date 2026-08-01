@@ -25,8 +25,10 @@ Acceptance targets (for 500K at 512-D):
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import math
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -34,6 +36,12 @@ from typing import Any, Dict, List, Tuple
 
 import faiss
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import config.config as cfg
 
 # ── Acceptance targets (for 500K @ 512-D) ──────────────────────────
 ACCEPTANCE_TARGETS: Dict[str, Dict[str, float]] = {
@@ -64,17 +72,19 @@ def _build_exact(vectors: np.ndarray) -> tuple[faiss.IndexFlatL2, float]:
 
 
 def _build_hnsw(
-    vectors: np.ndarray, m: int = 32, ef_construction: int = 200
+    vectors: np.ndarray, m: int = 32, ef_construction: int = 200,
+    ef_search: int = 128,
 ) -> tuple[faiss.IndexHNSWFlat, float]:
     start = time.perf_counter()
     index = faiss.IndexHNSWFlat(vectors.shape[1], m)
     index.hnsw.efConstruction = ef_construction
+    index.hnsw.efSearch = ef_search  # Tuned query-time search width (settings.yaml)
     index.add(vectors)
     return index, time.perf_counter() - start
 
 
 def _build_ivf(
-    vectors: np.ndarray, nlist: int | None = None
+    vectors: np.ndarray, nlist: int | None = None, nprobe: int = 256
 ) -> tuple[faiss.IndexIVFFlat, float]:
     dim = vectors.shape[1]
     nlist = nlist or max(32, int(math.sqrt(len(vectors))))
@@ -84,7 +94,7 @@ def _build_ivf(
     start = time.perf_counter()
     index.train(vectors[:train_size])
     index.add(vectors)
-    index.nprobe = min(16, nlist)
+    index.nprobe = min(nprobe, nlist)  # Tuned nprobe (settings.yaml)
     return index, time.perf_counter() - start
 
 
@@ -217,10 +227,15 @@ def benchmark_size(size: int, dim: int, queries: int, k: int) -> dict:
     vectors = _normalize(rng.random((size, dim), dtype=np.float32))
     probe = _normalize(rng.random((queries, dim), dtype=np.float32))
 
-    # ── Build indexes ──────────────────────────────────────────
+    # ── Build indexes (using tuned parameters from settings.yaml) ──
     exact, exact_build = _build_exact(vectors)
-    hnsw, hnsw_build = _build_hnsw(vectors)
-    ivf, ivf_build = _build_ivf(vectors)
+    hnsw, hnsw_build = _build_hnsw(
+        vectors,
+        m=cfg.FAISS_HNSW_M,
+        ef_construction=cfg.FAISS_HNSW_EF_CONSTRUCTION,
+        ef_search=cfg.FAISS_HNSW_EF_SEARCH,
+    )
+    ivf, ivf_build = _build_ivf(vectors, nprobe=cfg.FAISS_IVF_NPROBE)
 
     # ── Baseline (exact) search ────────────────────────────────
     exact_dist, exact_idx, exact_latency = _search_per_query(exact, probe, k)
@@ -313,10 +328,12 @@ def main() -> int:
     print(f"Sizes: {args.sizes}")
     print(sep)
 
-    results = [
-        benchmark_size(size, args.dim, args.queries, args.k)
-        for size in args.sizes
-    ]
+    results = []
+    for size in args.sizes:
+        results.append(benchmark_size(size, args.dim, args.queries, args.k))
+        # Free native FAISS memory between sizes so large runs (500K) don't
+        # accumulate multiple index sets in RAM simultaneously.
+        gc.collect()
 
     # Acceptance assessment
     assessments = _assess_targets(results)

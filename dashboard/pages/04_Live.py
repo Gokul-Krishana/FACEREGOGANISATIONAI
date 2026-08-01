@@ -39,7 +39,7 @@ import time
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -49,6 +49,11 @@ import streamlit as st
 # Performance: downscale large frames before AI pipeline for speed
 # Display stays at original resolution; AI processes at this size
 AI_PROCESS_SIZE = (320, 240)  # Downscale to this for YOLO/ArcFace inference
+
+# Cadence (seconds) for the E2E frame-latency sampler. Matches the display
+# rerun loop (time.sleep(0.05) + st.rerun()) so latency is measured at the
+# same rate a human sees frames.
+LATENCY_SAMPLE_CADENCE = 0.05
 
 # ── Ensure project root is on path ──────────────────────────────
 _project_root = str(Path(__file__).resolve().parent.parent.parent)
@@ -62,6 +67,9 @@ from camera.base import CameraSource
 from camera.selector import create_camera
 from camera.discovery import scan_network
 from services.attendance_service import AttendanceService
+from dashboard.camera_owner import CameraOwner
+from dashboard.frame_buffer import frame_buffer, results_buffer
+from dashboard.latency_logger import LatencyLogger
 
 # ── Page Config ────────────────────────────────────────────────
 st.set_page_config(page_title="Live Recognition", page_icon="📹", layout="wide")
@@ -106,8 +114,6 @@ class LiveRecognitionPipeline:
         self._lock = threading.Lock()
 
         # Latest results (thread-safe)
-        self._latest_frame: Optional[np.ndarray] = None
-        self._latest_results: List[Dict] = []
         self._fps: float = 0.0
         self._ai_fps: float = 0.0
         self._pipeline_latency: float = 0.0
@@ -116,6 +122,21 @@ class LiveRecognitionPipeline:
         self._frame_count: int = 0
         self._error: Optional[str] = None
         self._reconnect_attempts: int = 0
+
+        # E2E frame-latency logging (Camera → FrameBuffer → display)
+        self._latency_logger = LatencyLogger()
+        self._latency_thread: Optional[threading.Thread] = None
+
+        # Recognition worker — runs AI independently of the capture thread so
+        # the displayed video always shows the most recent RAW frame while
+        # inference happens at its own cadence.
+        self._worker_thread: Optional[threading.Thread] = None
+        self._worker_interval: float = 0.10        # normal cadence (~10 AI runs/s max)
+        self._verified_interval: float = 0.60      # verified-only scenes → run less often
+        self._verified_at: Dict[str, float] = {}    # track_id → last ACCEPT wall-clock
+        self._identity_ttl: float = 3.0
+        self._last_worker_run: float = 0.0
+        self._worker_errors: int = 0   # persistent inference failures (observability)
 
     # ── Lifecycle ────────────────────────────────────────────
 
@@ -154,6 +175,29 @@ class LiveRecognitionPipeline:
             daemon=True,
         )
         self._thread.start()
+
+        # Fresh latency stats per session, sampled at the display cadence.
+        self._latency_logger.reset()
+        self._latency_thread = threading.Thread(
+            target=self._latency_loop,
+            name="LatencySampler",
+            daemon=True,
+        )
+        self._latency_thread.start()
+
+        # The recognition worker fully controls inference cadence, so disable
+        # the service's internal frame-skip (every worker call runs the full
+        # pipeline; the worker decides WHEN to run it).
+        self._service.frame_skip = 1
+        self._verified_at.clear()
+        self._last_worker_run = 0.0
+        self._worker_errors = 0
+        self._worker_thread = threading.Thread(
+            target=self._recognition_worker,
+            name="RecognitionWorker",
+            daemon=True,
+        )
+        self._worker_thread.start()
         return True
 
     def stop(self) -> None:
@@ -161,6 +205,13 @@ class LiveRecognitionPipeline:
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=3.0)
+        if self._worker_thread and self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=3.0)
+        if self._latency_thread and self._latency_thread.is_alive():
+            self._latency_thread.join(timeout=1.0)
+        self._worker_thread = None
+        self._latency_thread = None
+        self._verified_at.clear()
         if self._cam:
             try:
                 self._cam.release()
@@ -169,21 +220,25 @@ class LiveRecognitionPipeline:
             self._cam = None
         self._status = "STOPPED"
         self._reconnect_attempts = 0
-        with self._lock:
-            self._latest_frame = None
-            self._latest_results = []
+        
+        # Clear global buffers
+        frame_buffer.clear()
+        results_buffer.clear()
 
     # ── Background capture loop ──────────────────────────────
 
     def _capture_loop(self) -> None:
-        """Continuously capture frames and run AMFR pipeline."""
-        frame_skip = getattr(cfg, 'FRAME_SKIP', 2)
-        frame_count = 0
+        """Capture frames and publish the latest RAW frame to the buffer.
+
+        Capture is decoupled from AI inference: this thread only reads the
+        camera and keeps the shared ``frame_buffer`` fresh at capture rate,
+        so the displayed video is always the most recent frame. Inference
+        runs in ``_recognition_worker`` at its own cadence and never blocks
+        the video feed. Old frames are dropped (latest-frame-only buffer),
+        so there is never a backlog.
+        """
         last_frame_time = time.time()
-        last_process_time = 0.0
         fps_alpha = 0.9
-        ai_frame_count = 0
-        last_ai_time = time.time()
         max_reconnects = 5
 
         while self._running and self._cam is not None:
@@ -198,7 +253,7 @@ class LiveRecognitionPipeline:
                     time.sleep(0.05)
                     continue
 
-                # Update FPS
+                # Update capture FPS
                 dt = now - last_frame_time
                 if dt > 0:
                     instant_fps = 1.0 / dt
@@ -206,57 +261,11 @@ class LiveRecognitionPipeline:
                         self._fps = fps_alpha * self._fps + (1 - fps_alpha) * instant_fps
                 last_frame_time = now
 
-                frame_count += 1
-
-                # Performance: run AI on downscaled frame (320x240) but display at full res (640x480)
-                # This keeps YOLO/ArcFace fast while the video stays sharp.
-                # _draw_overlays handles its own copy internally — no need to copy here.
-                results = []  # initialize for edge case where first frame is a non-skip frame
-                pipeline_start = time.time()
-                if frame_count % frame_skip == 0:
-                    small_frame = cv2.resize(frame, AI_PROCESS_SIZE, interpolation=cv2.INTER_LINEAR)
-                    _, results = self._service.process_frame_detailed(small_frame)
-                    pipeline_end = time.time()
-                    
-                    # Scale bbox coordinates back to original 640x480 frame size
-                    scale_x = frame.shape[1] / AI_PROCESS_SIZE[0]
-                    scale_y = frame.shape[0] / AI_PROCESS_SIZE[1]
-                    for r in results:
-                        bbox = r.get("bbox")
-                        if bbox and len(bbox) >= 4:
-                            r["bbox"] = (
-                                int(bbox[0] * scale_x),
-                                int(bbox[1] * scale_y),
-                                int(bbox[2] * scale_x),
-                                int(bbox[3] * scale_y),
-                            )
-                    
-                    # Update AI FPS
-                    ai_now = time.time()
-                    ai_dt = ai_now - last_ai_time
-                    if ai_dt > 0:
-                        instant_ai_fps = 1.0 / ai_dt
-                        with self._lock:
-                            self._ai_fps = fps_alpha * self._ai_fps + (1 - fps_alpha) * instant_ai_fps
-                    last_ai_time = ai_now
-                    ai_frame_count += 1
-                    pipeline_latency = (pipeline_end - pipeline_start) * 1000  # ms
-                else:
-                    pipeline_latency = 0.0
-
-                # Draw overlays on original full-resolution frame (_draw_overlays copies internally)
-                annotated = self._draw_overlays(frame, results)
+                # Publish the latest RAW frame (drops any older unread frame)
+                frame_buffer.put(frame)
 
                 with self._lock:
-                    self._latest_frame = annotated
-                    self._latest_results = results
-
-                with self._lock:
-                    self._latest_frame = annotated
-                    self._latest_results = results
-                    self._people_count = len(results)
-                    self._frame_count = frame_count
-                    self._pipeline_latency = pipeline_latency
+                    self._frame_count += 1
                     self._status = "LIVE"
                     self._reconnect_attempts = 0
 
@@ -293,6 +302,138 @@ class LiveRecognitionPipeline:
         if self._reconnect_attempts >= max_reconnects:
             self._status = "DISCONNECTED"
 
+    # ── Recognition worker (independent of capture) ───────────
+
+    def _recognition_worker(self) -> None:
+        """Run the AMFR pipeline on the latest frame at a controlled cadence.
+
+        - Pulls the latest RAW frame from the shared buffer (never queues).
+        - Runs the full pipeline on a 320×240 downscale.
+        - Scales result bboxes back to display resolution.
+        - Caches ACCEPTED identities per track_id; while every active track
+          is verified and fresh, the worker idles longer (``_verified_interval``)
+          instead of re-running the expensive pipeline on every frame.
+        - Publishes results to ``results_buffer`` for the display loop.
+        """
+        last_ai_time = time.time()
+        fps_alpha = 0.9
+
+        while self._running:
+            now = time.time()
+            elapsed = now - self._last_worker_run
+
+            # Adaptive cadence: verified-only scenes skip the full pipeline
+            interval = self._verified_interval if self._only_verified_tracks() else self._worker_interval
+            if elapsed < interval:
+                time.sleep(0.02)
+                continue
+
+            frame = frame_buffer.get()
+            if frame is None:
+                time.sleep(0.02)
+                continue
+
+            self._last_worker_run = time.time()
+            pipeline_start = time.time()
+            try:
+                small_frame = cv2.resize(frame, AI_PROCESS_SIZE, interpolation=cv2.INTER_LINEAR)
+                _, results = self._service.process_frame_detailed(small_frame)
+                pipeline_latency = (time.time() - pipeline_start) * 1000  # ms
+
+                # Scale bbox coordinates back to the raw (display) frame size
+                scale_x = frame.shape[1] / AI_PROCESS_SIZE[0]
+                scale_y = frame.shape[0] / AI_PROCESS_SIZE[1]
+                for r in results:
+                    bbox = r.get("bbox")
+                    if bbox and len(bbox) >= 4:
+                        r["bbox"] = (
+                            int(bbox[0] * scale_x),
+                            int(bbox[1] * scale_y),
+                            int(bbox[2] * scale_x),
+                            int(bbox[3] * scale_y),
+                        )
+
+                # Track verified identities per track_id (drives adaptive cadence)
+                now_ts = time.time()
+                for r in results:
+                    tid = r.get("track_id")
+                    if tid and r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
+                        self._verified_at[tid] = now_ts
+                # Prune stale entries so a departed person reverts to normal cadence
+                stale = [t for t, ts in self._verified_at.items() if now_ts - ts > self._identity_ttl]
+                for t in stale:
+                    self._verified_at.pop(t, None)
+
+                # Publish latest results (latest-only buffer — never a queue)
+                results_buffer.put(results)
+
+                # AI FPS + latency
+                ai_now = time.time()
+                ai_dt = ai_now - last_ai_time
+                if ai_dt > 0:
+                    instant_ai_fps = 1.0 / ai_dt
+                    with self._lock:
+                        self._ai_fps = fps_alpha * self._ai_fps + (1 - fps_alpha) * instant_ai_fps
+                last_ai_time = ai_now
+
+                with self._lock:
+                    self._people_count = len(results)
+                    self._pipeline_latency = pipeline_latency
+
+            except Exception as e:
+                # Inference errors are counted, not surfaced as a camera status
+                # change — the capture loop owns LIVE/ERROR/DISCONNECTED state.
+                # A transient inference failure must never freeze the feed.
+                with self._lock:
+                    self._error = str(e)
+                    self._worker_errors += 1
+                time.sleep(0.5)
+
+    def _only_verified_tracks(self) -> bool:
+        """True when every active track is a fresh, verified (ACCEPTED) identity.
+
+        When true, the worker uses the slower ``_verified_interval`` cadence
+        instead of running the full pipeline every ``_worker_interval`` — the
+        key track-based recognition caching optimisation.
+        """
+        if not self._verified_at:
+            return False
+        latest = results_buffer.get() or []
+        if not latest:
+            return False
+        now = time.time()
+        for r in latest:
+            tid = r.get("track_id")
+            if not tid or tid not in self._verified_at:
+                return False
+            if now - self._verified_at[tid] > self._identity_ttl:
+                return False
+        return True
+
+    # ── Latency sampling ─────────────────────────────────────
+
+    def _latency_loop(self) -> None:
+        """Sample E2E frame latency at the display cadence while running.
+
+        Reads the shared frame buffer via ``frame_buffer.get_with_meta()``
+        and records ``now - put_timestamp`` — the age of the latest frame
+        in the buffer at read time (capture → display). The capture loop
+        puts at capture rate (independent of AI inference), so this is a
+        faithful E2E proxy consistent with the benchmark methodology. Runs
+        as its own daemon thread so the cadence stays regular.
+
+        Only records while ``LIVE``: during DISCONNECTED/RECONNECTING the
+        capture loop stops putting frames, so the buffer would hold a stale
+        frame and ``now - ts`` would grow unboundedly, polluting the stats.
+        """
+        while self._running:
+            time.sleep(LATENCY_SAMPLE_CADENCE)
+            if self._status != "LIVE":
+                continue
+            _, _, ts = frame_buffer.get_with_meta()
+            if ts is not None:
+                self._latency_logger.record((time.time() - ts) * 1000.0)
+
     # ── Overlay drawing — clean, minimal labels ─────────────
 
     def _draw_overlays(self, frame: np.ndarray, results: List[Dict]) -> np.ndarray:
@@ -318,11 +459,21 @@ class LiveRecognitionPipeline:
             name = r.get("name", "?")
             emp_name = r.get("emp_name", "")
             emp_id = r.get("emp_id")
+            department = r.get("department", "")
+            risk_score = r.get("risk_score", 0.0)
+            liveness_score = r.get("liveness_score", 0.0)
             is_known = r.get("is_known", False)
             attended = r.get("attendance_marked", False)
 
             # Display name: prefer database name, fall back to FAISS name
             display_name = emp_name if emp_name and emp_name != "Unknown" else name
+
+            # Confidence + liveness summary line for known/accept boxes
+            detail_line = ""
+            if risk_score:
+                detail_line = f"\u2022 {risk_score:.0%} conf"
+                if liveness_score:
+                    detail_line += f" \u2022 live {liveness_score:.0%}"
 
             # Determine visual treatment based on AMFR decision
             if decision == AMFRDecision.ACCEPT.value:
@@ -332,6 +483,10 @@ class LiveRecognitionPipeline:
                 sublines = [status_text]
                 if emp_id is not None:
                     sublines.insert(0, f"ID: {name}")
+                if department:
+                    sublines.insert(0, f"{department}")
+                if detail_line:
+                    sublines.append(detail_line)
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 color = (50, 50, 200)       # Red
@@ -342,6 +497,8 @@ class LiveRecognitionPipeline:
                 color = (50, 180, 200)      # Yellow (BGR)
                 label = f"{display_name}?"
                 sublines = ["COLLECTING FRAMES..."]
+                if department:
+                    sublines.insert(0, f"{department}")
 
             elif is_known:
                 color = (50, 200, 50)       # Green
@@ -353,6 +510,10 @@ class LiveRecognitionPipeline:
                     sublines = ["KNOWN"]
                 if emp_id is not None:
                     sublines.insert(0, f"ID: {name}")
+                if department:
+                    sublines.insert(0, f"{department}")
+                if detail_line:
+                    sublines.append(detail_line)
 
             else:
                 color = (150, 150, 150)     # Grey
@@ -378,11 +539,6 @@ class LiveRecognitionPipeline:
         return frame
 
     # ── Thread-safe accessors ─────────────────────────────────
-
-    def latest(self) -> Tuple[Optional[np.ndarray], List[Dict]]:
-        """Get the latest frame and results (non-blocking)."""
-        with self._lock:
-            return self._latest_frame, list(self._latest_results)
 
     @property
     def fps(self) -> float:
@@ -422,6 +578,11 @@ class LiveRecognitionPipeline:
         return self._running
 
     @property
+    def worker_errors(self) -> int:
+        with self._lock:
+            return self._worker_errors
+
+    @property
     def resolution(self) -> str:
         if self._cam and self._cam.is_opened():
             try:
@@ -430,6 +591,12 @@ class LiveRecognitionPipeline:
             except Exception:
                 pass
         return "N/A"
+
+    # ── Latency accessors ────────────────────────────────────
+
+    def latency_stats(self) -> Dict:
+        """Rolling E2E frame-latency stats (count/p50_ms/p95_ms/avg_ms/last_ms)."""
+        return self._latency_logger.stats()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -622,12 +789,21 @@ def _test_camera_connection(config: dict) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 def _start_recognition() -> None:
-    """Start the camera and recognition pipeline."""
+    """Start the camera and recognition pipeline with CameraOwner."""
+    camera_owner = CameraOwner()
+
+    # Stop any existing pipeline first and release stale ownership.
+    # This guarantees START→STOP→START always works even if a previous
+    # run left the CameraOwner in an ACQUIRED state.
+    _stop_recognition(quiet=True)
+
+    # Now check if we can acquire the camera
+    if not camera_owner.can_acquire():
+        st.error("Camera is already in use. Please stop the current session first.")
+        return
+
     # Refresh camera cache
     st.session_state.pc_cameras_cache = scan_local_cameras()
-
-    # Stop any existing pipeline first
-    _stop_recognition()
 
     source_type = st.session_state.get("camera_type", "webcam")
     config = st.session_state.get("camera_config", {})
@@ -654,19 +830,44 @@ def _start_recognition() -> None:
 
     with st.spinner("Starting camera..."):
         if pipeline.start():
-            st.session_state.pipeline = pipeline
-            st.success("\u2705 Camera started — recognition running")
+            # Acquire camera ownership
+            if camera_owner.acquire(pipeline._cam, pipeline):
+                st.session_state.pipeline = pipeline
+                st.session_state.camera_manager_active = True
+                st.success("\u2705 Camera started — recognition running")
+            else:
+                st.error("Failed to acquire camera ownership")
+                pipeline.stop()
         else:
             st.error(f"\u274c Failed to start: {pipeline.error}")
 
     st.rerun()
 
 
-def _stop_recognition() -> None:
-    """Stop the camera and recognition pipeline."""
-    if st.session_state.pipeline:
-        st.session_state.pipeline.stop()
-        st.session_state.pipeline = None
+def _stop_recognition(quiet: bool = False) -> None:
+    """Stop the camera and recognition pipeline.
+
+    Args:
+        quiet: If True, skip the "Camera stopped" info message. Used when
+            stopping as part of a START (to release stale ownership).
+    """
+    camera_owner = CameraOwner()
+    owned = camera_owner.pipeline
+    session_pipeline = st.session_state.pipeline
+
+    # Stop + release the owned pipeline/camera via the owner (avoids
+    # double-stopping the same pipeline). Teardown happens outside the
+    # owner's state lock, so this is safe even during a START cycle.
+    camera_owner.release()
+
+    # Defensive fallback: stop a session pipeline the owner does NOT hold
+    # (unusual/stale state). Skipped when the owner already stopped it.
+    if session_pipeline is not None and session_pipeline is not owned:
+        session_pipeline.stop()
+
+    st.session_state.pipeline = None
+    st.session_state.camera_manager_active = False
+    if not quiet:
         st.info("\u23f9\ufe0f Camera stopped")
 
 
@@ -685,6 +886,8 @@ if "pc_cameras_cache" not in st.session_state:
     st.session_state.pc_cameras_cache = scan_local_cameras()
 if "camera_settings_expanded" not in st.session_state:
     st.session_state.camera_settings_expanded = False
+if "camera_manager_active" not in st.session_state:
+    st.session_state.camera_manager_active = False
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -799,8 +1002,23 @@ st.markdown("---")
 # ═══════════════════════════════════════════════════════════════
 
 if is_running:
-    frame, results = pipeline.latest()
+    # Latest RAW frame + latest recognition results. Overlays are drawn at
+    # DISPLAY time (on the most recent frame) so the video stays fluid at
+    # capture rate while recognition overlays refresh at the AI cadence.
+    raw_frame = frame_buffer.get()
+    results = results_buffer.get()
+    
+    if results is None:
+        results = []
+    frame = pipeline._draw_overlays(raw_frame, results) if raw_frame is not None else None
     last_result = results[0] if results else None
+
+    # Display FPS — measured at the rerun cadence (capture + recognition FPS
+    # are shown separately in the status bar).
+    _now = time.time()
+    _prev = st.session_state.get("_live_display_ts", _now)
+    st.session_state["_live_display_ts"] = _now
+    _display_fps = 1.0 / (_now - _prev) if _now > _prev else 0.0
 
     # Main layout: video + sidebar
     video_col, info_col = st.columns([3, 1])
@@ -824,7 +1042,15 @@ if is_running:
         camera_label_display = selected_camera_label
         st.markdown(f"**Camera:** {camera_label_display}")
         st.markdown(f"**FPS:** {pipeline.fps:.1f}")
+        st.markdown(f"**Display FPS:** {_display_fps:.1f}")
+        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
         st.markdown(f"**People:** {pipeline.people_count}")
+
+        _e2e = pipeline.latency_stats()
+        if _e2e.get("count", 0):
+            st.markdown(f"**E2E Latency:** {_e2e['p50_ms']:.1f} / {_e2e['p95_ms']:.1f} ms (P50/P95)")
+        else:
+            st.markdown("**E2E Latency:** measuring…")
 
         if pipeline.error:
             st.error(f"Error: {pipeline.error}")
@@ -859,9 +1085,13 @@ if is_running:
     with status_cols[1]:
         st.markdown(f"**FPS:** {pipeline.fps:.1f}")
     with status_cols[2]:
-        st.markdown(f"**People:** {pipeline.people_count}")
+        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
     with status_cols[3]:
-        st.markdown(f"**Latency:** {pipeline.pipeline_latency:.0f} ms")
+        _e2e = pipeline.latency_stats()
+        if _e2e.get("count", 0):
+            st.markdown(f"**E2E:** {_e2e['p50_ms']:.1f}/{_e2e['p95_ms']:.1f} ms")
+        else:
+            st.markdown("**E2E:** — ms")
 
     # ── Today's Attendance ────────────────────────────────────
     st.markdown("---")
@@ -932,9 +1162,24 @@ if is_running:
         st.markdown(f"**Source:** {camera_label_display}")
         st.markdown(f"**Type:** {selected_source}")
         st.markdown(f"**FPS:** {pipeline.fps:.1f}")
+        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
         st.markdown(f"**Resolution:** {pipeline.resolution}")
         st.markdown(f"**People detected:** {pipeline.people_count}")
         st.markdown(f"**Frames processed:** {pipeline.frame_count}")
+        if pipeline.worker_errors:
+            st.warning(f"\u26a0\ufe0f Worker errors (transient): {pipeline.worker_errors}")
+        try:
+            import psutil
+            st.markdown(f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
+                        f"**RAM:** {psutil.virtual_memory().percent:.0f}%")
+        except Exception:
+            pass  # psutil optional — skip CPU/RAM monitoring if unavailable
+        _e2e = pipeline.latency_stats()
+        if _e2e.get("count", 0):
+            st.markdown(f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
+                        f"{_e2e['p95_ms']:.1f} ms ({_e2e['count']:.0f} samples)")
+        else:
+            st.markdown("**E2E Latency (P50/P95):** measuring…")
         st.markdown(f"**Status:** {pipeline.status}")
         if pipeline.error:
             st.error(f"Error: {pipeline.error}")

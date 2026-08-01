@@ -12,6 +12,7 @@ import importlib.util
 import sys
 import time
 import threading
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -30,6 +31,7 @@ from app.amfr_engine import AMFRDecision
 from services.recognition_service import RecognitionService
 from camera.base import CameraSource
 from camera.selector import create_camera as _real_create_camera
+from dashboard.latency_logger import LatencyLogger
 
 # ═══════════════════════════════════════════════════════════════
 #  TestPipeline — minimal replication of LiveRecognitionPipeline
@@ -133,6 +135,7 @@ class _TestPipeline:
         self._frame_count: int = 0
         self._error: str | None = None
         self._reconnect_attempts: int = 0
+        self._latency_logger = LatencyLogger()
 
     # ── Lifecycle ────────────────────────────────────────────
 
@@ -360,6 +363,10 @@ class _TestPipeline:
             except Exception:
                 pass
         return "N/A"
+
+    def latency_stats(self):
+        """Rolling E2E frame-latency stats (parity with LiveRecognitionPipeline)."""
+        return self._latency_logger.stats()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -971,6 +978,123 @@ class TestEmployeeServiceIntegration:
         result = EmployeeService.delete("NONEXISTENT", operator="test")
         assert result is False
 
+    def test_remove_faiss_embedding_calls_remove_by_name(self):
+        """remove_faiss_embedding must attempt removal by display name first."""
+        from services.employee_service import EmployeeService
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            mock_enroll.remove_by_name.return_value = True
+
+            removed = EmployeeService.remove_faiss_embedding("Delete Test User")
+
+        assert removed is True
+        mock_enroll.remove_by_name.assert_called_with("Delete Test User")
+
+    def test_remove_faiss_embedding_falls_back_to_employee_id(self):
+        """If the display name is not in FAISS, fall back to employee_id."""
+        from services.employee_service import EmployeeService
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            # Display name not found → fall back to employee_id, which is found
+            mock_enroll.remove_by_name.side_effect = [False, True]
+
+            removed = EmployeeService.remove_faiss_embedding(
+                "Delete Test User", fallback="DEL-TEST"
+            )
+
+        assert removed is True
+        assert mock_enroll.remove_by_name.call_count == 2
+        assert mock_enroll.remove_by_name.call_args_list[0][0] == ("Delete Test User",)
+        assert mock_enroll.remove_by_name.call_args_list[1][0] == ("DEL-TEST",)
+
+    def test_remove_faiss_embedding_no_fallback_when_found(self):
+        """Fallback must NOT be attempted when the display name is removed."""
+        from services.employee_service import EmployeeService
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            mock_enroll.remove_by_name.return_value = True
+
+            removed = EmployeeService.remove_faiss_embedding(
+                "Delete Test User", fallback="DEL-TEST"
+            )
+
+        assert removed is True
+        mock_enroll.remove_by_name.assert_called_once_with("Delete Test User")
+
+    def test_remove_faiss_embedding_handles_error_gracefully(self):
+        """FAISS errors must not raise — logged and return False."""
+        from services.employee_service import EmployeeService
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            mock_enroll.remove_by_name.side_effect = Exception("FAISS error")
+
+            removed = EmployeeService.remove_faiss_embedding("X")
+
+        assert removed is False
+
+    def test_update_renames_faiss_when_name_changes(self, reset_db):
+        """Updating the display name must rename the FAISS metadata too."""
+        from services.employee_service import EmployeeService
+        EmployeeService.create(
+            employee_id="EDIT-TEST", name="Old Name", operator="test",
+        )
+
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            mock_enroll.rename.return_value = True
+
+            updated = EmployeeService.update(
+                "EDIT-TEST", name="New Name", operator="test",
+            )
+
+        assert updated is not None
+        assert updated.name == "New Name"
+        # FAISS rename must be attempted with old → new name
+        mock_enroll.rename.assert_called_once_with("Old Name", "New Name")
+
+    def test_update_does_not_rename_faiss_when_name_unchanged(self, reset_db):
+        """Department-only edits must NOT touch FAISS metadata."""
+        from services.employee_service import EmployeeService
+        EmployeeService.create(
+            employee_id="EDIT-TEST2", name="Stable Name", operator="test",
+        )
+
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+
+            updated = EmployeeService.update(
+                "EDIT-TEST2", department="Science", operator="test",
+            )
+
+        assert updated is not None
+        assert updated.department == "Science"
+        mock_enroll.rename.assert_not_called()
+
+    def test_update_faiss_rename_error_is_graceful(self, reset_db):
+        """FAISS rename failure must not block the DB update."""
+        from services.employee_service import EmployeeService
+        EmployeeService.create(
+            employee_id="EDIT-TEST3", name="Old", operator="test",
+        )
+
+        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+            mock_enroll = MagicMock()
+            MockEnroll.return_value = mock_enroll
+            mock_enroll.rename.side_effect = Exception("FAISS rename error")
+
+            updated = EmployeeService.update(
+                "EDIT-TEST3", name="New", operator="test",
+            )
+
+        assert updated is not None
+        assert updated.name == "New"
+
 
 # ═══════════════════════════════════════════════════════════════
 #  FAISS remove_by_name Tests
@@ -1059,6 +1183,47 @@ class TestFAISSRemove:
         results = faiss_index.search(query, k=3, threshold=5.0)
         names = [r["name"] for r in results]
         assert "Alice" not in names
+
+    def test_rename_returns_true(self, faiss_index):
+        """Renaming an existing person returns True."""
+        assert faiss_index.rename("Alice", "Alicia") is True
+
+    def test_rename_not_found_returns_false(self, faiss_index):
+        """Renaming a non-existent person returns False."""
+        assert faiss_index.rename("NonExistent", "X") is False
+
+    def test_rename_empty_new_name_returns_false(self, faiss_index):
+        """An empty new name must be rejected."""
+        assert faiss_index.rename("Alice", "   ") is False
+
+    def test_rename_updates_metadata_and_preserves_count(self, faiss_index):
+        """After rename, all entries for the person carry the new name."""
+        before = faiss_index.count()
+        faiss_index.rename("Alice", "Alicia")
+        after = faiss_index.count()
+        assert before == after  # vectors preserved
+        persons = faiss_index.all_persons()
+        assert "Alicia" in persons
+        assert "Alice" not in persons
+        assert "Bob" in persons and "Charlie" in persons
+
+    def test_rename_all_entries(self, faiss_index):
+        """Alice had 2 embeddings — both must be renamed."""
+        faiss_index.rename("Alice", "Alicia")
+        # Metadata must contain exactly 2 entries named Alicia (out of 4 total)
+        alicia_count = sum(1 for m in faiss_index.metadata if m["name"] == "Alicia")
+        assert alicia_count == 2
+
+    def test_search_after_rename(self, faiss_index):
+        """Search must return the new name after rename."""
+        faiss_index.rename("Alice", "Alicia")
+        rng = np.random.RandomState(42)
+        query = rng.randn(512).astype(np.float32)
+        query /= np.linalg.norm(query)
+        results = faiss_index.search(query, k=3, threshold=5.0)
+        names = [r["name"] for r in results]
+        assert "Alice" not in names
+        assert "Alicia" in names
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1214,6 +1379,204 @@ def _import_live_page() -> object:
     mod._mock_st = mock_st
     _live_page_modules[live_path] = mod
     return mod
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Generic Dashboard Page Importer — all other pages (01–03, 05–10)
+# ═══════════════════════════════════════════════════════════════
+#  Imports a page with streamlit (and optional streamlit_webrtc) fully
+#  mocked. The page body executes top-to-bottom like a real Streamlit run,
+#  so this catches NameErrors, missing config attributes, missing service
+#  methods, and unguarded DB/empty-data crashes.
+#  - st.cache_data is a passthrough → guarded DB loaders run for real
+#    against the isolated test database.
+#  - st.cache_resource is left as an auto-mock → 09_Health's heavy AI-model
+#    checks (YOLO/ArcFace) become mocks and never load weights.
+#  - cv2.VideoCapture is mocked so no real camera is probed at import.
+
+# Cache for generic dashboard page modules across tests
+_page_modules: dict = {}
+
+
+_webRTC_mock = None
+
+
+def _webrtc_mock_module() -> object:
+    """Return a mock ``streamlit_webrtc`` module (deterministic across envs)."""
+    global _webRTC_mock
+    if _webRTC_mock is None:
+        mod = MagicMock()
+        mod.webrtc_streamer = MagicMock()
+        mod.RTCConfiguration = MagicMock()
+
+        class _Base:
+            """Subclassable stand-in for VideoTransformerBase."""
+
+            def __init__(self, *a, **k):
+                pass
+
+            def transform(self, frame):
+                return frame
+
+        mod.VideoTransformerBase = _Base
+        _webRTC_mock = mod
+    return _webRTC_mock
+
+
+def _selectbox_first_option(*args, **kwargs) -> str:
+    """Return the first option of a selectbox call (or '' if none given)."""
+    options = kwargs.get("options")
+    if options is None and len(args) > 1:
+        options = args[1]
+    if options:
+        return options[0]
+    return ""
+
+
+def _columns_side_effect(*args, **kwargs) -> tuple:
+    """Return the right number of column mocks based on input."""
+    if args:
+        a = args[0]
+        if isinstance(a, int):
+            n = a
+        elif hasattr(a, '__iter__'):
+            n = len(a)
+        else:
+            n = 1
+    else:
+        n = 1
+    return tuple(MagicMock() for _ in range(n))
+
+
+def _tabs_side_effect(*args, **kwargs) -> tuple:
+    """Return one mock per tab label."""
+    labels = args[0] if args else []
+    n = len(labels) if isinstance(labels, (list, tuple)) else 2
+    return tuple(MagicMock() for _ in range(n))
+
+
+def _cache_data_side_effect(*args, **kwargs):
+    """Passthrough decorator supporting both @st.cache_data and @st.cache_data(...)."""
+    if args and callable(args[0]) and not kwargs:
+        return args[0]
+
+    def _decorator(fn):
+        return fn
+    return _decorator
+
+
+def _import_page(rel_name: str, extra_modules: dict | None = None) -> object:
+    """Import a dashboard page with streamlit fully mocked.
+
+    Args:
+        rel_name: Page filename, e.g. ``"01_Dashboard.py"``.
+        extra_modules: Extra modules to inject into ``sys.modules`` during
+            import (e.g. ``{"streamlit_webrtc": mock}``).
+
+    Returns:
+        The imported module object (cached by path).
+    """
+    page_path = str(Path(__file__).resolve().parent.parent / "dashboard" / "pages" / rel_name)
+
+    if page_path in _page_modules:
+        return _page_modules[page_path]
+
+    mock_st = MagicMock()
+    mock_st.session_state = MockSessionState()
+    mock_st.set_page_config = MagicMock()
+    mock_st.caption = MagicMock()
+    mock_st.button = MagicMock(return_value=False)
+    mock_st.checkbox = MagicMock(return_value=False)
+    mock_st.text_input = MagicMock(return_value="")
+    mock_st.number_input = MagicMock(return_value=1)
+    mock_st.selectbox = MagicMock(side_effect=_selectbox_first_option)
+    mock_st.radio = MagicMock(return_value="")
+    mock_st.multiselect = MagicMock(return_value=[])
+    mock_st.date_input = MagicMock(return_value=date.today())
+    mock_st.columns = MagicMock(side_effect=_columns_side_effect)
+    mock_st.tabs = MagicMock(side_effect=_tabs_side_effect)
+    mock_st.cache_data = MagicMock(side_effect=_cache_data_side_effect)
+    mock_st.markdown = MagicMock()
+    mock_st.success = MagicMock()
+    mock_st.error = MagicMock()
+    mock_st.info = MagicMock()
+    mock_st.warning = MagicMock()
+    mock_st.rerun = MagicMock()
+    mock_st.dataframe = MagicMock()
+    mock_st.divider = MagicMock()
+    mock_st.expander = MagicMock(return_value=MagicMock())
+    mock_st.spinner = MagicMock(return_value=MagicMock())
+    mock_st.form = MagicMock(return_value=MagicMock())
+    mock_st.form_submit_button = MagicMock(return_value=False)
+    mock_st.metric = MagicMock()
+    mock_st.stop = MagicMock()
+    mock_st.empty = MagicMock()
+    mock_st.write = MagicMock()
+    mock_st.code = MagicMock()
+    mock_st.image = MagicMock()
+    mock_st.camera_input = MagicMock(return_value=None)
+    mock_st.plotly_chart = MagicMock()
+    mock_st.switch_page = MagicMock()
+    mock_st.download_button = MagicMock(return_value=False)
+    mock_st.slider = MagicMock(return_value=1)
+
+    modules = {"streamlit": mock_st}
+    if extra_modules:
+        modules.update(extra_modules)
+
+    mock_cap = MagicMock()
+    mock_cap.isOpened.return_value = False  # No cameras detected at import
+
+    with patch('cv2.VideoCapture', return_value=mock_cap):
+        with patch.dict('sys.modules', modules):
+            spec = importlib.util.spec_from_file_location(
+                "page_" + rel_name.replace(".", "_"), page_path
+            )
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = mod
+            spec.loader.exec_module(mod)
+
+    mod._mock_st = mock_st
+    _page_modules[page_path] = mod
+    return mod
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Dashboard Page Import Smoke Tests
+# ═══════════════════════════════════════════════════════════════
+#  Every non-live page must import/execute without crashing under a mocked
+#  Streamlit runtime. This catches NameErrors, missing config attributes,
+#  missing service/repo methods, and unguarded DB/empty-data crashes.
+
+class TestDashboardPageImports:
+    """Smoke tests: all dashboard pages import/execute without crashing."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_db(self, reset_db):
+        """Fresh, migrated tables before each page body executes."""
+        yield
+
+    @pytest.mark.parametrize("page_file,extra_key,expected_symbols", [
+        ("01_Dashboard.py", None, ["get_home_stats", "get_recent_attendance_df", "status_badge"]),
+        ("02_Employees.py", None, []),
+        ("03_Enroll.py", None, ["_process_enrollment"]),
+        ("05_Attendance.py", "webrtc", ["PhoneAttendanceFeed", "AttendanceVideoTransformer"]),
+        ("06_Unknown.py", None, []),
+        ("07_Analytics.py", None, []),
+        ("08_Settings.py", None, []),
+        ("09_Health.py", None, ["render_status", "check_database"]),
+        ("10_About.py", None, ["_pill"]),
+    ])
+    def test_page_imports(self, page_file, extra_key, expected_symbols):
+        extra = {}
+        if extra_key == "webrtc":
+            extra["streamlit_webrtc"] = _webrtc_mock_module()
+        mod = _import_page(page_file, extra_modules=extra or None)
+        assert mod is not None
+        # Every page must call st.set_page_config at the top of its body
+        assert mod._mock_st.set_page_config.called, f"{page_file} did not call set_page_config"
+        for sym in expected_symbols:
+            assert hasattr(mod, sym), f"{page_file} missing symbol {sym}"
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -32,6 +32,7 @@ pyotp>=2.9.0                   # TOTP for MFA
 plotly>=5.18.0
 prometheus-client>=0.19.0
 ydata-profiling>=2.0.0          # Data profiling (renamed from pandas-profiling)
+psutil>=5.9.0                   # CPU/RAM monitoring on the Live page
 
 # – Production
 python-json-logger>=2.0.0        # Structured JSON logging
