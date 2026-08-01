@@ -23,6 +23,7 @@ recognition:
   recognition_threshold: 1.0
   frame_skip: 2                     # Process every Nth frame (higher = faster, less CPU)
   cooldown_seconds: 60              # Don't re-mark attendance within this window
+  identity_ttl: 3.0                 # Seconds before a verified track is re-validated (lower = more accurate, more CPU)
 
 database:
   type: sqlite                      # sqlite | postgresql

@@ -105,6 +105,7 @@ YOLO_CONFIDENCE: float = _get("recognition", "yolo_confidence", default=0.5)
 RECOGNITION_THRESHOLD: float = _get("recognition", "recognition_threshold", default=1.0)
 FRAME_SKIP: int = _get("recognition", "frame_skip", default=2)
 COOLDOWN_SECONDS: int = _get("recognition", "cooldown_seconds", default=60)
+IDENTITY_TTL: float = _get("recognition", "identity_ttl", default=3.0)
 
 # ── Paths ─────────────────────────────────────────────────────
 EMBEDDINGS_DIR = ROOT_DIR / "embeddings"
