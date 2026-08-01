@@ -144,7 +144,7 @@ class LiveRecognitionPipeline:
         self._worker_interval: float = 0.10        # normal cadence (~10 AI runs/s max)
         self._verified_interval: float = 0.60      # verified-only scenes → run less often
         self._verified_at: Dict[str, float] = {}    # track_id → last ACCEPT wall-clock
-        self._identity_ttl: float = 3.0
+        self._identity_ttl: float = getattr(cfg, 'IDENTITY_TTL', 3.0)
         self._last_worker_run: float = 0.0
         self._worker_errors: int = 0   # persistent inference failures (observability)
 
