@@ -46,6 +46,16 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+# psutil is optional — used for CPU/RAM monitoring in the sidebar.
+# Imported once at module level to avoid repeated import lookup overhead
+# in the Streamlit hot path (~20 reruns/sec when live).
+try:
+    import psutil
+    _PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None  # type: ignore[assignment]
+    _PSUTIL_AVAILABLE = False
+
 # Performance: downscale large frames before AI pipeline for speed
 # Display stays at original resolution; AI processes at this size
 AI_PROCESS_SIZE = (320, 240)  # Downscale to this for YOLO/ArcFace inference
@@ -1066,13 +1076,10 @@ if is_running:
         st.markdown(f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}")
 
         # CPU / RAM (psutil optional)
-        try:
-            import psutil
+        if _PSUTIL_AVAILABLE:
             _cpu = psutil.cpu_percent(interval=None)
             _ram = psutil.virtual_memory().percent
             st.markdown(f"**CPU:** {_cpu:.0f}% · **RAM:** {_ram:.0f}%")
-        except Exception:
-            pass  # psutil not installed — skip silently
 
         if pipeline.error:
             st.error(f"Error: {pipeline.error}")
@@ -1175,12 +1182,9 @@ if is_running:
         st.markdown(f"**Frames processed:** {pipeline.frame_count}")
         if pipeline.worker_errors:
             st.warning(f"\u26a0\ufe0f Worker errors (transient): {pipeline.worker_errors}")
-        try:
-            import psutil
+        if _PSUTIL_AVAILABLE:
             st.markdown(f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
                         f"**RAM:** {psutil.virtual_memory().percent:.0f}%")
-        except Exception:
-            pass  # psutil optional — skip CPU/RAM monitoring if unavailable
         _e2e = pipeline.latency_stats()
         if _e2e.get("count", 0):
             st.markdown(f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
