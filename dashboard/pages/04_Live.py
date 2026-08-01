@@ -1005,6 +1005,10 @@ if is_running:
     # Latest RAW frame + latest recognition results. Overlays are drawn at
     # DISPLAY time (on the most recent frame) so the video stays fluid at
     # capture rate while recognition overlays refresh at the AI cadence.
+    #
+    # IMPORTANT: check has_frame() BEFORE get() — get() clears the
+    # available flag, so has_frame() would always return False after get().
+    _has_frame = frame_buffer.has_frame()
     raw_frame = frame_buffer.get()
     results = results_buffer.get()
     
@@ -1052,6 +1056,24 @@ if is_running:
         else:
             st.markdown("**E2E Latency:** measuring…")
 
+        # Queue size (latest-frame-only buffer: 0=empty, 1=ready)
+        # Uses _has_frame captured before get() to avoid always reading 0.
+        _q = 1 if _has_frame else 0
+        st.markdown(f"**Queue:** {_q}/1")
+
+        # Camera Health
+        _health_color = "green" if pipeline.status == "LIVE" else ("orange" if pipeline.status in ("CONNECTING", "RECONNECTING") else "red")
+        st.markdown(f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}")
+
+        # CPU / RAM (psutil optional)
+        try:
+            import psutil
+            _cpu = psutil.cpu_percent(interval=None)
+            _ram = psutil.virtual_memory().percent
+            st.markdown(f"**CPU:** {_cpu:.0f}% · **RAM:** {_ram:.0f}%")
+        except Exception:
+            pass  # psutil not installed — skip silently
+
         if pipeline.error:
             st.error(f"Error: {pipeline.error}")
 
@@ -1077,21 +1099,6 @@ if is_running:
             else:
                 st.markdown(f"\u2753 **{name}**")
                 st.info("Not Enrolled")
-
-    # ── Camera Status Bar ─────────────────────────────────────
-    status_cols = st.columns(4)
-    with status_cols[0]:
-        st.markdown(f":green[**{camera_label_display}**]")
-    with status_cols[1]:
-        st.markdown(f"**FPS:** {pipeline.fps:.1f}")
-    with status_cols[2]:
-        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
-    with status_cols[3]:
-        _e2e = pipeline.latency_stats()
-        if _e2e.get("count", 0):
-            st.markdown(f"**E2E:** {_e2e['p50_ms']:.1f}/{_e2e['p95_ms']:.1f} ms")
-        else:
-            st.markdown("**E2E:** — ms")
 
     # ── Today's Attendance ────────────────────────────────────
     st.markdown("---")
