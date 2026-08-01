@@ -55,6 +55,11 @@ models/liveness/
 *.db-wal
 *.db-shm
 
+# Generated backup artifacts (SQL dumps, FAISS indexes, manifests)
+# Note: ignore contents (backups/*) so a tracked README can be re-included.
+backups/*
+!backups/README.md
+
 # Next.js frontend (Streamlit is primary)
 frontend/
 

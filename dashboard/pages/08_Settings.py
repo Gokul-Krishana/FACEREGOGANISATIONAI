@@ -189,12 +189,12 @@ with st.form("settings_form", clear_on_submit=False):
     st.markdown("### 📋 Logging")
     col1, col2 = st.columns(2)
     with col1:
+        _log_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
+        _current_level = _get_live("logging", "level", default="INFO").upper()
         log_level = st.selectbox(
             "Log Level",
-            options=["DEBUG", "INFO", "WARNING", "ERROR"],
-            index=["DEBUG", "INFO", "WARNING", "ERROR"].index(
-                _get_live("logging", "level", default="INFO").upper()
-            ),
+            options=_log_levels,
+            index=_log_levels.index(_current_level) if _current_level in _log_levels else 1,
         )
     with col2:
         log_max_mb = st.number_input(

@@ -229,6 +229,37 @@ class EmployeeRepo:
         return True
 
     @staticmethod
+    def update(session: Session, emp_id: int, **fields) -> Optional[Employee]:
+        """Update editable fields of an employee by database ID.
+
+        Only keys present in ``fields`` are changed (partial update) and
+        only whitelisted columns may be set — arbitrary attributes (e.g.
+        ``id``, relationships) are ignored to protect invariants.
+
+        Args:
+            session: SQLAlchemy session.
+            emp_id: Database primary key of the employee.
+            **fields: Column names → new values (e.g. ``name=...``).
+
+        Returns:
+            The updated ``Employee``, or ``None`` if not found.
+        """
+        _EDITABLE = {"name", "department", "photo_path"}
+        emp = EmployeeRepo.get_by_id(session, emp_id)
+        if not emp:
+            return None
+        changed = False
+        for key, value in fields.items():
+            if key in _EDITABLE and hasattr(emp, key):
+                setattr(emp, key, value)
+                changed = True
+        if not changed:
+            return emp
+        session.commit()
+        session.refresh(emp)
+        return emp
+
+    @staticmethod
     def count(session: Session) -> int:
         return session.query(func.count(Employee.id)).scalar() or 0
 
@@ -352,13 +383,25 @@ class RecognitionLogRepo:
         employee_id: Optional[int] = None,
         camera_id: Optional[int] = None,
         face_snapshot_path: Optional[str] = None,
+        liveness_confidence: Optional[float] = None,
+        is_spoof: bool = False,
+        track_id: Optional[str] = None,
     ) -> RecognitionLog:
+        """Create a recognition log entry.
+
+        ``liveness_confidence`` / ``is_spoof`` / ``track_id`` are stored on
+        the model (used by the live pipeline via RecognitionService) — this
+        previously caused a silent TypeError on every recognition event.
+        """
         log = RecognitionLog(
             is_known=is_known,
             confidence=confidence,
             employee_id=employee_id,
             camera_id=camera_id,
             face_snapshot_path=face_snapshot_path,
+            liveness_confidence=liveness_confidence,
+            is_spoof=is_spoof,
+            track_id=track_id,
         )
         session.add(log)
         session.commit()

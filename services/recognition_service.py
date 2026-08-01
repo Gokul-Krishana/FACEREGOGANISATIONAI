@@ -256,6 +256,7 @@ class RecognitionService:
                     emp = EmployeeService.get_by_employee_id(name)
                 emp_id = emp.id if emp else None
                 emp_name = emp.name if emp else name
+                emp_dept = emp.department if emp else None
 
                 logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s emp_name='%s'",
                             name, emp_id, emp_name)
@@ -273,12 +274,14 @@ class RecognitionService:
                     confidence=risk_score,
                     liveness_score=liveness_score,
                     quality_score=quality_score,
+                    track_id=amfr_detection.get("track_id"),
                 )
                 results.append({
                     "bbox": bbox,
                     "name": name,  # FAISS name (display name or employee_id string)
                     "emp_name": emp_name,  # Database display name
                     "emp_id": emp_id,  # Database primary key
+                    "department": emp_dept,  # Department for overlay display
                     "confidence": risk_score,
                     "is_known": True,
                     "attendance_marked": attendance_marked,
@@ -296,6 +299,7 @@ class RecognitionService:
                 if emp is None:
                     emp = EmployeeService.get_by_employee_id(name)
                 emp_id = emp.id if emp else None
+                emp_dept = emp.department if emp else None
                 logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s (BORDERLINE)", name, emp_id)
 
                 self._log_recognition(
@@ -304,12 +308,14 @@ class RecognitionService:
                     confidence=risk_score,
                     liveness_score=liveness_score,
                     quality_score=quality_score,
+                    track_id=amfr_detection.get("track_id"),
                 )
                 results.append({
                     "bbox": bbox,
                     "name": name,
                     "emp_name": emp.name if emp else name,
                     "emp_id": emp_id,
+                    "department": emp_dept,
                     "confidence": risk_score,
                     "is_known": False,
                     "attendance_marked": False,
@@ -331,6 +337,7 @@ class RecognitionService:
                     liveness_score=liveness_score,
                     quality_score=quality_score,
                     is_spoof=True,
+                    track_id=amfr_detection.get("track_id"),
                 )
                 AuditService.log(
                     "SPOOF_ATTEMPT",
@@ -365,6 +372,7 @@ class RecognitionService:
                     confidence=risk_score,
                     liveness_score=liveness_score,
                     quality_score=quality_score,
+                    track_id=amfr_detection.get("track_id"),
                 )
                 results.append({
                     "bbox": bbox,
@@ -452,6 +460,7 @@ class RecognitionService:
         liveness_score: Optional[float] = None,
         quality_score: Optional[float] = None,
         is_spoof: bool = False,
+        track_id: Optional[str] = None,
     ) -> None:
         """Log every recognition event to the database with AMFR data."""
         try:
@@ -462,6 +471,8 @@ class RecognitionService:
                     confidence=confidence,
                     employee_id=employee_id,
                     liveness_confidence=liveness_score,
+                    is_spoof=is_spoof,
+                    track_id=track_id,
                 )
         except Exception as exc:
             logger.warning("Failed to log recognition event: %s", exc)

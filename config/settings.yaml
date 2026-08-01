@@ -7,21 +7,21 @@ camera:
   id: 0
   # URL for phone cameras (IP Webcam, DroidCam, EpocCam)
   url: "http://192.168.1.100:8080/video"
-  width: 640
-  height: 480
-  fps: 30
+  width: 480
+  height: 360
+  fps: 15
   auto_connect: false
 
 recognition:
-  yolo_confidence: 0.5
+  yolo_confidence: 0.60
   # FAISS L2 distance threshold (lower = stricter, higher = more tolerant)
   #   0.0-0.5  → Exact duplicate (identical image)
   #   0.5-1.0  → Same person, similar conditions
   #   1.0-1.5  → Same person, different lighting/angle  ← Default range
   #   1.5-2.0  → Possibly different person
   #   > 2.0    → Almost certainly different person
-  recognition_threshold: 1.5
-  frame_skip: 4                     # Process every Nth frame (higher = faster, less CPU)
+  recognition_threshold: 1.0
+  frame_skip: 2                     # Process every Nth frame (higher = faster, less CPU)
   cooldown_seconds: 60              # Don't re-mark attendance within this window
 
 database:

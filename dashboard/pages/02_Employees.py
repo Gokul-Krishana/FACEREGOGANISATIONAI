@@ -39,7 +39,11 @@ st.title("👥 Employee Management")
 st.markdown("Register, view, and manage employee records.")
 
 # ── Statistics ───────────────────────────────────────────────
-employees = EmployeeService.get_all()
+try:
+    employees = EmployeeService.get_all()
+except Exception as _exc:
+    st.error(f"⚠️ Could not load employees: {_exc}")
+    employees = []
 total = len(employees)
 departments = len(set(e.department for e in employees if e.department))
 faiss_enrolled = sum(1 for e in employees if e.faiss_id is not None)
@@ -76,9 +80,12 @@ else:
 if filtered:
     # Batch-fetch today's attendance counts in a single session
     today_counts = {}
-    with get_session() as s:
-        for emp in filtered:
-            today_counts[emp.id] = len(AttendanceRepo.get_by_employee(s, emp.id))
+    try:
+        with get_session() as s:
+            for emp in filtered:
+                today_counts[emp.id] = len(AttendanceRepo.get_by_employee(s, emp.id))
+    except Exception:
+        today_counts = {}  # Degrade gracefully — counts stay 0
 
     table_data = []
     for emp in filtered:
@@ -111,6 +118,40 @@ if filtered:
         },
     )
 
+    # ── Expandable edit row ──────────────────────────────────
+    with st.expander("✏️ Edit an Employee"):
+        emp_to_edit = st.selectbox(
+            "Select employee to edit",
+            options=[(e.employee_id, e.name) for e in filtered],
+            format_func=lambda x: f"{x[0]} — {x[1]}",
+            key="emp_edit_select",
+        )
+        if emp_to_edit:
+            emp_obj = EmployeeService.get_by_employee_id(emp_to_edit[0])
+            if emp_obj is None:
+                st.error("Employee not found.")
+            else:
+                with st.form("edit_employee_form"):
+                    new_name = st.text_input("Full Name", value=emp_obj.name or "", key="emp_edit_name")
+                    new_dept = st.text_input("Department", value=emp_obj.department or "", key="emp_edit_dept")
+                    save_clicked = st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True)
+                    if save_clicked:
+                        if not new_name.strip():
+                            st.error("Name cannot be empty.")
+                        else:
+                            updated = EmployeeService.update(
+                                employee_id=emp_obj.employee_id,
+                                name=new_name.strip(),
+                                department=new_dept.strip() or None,
+                                operator="dashboard",
+                            )
+                            if updated is not None:
+                                st.success(f"✅ {updated.name} updated successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to update employee.")
+                st.caption("Renaming an employee also updates their recognition label (FAISS).")
+
     # ── Expandable delete rows ───────────────────────────────
     with st.expander("🗑️ Delete an Employee"):
         emp_to_delete = st.selectbox(
@@ -119,7 +160,7 @@ if filtered:
             format_func=lambda x: f"{x[0]} — {x[1]}",
         )
         if emp_to_delete:
-            st.warning(f"This will remove {emp_to_delete[1]} ({emp_to_delete[0]}) from the database. FAISS embedding will NOT be removed automatically.")
+            st.warning(f"This will remove {emp_to_delete[1]} ({emp_to_delete[0]}) from the database and remove their face embedding from the recognition index.")
             confirm = st.text_input("Type the Employee ID to confirm:", placeholder=emp_to_delete[0])
             if confirm == emp_to_delete[0]:
                 if st.button("🗑️ Delete Permanently", type="primary", use_container_width=True):
@@ -176,18 +217,21 @@ if st.session_state.get("show_add_form"):
 st.markdown("---")
 st.markdown("### 📋 Attendance History")
 
-with get_session() as s:
-    all_attendance = []
-    for emp in filtered[:10]:  # limit to first 10 to avoid slow loads
-        records = AttendanceRepo.get_by_employee(s, emp.id)
-        for r in records:
-            all_attendance.append({
-                "Employee": emp.name,
-                "ID": emp.employee_id,
-                "Date": r.timestamp.strftime("%d %b %Y"),
-                "Time": r.timestamp.strftime("%I:%M %p"),
-                "Confidence": f"{r.confidence:.1%}",
-            })
+all_attendance = []
+try:
+    with get_session() as s:
+        for emp in filtered[:10]:  # limit to first 10 to avoid slow loads
+            records = AttendanceRepo.get_by_employee(s, emp.id)
+            for r in records:
+                all_attendance.append({
+                    "Employee": emp.name,
+                    "ID": emp.employee_id,
+                    "Date": r.timestamp.strftime("%d %b %Y"),
+                    "Time": r.timestamp.strftime("%I:%M %p"),
+                    "Confidence": f"{r.confidence:.1%}",
+                })
+except Exception:
+    all_attendance = []  # Degrade gracefully if attendance query fails
 
 if all_attendance:
     df_att = pd.DataFrame(all_attendance)

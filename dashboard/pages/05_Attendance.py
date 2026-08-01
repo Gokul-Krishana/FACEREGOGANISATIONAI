@@ -33,7 +33,10 @@ import streamlit as st
 import pandas as pd
 import cv2
 import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
+
+# streamlit_webrtc is an OPTIONAL dependency. It is imported below inside a
+# try/except so the page still loads (and shows a helpful message) when the
+# package is not installed.
 
 from services.attendance_service import AttendanceService
 from services.employee_service import EmployeeService
@@ -48,6 +51,17 @@ from camera.selector import create_camera, CAMERA_CHOICES
 
 import config.config as cfg
 
+# streamlit_webrtc is an OPTIONAL dependency — the page must still load
+# (and show a helpful message) when it is not installed.
+try:
+    from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
+    _WEBRTC_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    webrtc_streamer = None  # type: ignore[assignment]
+    VideoTransformerBase = object
+    RTCConfiguration = None  # type: ignore[assignment]
+    _WEBRTC_AVAILABLE = False
+
 
 # ── Video Transformer for Real-time Recognition ─────────────────
 class AttendanceVideoTransformer(VideoTransformerBase):
@@ -55,7 +69,6 @@ class AttendanceVideoTransformer(VideoTransformerBase):
     
     def __init__(self):
         self.pipeline = LiveDetection()
-        self._lock = True
     
     def transform(self, frame):
         """Process frame through recognition pipeline."""
@@ -161,26 +174,31 @@ if "att_cam_mode" not in st.session_state:
 @st.cache_data(ttl=5)
 def get_attendance_data(target_date: date, limit: int = 200, skip: int = 0):
     """Get attendance records for a specific date."""
-    with get_session() as session:
-        records = AttendanceRepo.get_by_date(session, target_date, limit=limit, skip=skip)
-        data = []
-        for r in records:
-            emp = r.employee
-            data.append({
-                "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
-                "Name": emp.name if emp else "Unknown",
-                "Department": emp.department if emp and emp.department else "—",
-                "Time": r.timestamp.strftime("%I:%M:%S %p"),
-                "Confidence": f"{r.confidence:.1%}",
-            })
-        return data
+    try:
+        with get_session() as session:
+            records = AttendanceRepo.get_by_date(session, target_date, limit=limit, skip=skip)
+            data = []
+            for r in records:
+                emp = r.employee
+                data.append({
+                    "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
+                    "Name": emp.name if emp else "Unknown",
+                    "Department": emp.department if emp and emp.department else "—",
+                    "Time": r.timestamp.strftime("%I:%M:%S %p"),
+                    "Confidence": f"{r.confidence:.1%}",
+                })
+            return data
+    except Exception:
+        return []
 
 
 @st.cache_data(ttl=5)
 def get_today_stats():
     """Get today's attendance statistics."""
-    stats = AttendanceService.get_statistics()
-    return stats
+    try:
+        return AttendanceService.get_statistics()
+    except Exception:
+        return {}
 
 
 def format_date(d: date) -> str:
@@ -335,23 +353,30 @@ with col_camera:
                 st.info("📱 Configure and connect a phone/IP camera above, then enable the checkbox.")
         else:
             # ── Browser Webcam mode (WebRTC) ──
-            RTC_CONFIG = RTCConfiguration({
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            })
-
-            webrtc_ctx = webrtc_streamer(
-                key="attendance-camera",
-                video_transformer_factory=AttendanceVideoTransformer,
-                rtc_configuration=RTC_CONFIG,
-                media_stream_constraints={"video": True, "audio": False},
-                async_processing=True,
-            )
-
-            # Status indicator
-            if webrtc_ctx.state.playing:
-                st.success("🟢 Camera Active — Recognition Running")
+            if not _WEBRTC_AVAILABLE:
+                st.error(
+                    "⚠️ `streamlit-webrtc` is not installed — Browser Webcam mode is "
+                    "unavailable. Install it with `pip install streamlit-webrtc`, or "
+                    "use the Phone / IP Camera mode instead."
+                )
             else:
-                st.warning("🟡 Camera Starting...")
+                RTC_CONFIG = RTCConfiguration({
+                    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+                })
+
+                webrtc_ctx = webrtc_streamer(
+                    key="attendance-camera",
+                    video_transformer_factory=AttendanceVideoTransformer,
+                    rtc_configuration=RTC_CONFIG,
+                    media_stream_constraints={"video": True, "audio": False},
+                    async_processing=True,
+                )
+
+                # Status indicator
+                if webrtc_ctx.state.playing:
+                    st.success("🟢 Camera Active — Recognition Running")
+                else:
+                    st.warning("🟡 Camera Starting...")
     else:
         st.info("Camera stopped. Check the checkbox to begin.")
 
@@ -496,6 +521,5 @@ Camera ID: {cfg.CAMERA_ID}
 # ─── Auto-refresh ───────────────────────────────────────────────
 if st.session_state.get("auto_refresh", True) and camera_active:
     # Rerun every 5 seconds to update attendance table
-    import time
     time.sleep(5)
     st.rerun()

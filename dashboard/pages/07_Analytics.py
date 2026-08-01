@@ -43,121 +43,143 @@ st.set_page_config(page_title="Analytics", page_icon="📈", layout="wide")
 @st.cache_data(ttl=30)
 def load_attendance_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
     """Load a bounded attendance slice as DataFrame."""
-    with get_session() as session:
-        cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
-        records = (
-            session.query(
-                Attendance.id,
-                Attendance.timestamp,
-                Attendance.employee_id,
-                Attendance.confidence,
-                Employee.name.label("employee_name"),
-                Employee.department.label("department"),
+    try:
+        with get_session() as session:
+            cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
+            records = (
+                session.query(
+                    Attendance.id,
+                    Attendance.timestamp,
+                    Attendance.employee_id,
+                    Attendance.confidence,
+                    Employee.name.label("employee_name"),
+                    Employee.department.label("department"),
+                )
+                .join(Employee, Employee.id == Attendance.employee_id)
+                .filter(Attendance.timestamp >= cutoff)
+                .order_by(desc(Attendance.timestamp))
+                .limit(limit)
+                .all()
             )
-            .join(Employee, Employee.id == Attendance.employee_id)
-            .filter(Attendance.timestamp >= cutoff)
-            .order_by(desc(Attendance.timestamp))
-            .limit(limit)
-            .all()
-        )
-        data = []
-        for r in records:
-            data.append({
-                "date": r.timestamp.date(),
-                "hour": r.timestamp.hour,
-                "timestamp": r.timestamp,
-                "employee_id": r.employee_id,
-                "employee_name": r.employee_name or "Unknown",
-                "department": r.department or "—",
-                "confidence": r.confidence,
-            })
-        return pd.DataFrame(data)
+            data = []
+            for r in records:
+                data.append({
+                    "date": r.timestamp.date(),
+                    "hour": r.timestamp.hour,
+                    "timestamp": r.timestamp,
+                    "employee_id": r.employee_id,
+                    "employee_name": r.employee_name or "Unknown",
+                    "department": r.department or "—",
+                    "confidence": r.confidence,
+                })
+            # Always keep the schema columns — an empty result must still
+            # be a valid, columned DataFrame so the page's column access
+            # (e.g. attendance_df["confidence"]) never raises KeyError.
+            return pd.DataFrame(data, columns=["date", "hour", "timestamp",
+                                               "employee_id", "employee_name",
+                                               "department", "confidence"])
+    except Exception:
+        return pd.DataFrame(columns=["date", "hour", "timestamp", "employee_id",
+                                     "employee_name", "department", "confidence"])
 
 
 @st.cache_data(ttl=30)
 def load_recognition_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
     """Load a bounded recognition slice as DataFrame."""
-    with get_session() as session:
-        cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
-        records = (
-            session.query(
-                RecognitionLog.timestamp,
-                RecognitionLog.is_known,
-                RecognitionLog.confidence,
-                Employee.name.label("employee_name"),
+    try:
+        with get_session() as session:
+            cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
+            records = (
+                session.query(
+                    RecognitionLog.timestamp,
+                    RecognitionLog.is_known,
+                    RecognitionLog.confidence,
+                    Employee.name.label("employee_name"),
+                )
+                .outerjoin(Employee, Employee.id == RecognitionLog.employee_id)
+                .filter(RecognitionLog.timestamp >= cutoff)
+                .order_by(desc(RecognitionLog.timestamp))
+                .limit(limit)
+                .all()
             )
-            .outerjoin(Employee, Employee.id == RecognitionLog.employee_id)
-            .filter(RecognitionLog.timestamp >= cutoff)
-            .order_by(desc(RecognitionLog.timestamp))
-            .limit(limit)
-            .all()
-        )
-        data = []
-        for r in records:
-            data.append({
-                "timestamp": r.timestamp,
-                "is_known": r.is_known,
-                "confidence": r.confidence,
-                "employee_name": r.employee_name,
-            })
-        return pd.DataFrame(data)
+            data = []
+            for r in records:
+                data.append({
+                    "timestamp": r.timestamp,
+                    "is_known": r.is_known,
+                    "confidence": r.confidence,
+                    "employee_name": r.employee_name,
+                })
+            return pd.DataFrame(data, columns=["timestamp", "is_known",
+                                               "confidence", "employee_name"])
+    except Exception:
+        return pd.DataFrame(columns=["timestamp", "is_known", "confidence", "employee_name"])
 
 
 @st.cache_data(ttl=30)
 def load_employee_stats() -> pd.DataFrame:
     """Load employee attendance statistics."""
-    with get_session() as session:
-        records = (
-            session.query(
-                Employee.id,
-                Employee.employee_id,
-                Employee.name,
-                Employee.department,
-                func.count(Attendance.id).label("total_attendance"),
-                func.max(Attendance.timestamp).label("last_seen"),
+    try:
+        with get_session() as session:
+            records = (
+                session.query(
+                    Employee.id,
+                    Employee.employee_id,
+                    Employee.name,
+                    Employee.department,
+                    func.count(Attendance.id).label("total_attendance"),
+                    func.max(Attendance.timestamp).label("last_seen"),
+                )
+                .outerjoin(Attendance, Employee.id == Attendance.employee_id)
+                .group_by(Employee.id)
+                .all()
             )
-            .outerjoin(Attendance, Employee.id == Attendance.employee_id)
-            .group_by(Employee.id)
-            .all()
-        )
-        data = []
-        for r in records:
-            data.append({
-                "id": r.id,
-                "employee_id": r.employee_id,
-                "name": r.name,
-                "department": r.department or "—",
-                "total_attendance": r.total_attendance or 0,
-                "last_seen": r.last_seen,
-            })
-        return pd.DataFrame(data)
+            data = []
+            for r in records:
+                data.append({
+                    "id": r.id,
+                    "employee_id": r.employee_id,
+                    "name": r.name,
+                    "department": r.department or "—",
+                    "total_attendance": r.total_attendance or 0,
+                    "last_seen": r.last_seen,
+                })
+            return pd.DataFrame(data, columns=["id", "employee_id", "name",
+                                               "department", "total_attendance",
+                                               "last_seen"])
+    except Exception:
+        return pd.DataFrame(columns=["id", "employee_id", "name", "department",
+                                     "total_attendance", "last_seen"])
 
 
 @st.cache_data(ttl=30)
 def load_unknown_face_stats(days: int = 30) -> dict:
     """Load unknown face statistics."""
-    with get_session() as session:
-        cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
-        total = session.query(UnknownFace).count()
-        today = session.query(UnknownFace).filter(
-            UnknownFace.timestamp >= datetime.combine(date.today(), datetime.min.time())
-        ).count()
-        this_week = session.query(UnknownFace).filter(
-            UnknownFace.timestamp >= cutoff
-        ).count()
-        pending = session.query(UnknownFace).filter(
-            UnknownFace.reviewed == False
-        ).count()
-        converted = session.query(UnknownFace).filter(
-            UnknownFace.converted_to_employee == True
-        ).count()
-        return {
-            "total": total,
-            "today": today,
-            "this_week": this_week,
-            "pending": pending,
-            "converted": converted,
-        }
+    try:
+        with get_session() as session:
+            cutoff = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
+            total = session.query(UnknownFace).count()
+            today = session.query(UnknownFace).filter(
+                UnknownFace.timestamp >= datetime.combine(date.today(), datetime.min.time())
+            ).count()
+            this_week = session.query(UnknownFace).filter(
+                UnknownFace.timestamp >= cutoff
+            ).count()
+            pending = session.query(UnknownFace).filter(
+                UnknownFace.reviewed == False
+            ).count()
+            converted = session.query(UnknownFace).filter(
+                UnknownFace.converted_to_employee == True
+            ).count()
+            return {
+                "total": total,
+                "today": today,
+                "this_week": this_week,
+                "pending": pending,
+                "converted": converted,
+            }
+    except Exception:
+        return {"total": 0, "today": 0, "this_week": 0, "pending": 0, "converted": 0}
 
 
 # ── Page Header ────────────────────────────────────────────────
@@ -513,7 +535,7 @@ with st.expander("📋 View Raw Data Tables"):
         if not recognition_df.empty:
             display_rec = recognition_df.copy()
             display_rec["timestamp"] = display_rec["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-            display_rec["type"] = display_rec["is_known"].map({True: "Known", False: "Unknown"})
+            display_rec["type"] = display_rec["is_known"].map({True: "Known", "False": "Unknown"})
             st.dataframe(display_rec[["timestamp", "type", "confidence", "employee_name"]], 
                         use_container_width=True, hide_index=True)
         else:

@@ -1620,8 +1620,10 @@ async def delete_employee(
 ):
     """Delete an employee by database ID.
 
-    Returns 204 No Content on success. Does **not** remove the FAISS
-    embedding — use the enrollment service for that.
+    Also removes the employee's embedding(s) from the FAISS index so
+    the deleted employee is no longer recognised by the camera pipeline.
+
+    Returns 204 No Content on success.
     """
     employee = session.get(Employee, employee_id)
     if not employee:
@@ -1631,6 +1633,11 @@ async def delete_employee(
     emp_name = employee.name
     session.delete(employee)
     session.commit()
+
+    # Keep FAISS in sync — remove the embedding so the deleted employee
+    # is no longer recognised. The helper logs FAISS failures internally
+    # and never raises.
+    EmployeeService.remove_faiss_embedding(emp_name, fallback=emp_id_str)
 
     await log_audit(
         request, AuditAction.DATA_DELETED, current_user.username, current_user.id,
