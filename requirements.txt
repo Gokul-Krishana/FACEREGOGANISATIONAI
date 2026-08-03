@@ -26,7 +26,7 @@ python-multipart>=0.0.6         # File upload parsing
 python-magic>=0.4.27            # Magic bytes file type detection
 slowapi>=0.1.9                  # Rate limiting
 secure>=0.3.0                   # Security headers
-python-dotenv>=1.0.0
+python-dotenv>=1.2.2
 httpx>=0.27.0                   # HTTP client for OIDC
 pyotp>=2.9.0                   # TOTP for MFA
 
