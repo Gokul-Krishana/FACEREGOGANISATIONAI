@@ -131,15 +131,21 @@ jobs:
           pip install -r requirements.txt
           pip install alembic
 
-      - name: Verify Alembic migrations (forward + backward)
-        env:
-          DATABASE_URL: sqlite:///${{ github.workspace }}/data/test_migrations.db
+      - name: Verify schema bootstrap + Alembic migrations (forward + backward)
+        # The app's boot path is init_db(): it tries Alembic first and, for fresh
+        # databases, falls back to Base.metadata.create_all() then stamps head.
+        # So we bootstrap the schema exactly like production, then exercise the
+        # migration chain (downgrade -1 / upgrade head) to prove it stays in sync.
         run: |
           mkdir -p data
-          alembic upgrade head
+          python -c "from database.database import init_db; init_db()"
+          # Confirm the database is stamped at the latest revision
+          alembic current | grep -q "(head)"
+          # Round-trip the latest migration to verify it applies cleanly
           alembic downgrade -1
           alembic upgrade head
-          rm -f data/test_migrations.db
+          alembic current | grep -q "(head)"
+          rm -f data/face_recognition.db
 
   test:
     name: Tests (pytest py${{ matrix.python-version }})

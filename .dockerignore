@@ -63,10 +63,24 @@ build/
 *.whl
 *.tar.gz
 
-# ── Logs / Temp / Outputs (created at runtime) ──────────────────────
+# ── Runtime data (must NOT be baked into the image) ──────────────────
+# These directories hold the live database, backups, embeddings, uploads
+# and logs. Excluding them keeps the image small and prevents production
+# data (face_recognition.db, SQL dumps, FAISS index) from leaking into it.
+data/
+backups/
 logs/
-*.log
 outputs/
+unknown_faces/
+uploads/
+embeddings/
+attendance/*.csv
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs / Temp / Outputs (created at runtime) ──────────────────────
+*.log
 __pycache__/
 *.py[cod]
 *$py.class
