@@ -43,6 +43,7 @@ Press ``q`` to quit, ``e`` to enroll the face in view.
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from datetime import datetime
@@ -68,6 +69,8 @@ from camera.base import CameraSource
 from database.database import get_session
 from database.repository import AttendanceRepo, UnknownFaceRepo
 from services.employee_service import EmployeeService
+
+logger = logging.getLogger(__name__)
 
 
 class LiveDetection:
@@ -188,7 +191,10 @@ class LiveDetection:
 
             if decision == AMFRDecision.ACCEPT.value:
                 # ── High confidence + live → mark attendance ──
-                print(f"  ✅ AMFR ACCEPT: {name} | risk={risk_score:.2%} | liveness={liveness_score:.2%}")
+                logger.info(
+                    "AMFR ACCEPT: %s | risk=%.2f%% | liveness=%.2f%%",
+                    name, risk_score * 100, liveness_score * 100,
+                )
                 if name not in self._marked_this_session:
                     self.attendance.mark(name, risk_score)
                     self._log_attendance_db(name, risk_score)
@@ -205,7 +211,7 @@ class LiveDetection:
 
             elif decision == AMFRDecision.BORDERLINE.value:
                 # ── Uncertain — needs more frames ─────────────
-                print(f"  ⚠️  AMFR BORDERLINE: {name}? | risk={risk_score:.2%} | collecting more frames")
+                logger.info("AMFR BORDERLINE: %s? | risk=%.2f%% | collecting more frames", name, risk_score * 100)
                 recognised.append({
                     "bbox": bbox,
                     "name": f"{name}?",
@@ -218,7 +224,7 @@ class LiveDetection:
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 # ── Spoof detected! ───────────────────────────
-                print(f"  🚨 AMFR SPOOF REJECTED | liveness={liveness_score:.2%} | risk={risk_score:.2%}")
+                logger.warning("AMFR SPOOF REJECTED | liveness=%.2f%% | risk=%.2f%%", liveness_score * 100, risk_score * 100)
                 recognised.append({
                     "bbox": bbox,
                     "name": "SPOOF",
@@ -231,7 +237,7 @@ class LiveDetection:
 
             else:  # LOW_CONFIDENCE / No Face
                 # ── Unknown person ─────────────────────────────
-                print(f"  ❌ AMFR UNKNOWN | risk={risk_score:.2%} | quality={quality_score:.2%}")
+                logger.info("AMFR UNKNOWN | risk=%.2f%% | quality=%.2f%%", risk_score * 100, quality_score * 100)
                 person_crop = self.detector.crop_person(frame, bbox)
                 if person_crop.size > 0 and (time.time() - getattr(self, '_last_unknown_save', 0)) > self._unknown_save_cooldown:
                     self._save_unknown_face(person_crop)
@@ -308,20 +314,20 @@ class LiveDetection:
         """
         cap = self.open_camera(camera_id, source_type=source_type, camera_url=camera_url)
         if cap is None:
-            print("[FAIL] Could not open camera. Try a different camera ID:")
-            print("       python main.py --camera-id 1")
+            logger.error("Could not open camera. Try a different camera ID:")
+            logger.error("       python main.py --camera-id 1")
             return
 
-        print("[INFO] Live Detection started")
+        logger.info("Live Detection started")
         print("  [Q] Quit    [E] Enroll face    [R] Reset session")
 
         enrolled_count = self.enrollment.count()
-        print(f"[INFO] Enrolled faces in database: {enrolled_count}")
+        logger.info("Enrolled faces in database: %d", enrolled_count)
 
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("[WARN] Failed to read frame from camera")
+                logger.warning("Failed to read frame from camera")
                 break
 
             frame = self.process_frame(frame)
@@ -329,17 +335,17 @@ class LiveDetection:
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
-                print("[INFO] Quitting...")
+                logger.info("Quitting...")
                 break
             elif key == ord("e"):
                 self._interactive_enroll(frame)
             elif key == ord("r"):
                 self._marked_this_session.clear()
-                print("[INFO] Session reset - all faces can be re-marked")
+                logger.info("Session reset - all faces can be re-marked")
 
         cap.release()
         cv2.destroyAllWindows()
-        print("[INFO] Live detection ended")
+        logger.info("Live detection ended")
 
     # ── Image / Video File Processing ─────────────────────────
 
@@ -367,7 +373,7 @@ class LiveDetection:
         """
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
-            print(f"Could not open video: {video_path}")
+            logger.error("Could not open video: %s", video_path)
             return
 
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -382,7 +388,7 @@ class LiveDetection:
             writer = cv2.VideoWriter(str(output_path), fourcc, fps, (w, h))
 
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        print(f"Processing video: {total} frames @ {fps:.1f} fps")
+        logger.info("Processing video: %d frames @ %.1f fps", total, fps)
 
         while True:
             ret, frame = cap.read()
@@ -409,7 +415,7 @@ class LiveDetection:
         derived confidence, and whether it passes the threshold.
         """
         if self.enrollment.index.ntotal == 0:
-            print("  [FAISS] Index is empty — 0 enrolled faces")
+            logger.debug("[FAISS] Index is empty — 0 enrolled faces")
             return
 
         query = embedding.reshape(1, -1).astype(np.float32)
@@ -418,24 +424,24 @@ class LiveDetection:
         idx = int(indices[0][0])
 
         emb_norm = np.linalg.norm(embedding)
-        print("=" * 60)
-        print("  FAISS DEBUG")
-        print(f"  Embedding norm : {emb_norm:.4f}")
+        logger.debug("=" * 60)
+        logger.debug("  FAISS DEBUG")
+        logger.debug("  Embedding norm : %.4f", emb_norm)
         if idx != -1 and idx < len(self.enrollment.metadata):
             name = self.enrollment.metadata[idx]["name"]
             # Use the same formula as enrollment.search() for consistency
             conf = 1.0 / (1.0 + dist * dist)
-            print(f"  Closest match : '{name}'")
-            print(f"  L2 distance   : {dist:.4f}")
-            print(f"  Confidence    : {conf:.4f} ({conf:.2%})")
-            print(f"  Threshold     : {self.recog_threshold}")
+            logger.debug("  Closest match : '%s'", name)
+            logger.debug("  L2 distance   : %.4f", dist)
+            logger.debug("  Confidence    : %.4f (%.2f%%)", conf, conf * 100)
+            logger.debug("  Threshold     : %s", self.recog_threshold)
             if dist <= self.recog_threshold:
-                print(f"  PASSED threshold — would be recognized")
+                logger.debug("  PASSED threshold — would be recognized")
             else:
-                print(f"  FAILED threshold — would show Unknown")
+                logger.debug("  FAILED threshold — would show Unknown")
         else:
-            print(f"  No valid match found (index has {self.enrollment.index.ntotal} entries)")
-        print("=" * 60)
+            logger.debug("  No valid match found (index has %s entries)", self.enrollment.index.ntotal)
+        logger.debug("=" * 60)
 
     # ── Status ────────────────────────────────────────────────
 
@@ -613,7 +619,7 @@ class LiveDetection:
                         confidence=round(confidence, 4),
                     )
         except Exception as exc:
-            print(f"  Failed to log attendance to DB: {exc}")
+            logger.exception("Failed to log attendance to DB")
 
     def _save_unknown_face(self, face_img: np.ndarray) -> None:
         """Save an unrecognised face snapshot to disk and database.
@@ -639,9 +645,9 @@ class LiveDetection:
             save_path = cfg.UNKNOWN_FACES_DIR / filename
             ok = cv2.imwrite(str(save_path), face_img)
             if ok:
-                print(f"  Saved unknown face: {filename}")
+                logger.info("Saved unknown face: %s", filename)
             else:
-                print(f"  Could not write unknown face to disk: {filename}")
+                logger.warning("Could not write unknown face to disk: %s", filename)
                 return  # don't log to DB if file save failed
 
             # Log to database for dashboard queries
@@ -652,33 +658,33 @@ class LiveDetection:
                     confidence=0.0,
                 )
         except Exception as exc:
-            print(f"  Failed to save unknown face: {exc}")
+            logger.exception("Failed to save unknown face")
 
     def _interactive_enroll(self, frame: np.ndarray) -> None:
         """Enroll the largest face currently visible."""
         detections = self.detector.detect(frame, conf_threshold=self.conf_threshold)
         if not detections:
-            print("No person detected — cannot enroll.")
+            logger.warning("No person detected — cannot enroll.")
             return
 
         largest = self.detector.get_largest_detection(detections)
         person_crop = self.detector.crop_person(frame, largest["bbox"])
         embedding = self.recognizer.extract_embedding(person_crop)
         if embedding is None:
-            print("No face found in the detected person.")
+            logger.warning("No face found in the detected person.")
             return
 
         # Check if already enrolled
         matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
         if matches:
-            print(f"Face already enrolled as: {matches[0]['name']} (conf={matches[0]['confidence']:.2f})")
+            logger.warning("Face already enrolled as: %s (conf=%.2f)", matches[0]["name"], matches[0]["confidence"])
             return
 
         # In a real GUI you'd pop an input dialog; here we use the terminal
         name = input("Enter name for enrollment: ").strip()
         if not name:
-            print("Name cannot be empty.")
+            logger.warning("Name cannot be empty.")
             return
 
         self.enrollment.enroll(name, embedding)
-        print(f"Enrolled '{name}' ({self.enrollment.count()} total embeddings).")
+        logger.info("Enrolled '%s' (%d total embeddings).", name, self.enrollment.count())

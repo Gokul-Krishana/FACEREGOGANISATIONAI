@@ -228,7 +228,7 @@ class Department(Base):
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False)
     name = Column(String(255), nullable=False)
     code = Column(String(20), nullable=False)
-    head_id = Column(Integer, ForeignKey("staff.id", use_alter=True), nullable=True)
+    head_id = Column(Integer, ForeignKey("staff.id", name="fk_departments_head_id", use_alter=True), nullable=True)
     is_active = Column(Boolean, default=True)
     
     institution = relationship("Institution", back_populates="departments")

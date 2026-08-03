@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from dataclasses import dataclass
+from pathlib import Path
 import uuid
 from typing import List, Optional
 
@@ -777,3 +778,48 @@ class AuditLogRepo:
             .order_by(desc(AuditLog.timestamp))
             .all()
         )
+
+    @staticmethod
+    def search_paginated(
+        session: Session,
+        query: str = "",
+        action: Optional[str] = None,
+        actor: Optional[str] = None,
+        severity: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> PageResult:
+        """Search audit logs with filters and server-side pagination.
+
+        Supports free-text search across actor/action/description/resource,
+        plus exact filters for action, actor, severity and a timestamp range.
+        Results are ordered newest-first.
+        """
+        q = session.query(AuditLog)
+
+        term = query.strip()
+        if term:
+            pattern = f"%{term}%"
+            q = q.filter(
+                or_(
+                    AuditLog.actor.ilike(pattern),
+                    AuditLog.action.ilike(pattern),
+                    AuditLog.description.ilike(pattern),
+                    AuditLog.resource_type.ilike(pattern),
+                )
+            )
+        if action:
+            q = q.filter(AuditLog.action == action)
+        if actor:
+            q = q.filter(AuditLog.actor == actor)
+        if severity:
+            q = q.filter(AuditLog.severity == severity)
+        if date_from:
+            q = q.filter(AuditLog.timestamp >= date_from)
+        if date_to:
+            q = q.filter(AuditLog.timestamp <= date_to)
+
+        q = q.order_by(desc(AuditLog.timestamp))
+        return _paginate(q, skip=skip, limit=limit)

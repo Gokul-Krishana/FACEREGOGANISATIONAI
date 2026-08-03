@@ -1,8 +1,27 @@
 # FINAL DELIVERY REPORT — FaceRecognitionAI
 
 **Date:** 2026-08-01
-**Status:** ✅ PRODUCTION READY — Ready for client demonstration
+**Status:** ✅ **PILOT DEPLOYMENT READY** — Ready for a structured pilot (see note below)
 **Product:** Real-Time Face Recognition & Automatic Attendance System (College Deployment)
+
+---
+
+> ## ⚠️ Read this first — calibrated status (2026-08-02)
+>
+> This report was originally written with a **“PRODUCTION READY — ready for
+> client demonstration”** status and a 9.5/10 readiness score. That wording
+> overstates readiness and has been **superseded** by
+> `FINAL_ACCEPTANCE_REPORT.md` and `docs/PILOT_DEPLOYMENT_PLAN.md`.
+>
+> **Accurate claim today:** the software is **ready for pilot deployment in a
+> college environment** — every requirement is implemented and the automated
+> test suite is green (490 passed, 0 failed with Redis). What is **not** yet proven is
+> on-site validation: real-person attendance on the deployment camera, spoof
+> artifact testing, multi-classroom operation, and infrastructure load
+> behaviour. Those are explicitly scoped to the pilot phases in the plan, with
+> decision gates before any campus-wide rollout.
+>
+> All technical content below remains accurate and is retained for reference.
 
 ---
 
@@ -204,8 +223,8 @@ counter (transient inference failures surfaced, never freeze the feed).
 
 | Metric | Value |
 |--------|-------|
-| **Total** | **484 passed, 0 failed, 0 errors** |
-| Skipped | 6 (require a live Redis server) |
+| **Total** | **490 passed, 0 failed, 0 errors** (with Redis + PostgreSQL running) |
+| Without Redis | 484 passed, 6 skipped (Redis-dependent tests) |
 | Warnings | 17 (pre-existing pytest/Redis deprecations) |
 | Suite time | ~1:55 |
 
@@ -285,11 +304,11 @@ python tools/validate_startup.py    # health check
 | Tests (484 pass, 0 fail) | 10 / 10 |
 | **OVERALL** | **9.5 / 10** |
 
-**Final verdict:** the system is **stable, polished, and ready for client
-demonstration**. All critical flows are implemented, tested (484 passing, 0
-failing), and validated on real hardware. The only environment-dependent items
-are Redis/PostgreSQL live validation, which are configuration switches away and
-are already covered by the integration test suite.
+**Final verdict:** the system is **stable, polished, and ready for pilot
+deployment**. All critical flows are implemented and tested (484 passing, 0
+failing). See the calibration note at the top of this report and
+`FINAL_ACCEPTANCE_REPORT.md` §5 for what still requires on-site validation
+before any full-campus rollout claim.
 
 ---
 

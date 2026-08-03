@@ -13,6 +13,8 @@ Covers:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pytest
@@ -21,12 +23,29 @@ from app.deep_liveness import (
     DeepLivenessDetector,
     DeepLivenessResult,
     get_deep_liveness_detector,
+    _MODEL_INPUT_SIZE,
 )
 
 
 @pytest.fixture()
-def detector() -> DeepLivenessDetector:
-    """Return a DeepLivenessDetector instance (fallback mode)."""
+def detector(monkeypatch) -> DeepLivenessDetector:
+    """Return a DeepLivenessDetector forced into fallback mode.
+
+    The real ONNX model may be present locally (``models/liveness/``),
+    so force the fallback path deterministically: the model file is
+    reported as missing and the download is made to fail. This keeps
+    the fallback tests stable whether or not the model is installed.
+    """
+    monkeypatch.setattr(
+        DeepLivenessDetector,
+        "_get_model_path",
+        lambda self: Path("C:/nonexistent/MiniFASNetV2.onnx"),
+    )
+    monkeypatch.setattr(
+        DeepLivenessDetector,
+        "_download_model",
+        lambda self, dest_path: False,
+    )
     return DeepLivenessDetector()
 
 
@@ -137,10 +156,16 @@ class TestDeepLivenessDetector:
 
     # ── Preprocessing ─────────────────────────────────────────
 
+    @staticmethod
+    def _expected_tensor_shape() -> tuple:
+        """NCHW shape the model expects: (1, 3, H, W)."""
+        w, h = _MODEL_INPUT_SIZE
+        return (1, 3, h, w)
+
     def test_preprocess_normal_face(self, detector, live_face, frontal_landmarks):
         """Preprocessing should produce correct NCHW tensor."""
         tensor = detector._preprocess(live_face, frontal_landmarks)
-        assert tensor.shape == (1, 3, 128, 128)
+        assert tensor.shape == self._expected_tensor_shape()
         assert tensor.dtype == np.float32
         assert tensor.min() >= -3.0  # Normalized values
         assert tensor.max() <= 3.0
@@ -148,7 +173,7 @@ class TestDeepLivenessDetector:
     def test_preprocess_without_landmarks(self, detector, live_face):
         """Preprocessing should work without landmarks."""
         tensor = detector._preprocess(live_face, landmarks=None)
-        assert tensor.shape == (1, 3, 128, 128)
+        assert tensor.shape == self._expected_tensor_shape()
         assert tensor.dtype == np.float32
 
     def test_preprocess_different_input_sizes(self, detector):
@@ -157,7 +182,7 @@ class TestDeepLivenessDetector:
         for h, w in sizes:
             face = np.random.randint(0, 255, (h, w, 3), dtype=np.uint8)
             tensor = detector._preprocess(face, landmarks=None)
-            assert tensor.shape == (1, 3, 128, 128)
+            assert tensor.shape == self._expected_tensor_shape()
 
     def test_preprocess_preserves_color(self, detector):
         """Preprocessing shouldn't distort colors catastrophically."""
@@ -382,9 +407,20 @@ class TestIntegrationWithLivenessDetector:
 class TestModelFallback:
     """Tests for the fallback CNN mechanism."""
 
-    def test_fallback_initializes_quickly(self):
+    def test_fallback_initializes_quickly(self, monkeypatch):
         """Fallback CNN should initialise instantly."""
         import time
+        # Force the fallback path regardless of local model presence
+        monkeypatch.setattr(
+            DeepLivenessDetector,
+            "_get_model_path",
+            lambda self: Path("C:/nonexistent/MiniFASNetV2.onnx"),
+        )
+        monkeypatch.setattr(
+            DeepLivenessDetector,
+            "_download_model",
+            lambda self, dest_path: False,
+        )
         start = time.perf_counter()
         det = DeepLivenessDetector()
         elapsed = time.perf_counter() - start

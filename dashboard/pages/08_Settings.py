@@ -12,6 +12,7 @@ Supports:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import sys
 from typing import Dict, List
@@ -22,6 +23,8 @@ if _project_root not in sys.path:
 
 import streamlit as st
 import config.config as cfg
+
+logger = logging.getLogger(__name__)
 
 # ── Page config (must be first Streamlit command) ────────────
 st.set_page_config(page_title="Settings", page_icon="⚙️", layout="wide")
@@ -408,5 +411,6 @@ st.divider()
 with st.expander("📄 Current settings.yaml contents"):
     try:
         st.code(cfg.SETTINGS_PATH.read_text(encoding="utf-8"), language="yaml")
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not read settings file: %s", _exc)
         st.info("Could not read settings file.")

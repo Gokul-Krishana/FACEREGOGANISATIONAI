@@ -6,7 +6,7 @@
       <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python">
     </a>
     <a href="https://github.com/Gokul-Krishana/FACEREGOGANISATIONAI/actions">
-      <img src="https://img.shields.io/badge/Tests-393%20passing-22c55e?logo=pytest" alt="Tests">
+      <img src="https://img.shields.io/badge/Tests-484%20passing-22c55e?logo=pytest" alt="Tests">
     </a>
     <a href="https://github.com/Gokul-Krishana/FACEREGOGANISATIONAI/blob/master/LICENSE">
       <img src="https://img.shields.io/badge/License-MIT-22c55e" alt="License">
@@ -24,7 +24,7 @@
       <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker" alt="Docker">
     </a>
     <br>
-    <img src="https://img.shields.io/badge/Status-Production%20Ready-22c55e" alt="Status">
+    <img src="https://img.shields.io/badge/Status-Pilot%20Deployment%20Ready-22c55e" alt="Status">
     <img src="https://img.shields.io/badge/Privacy-Offline%20First-6366f1" alt="Offline First">
   </p>
 </div>
@@ -51,7 +51,7 @@
 
 ## 📖 Overview
 
-**Face Recognition AI** is a production-ready, real-time face recognition and automatic attendance system that runs entirely **offline** — no cloud services required. Built with a modern AI stack, it combines a powerful recognition pipeline with an intuitive Streamlit dashboard.
+**Face Recognition AI** is a real-time face recognition and automatic attendance system that runs entirely **offline** — no cloud services required. Built with a modern AI stack, it combines a powerful recognition pipeline with an intuitive Streamlit dashboard. The system is **ready for pilot deployment** in a college environment; full campus rollout is achieved through the phased plan in [`docs/PILOT_DEPLOYMENT_PLAN.md`](docs/PILOT_DEPLOYMENT_PLAN.md).
 
 ### 🎯 Key Capabilities
 
@@ -63,7 +63,7 @@
 | **Camera Types** | Webcam, USB, Android (Wi-Fi/USB), iPhone (Wi-Fi/USB), IP/RTSP |
 | **Performance** | Processes AI on 320×240 downscale, displays at 640×480 sharp |
 | **Database** | SQLite (dev) / PostgreSQL (prod) with Alembic migrations |
-| **Tests** | 🏆 **393 passing** — 0 failing, 6 gracefully skipped (Redis optional) |
+| **Tests** | 🏆 **484 passing** — 0 failing, 6 gracefully skipped (Redis optional) |
 
 ### 💡 Use Cases
 
@@ -334,7 +334,7 @@ Edit `config/settings.yaml` or use the **Settings** page in the dashboard.
 ## 🧪 Testing
 
 ```bash
-# Run all 393 tests
+# Run all tests (490 with Redis, 484 without — Redis tests skip when unavailable)
 python -m pytest tests/ -v
 
 # Run with coverage
@@ -347,7 +347,7 @@ python -m pytest tests/test_enrollment.py -v
 python -m pytest tests/test_integration.py -v
 ```
 
-### Test Suite (393 Passing ✅)
+### Test Suite (484 Passing ✅)
 
 | Test File | Tests | Coverage |
 |:----------|:-----:|:---------|
@@ -364,7 +364,7 @@ python -m pytest tests/test_integration.py -v
 | `test_brute_force_protection.py` | — | Rate limiting + locking |
 | `test_ip_camera.py` | — | IP camera source |
 | `test_phone_cameras.py` | — | Phone camera sources |
-| `test_integration.py` | 18 | PostgreSQL + Redis (6 skipped) |
+| `test_integration.py` | 17 | PostgreSQL + Redis (runs when services available) |
 
 ---
 
@@ -443,7 +443,7 @@ FaceRecognitionAI/
 │   ├── migrate_faiss_hnsw.py
 │   └── seed_admin.py       # Admin user seeding
 │
-├── tests/                  # 393+ pytest tests
+├── tests/                  # 484 pytest tests
 ├── docs/                   # Architecture, deployment, troubleshooting
 ├── embeddings/             # FAISS index + metadata
 ├── models/                 # YOLO weights
@@ -485,6 +485,7 @@ The system includes several key optimizations for real-time performance:
 
 | Report | Description |
 |:-------|:------------|
+| [FINAL_ACCEPTANCE_REPORT.md](FINAL_ACCEPTANCE_REPORT.md) | **Final acceptance vs client spec (490 tests green with Redis)** |
 | [BASELINE_REPORT.md](BASELINE_REPORT.md) | Initial project baseline (312 tests, 296 pass) |
 | [FINAL_VALIDATION_REPORT.md](FINAL_VALIDATION_REPORT.md) | Final validation (393 tests, all passing) |
 | [FUNCTIONAL_REPAIR_REPORT.md](FUNCTIONAL_REPAIR_REPORT.md) | Critical bug fixes & root cause analysis |
@@ -492,6 +493,19 @@ The system includes several key optimizations for real-time performance:
 | [POSTGRESQL_VALIDATION_REPORT.md](POSTGRESQL_VALIDATION_REPORT.md) | PostgreSQL + Redis validation |
 | [PRODUCT_BASELINE_REPORT.md](PRODUCT_BASELINE_REPORT.md) | Full product baseline |
 | [PRODUCT_VALIDATION_REPORT.md](PRODUCT_VALIDATION_REPORT.md) | Full product validation |
+
+### Delivery Documents (Administrator / User / API / Ops)
+
+| Document | Description |
+|:---------|:------------|
+| [PILOT_DEPLOYMENT_PLAN.md](docs/PILOT_DEPLOYMENT_PLAN.md) | Phased roadmap: pilot → multi-classroom → campus (with decision gates) |
+| [ADMIN_MANUAL.md](docs/ADMIN_MANUAL.md) | Administrator manual — setup, operations, maintenance, troubleshooting |
+| [USER_MANUAL.md](docs/USER_MANUAL.md) | User manual — dashboard, enrollment, live recognition, attendance |
+| [API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) | REST API reference (auth, CRUD, health, jobs, events) |
+| [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | Full database schema & index strategy |
+| [BACKUP_RESTORE_GUIDE.md](docs/BACKUP_RESTORE_GUIDE.md) | Backup & restore guide (scripted, encrypted, off-site) |
+| [PERFORMANCE_REPORT.md](docs/PERFORMANCE_REPORT.md) | Measured performance report (GPU-accelerated) |
+| [SECURITY_REPORT.md](docs/SECURITY_REPORT.md) | Security posture, threat model & compliance |
 
 ### Technology Stack
 

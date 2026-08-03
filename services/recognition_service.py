@@ -42,7 +42,7 @@ from database.repository import (
 from services.attendance_service import AttendanceService
 from services.audit_service import AuditService
 from services.employee_service import EmployeeService
-
+from services.alert_service import send_security_alert
 logger = logging.getLogger(__name__)
 
 
@@ -345,6 +345,19 @@ class RecognitionService:
                     f"quality={quality_score:.2f}, arcface_distance={arcface_distance:.2f}",
                     operator="system",
                 )
+                # Best-effort email alert (never blocks/raises; throttled).
+                try:
+                    send_security_alert(
+                        "Spoof attempt detected by the recognition pipeline",
+                        details={
+                            "liveness_score": round(liveness_score, 4),
+                            "quality_score": round(quality_score, 4),
+                            "arcface_distance": round(arcface_distance, 4),
+                            "track_id": amfr_detection.get("track_id"),
+                        },
+                    )
+                except Exception:
+                    logger.debug("Security alert dispatch failed", exc_info=True)
                 results.append({
                     "bbox": bbox,
                     "name": "SPOOF",

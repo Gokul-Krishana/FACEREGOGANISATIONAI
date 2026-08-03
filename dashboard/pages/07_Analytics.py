@@ -13,6 +13,7 @@ Charts:
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
@@ -34,6 +35,8 @@ from database.repository import (
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 from database.models import Attendance, Employee, RecognitionLog, UnknownFace
+
+logger = logging.getLogger(__name__)
 
 
 st.set_page_config(page_title="Analytics", page_icon="📈", layout="wide")
@@ -78,7 +81,8 @@ def load_attendance_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
             return pd.DataFrame(data, columns=["date", "hour", "timestamp",
                                                "employee_id", "employee_name",
                                                "department", "confidence"])
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load attendance analytics: %s", _exc)
         return pd.DataFrame(columns=["date", "hour", "timestamp", "employee_id",
                                      "employee_name", "department", "confidence"])
 
@@ -112,7 +116,8 @@ def load_recognition_df(days: int = 30, limit: int = 5000) -> pd.DataFrame:
                 })
             return pd.DataFrame(data, columns=["timestamp", "is_known",
                                                "confidence", "employee_name"])
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load recognition analytics: %s", _exc)
         return pd.DataFrame(columns=["timestamp", "is_known", "confidence", "employee_name"])
 
 
@@ -147,7 +152,8 @@ def load_employee_stats() -> pd.DataFrame:
             return pd.DataFrame(data, columns=["id", "employee_id", "name",
                                                "department", "total_attendance",
                                                "last_seen"])
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load attendance-by-employee analytics: %s", _exc)
         return pd.DataFrame(columns=["id", "employee_id", "name", "department",
                                      "total_attendance", "last_seen"])
 
@@ -178,7 +184,8 @@ def load_unknown_face_stats(days: int = 30) -> dict:
                 "pending": pending,
                 "converted": converted,
             }
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load unknown-face analytics: %s", _exc)
         return {"total": 0, "today": 0, "this_week": 0, "pending": 0, "converted": 0}
 
 
@@ -582,6 +589,103 @@ with exp_col3:
                 mime="text/csv",
                 use_container_width=True,
             )
+
+# ── Professional formats: PDF / Excel ─────────────────────────
+exp_col4, exp_col5, exp_col6 = st.columns(3)
+
+with exp_col4:
+    if st.button("📕 Export Attendance (PDF)", use_container_width=True):
+        if not attendance_df.empty:
+            try:
+                from services.report_service import ReportService, ReportUnavailableError
+                rows = [
+                    {
+                        "Date": r["date"].strftime("%Y-%m-%d") if r.get("date") is not None else "",
+                        "Time": r["timestamp"].strftime("%H:%M:%S") if r.get("timestamp") is not None else "",
+                        "ID": r.get("employee_id", ""),
+                        "Name": r.get("employee_name", ""),
+                        "Department": r.get("department", ""),
+                        "Confidence": f"{r.get('confidence', 0):.1%}" if r.get("confidence") is not None else "",
+                    }
+                    for r in attendance_df.to_dict("records")
+                ]
+                pdf = ReportService._pdf_table(
+                    f"Attendance Report — Last {days_back} days",
+                    ["Date", "Time", "ID", "Name", "Department", "Confidence"],
+                    rows,
+                    subtitle=f"{len(rows)} record(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                )
+                st.download_button(
+                    "Download Attendance PDF",
+                    pdf,
+                    file_name=f"attendance_report_{date.today()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except ReportUnavailableError as _exc:
+                st.error(f"⚠️ {_exc}")
+
+with exp_col5:
+    if st.button("📗 Export Attendance (Excel)", use_container_width=True):
+        if not attendance_df.empty:
+            try:
+                from services.report_service import ReportService, ReportUnavailableError
+                rows = [
+                    {
+                        "Date": r["date"].strftime("%Y-%m-%d") if r.get("date") is not None else "",
+                        "Time": r["timestamp"].strftime("%H:%M:%S") if r.get("timestamp") is not None else "",
+                        "ID": r.get("employee_id", ""),
+                        "Name": r.get("employee_name", ""),
+                        "Department": r.get("department", ""),
+                        "Confidence": f"{r.get('confidence', 0):.1%}" if r.get("confidence") is not None else "",
+                    }
+                    for r in attendance_df.to_dict("records")
+                ]
+                xlsx = ReportService._excel_table(
+                    f"Attendance Report — Last {days_back} days",
+                    ["Date", "Time", "ID", "Name", "Department", "Confidence"],
+                    rows,
+                    sheet_name="Attendance",
+                )
+                st.download_button(
+                    "Download Attendance Excel",
+                    xlsx,
+                    file_name=f"attendance_report_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except ReportUnavailableError as _exc:
+                st.error(f"⚠️ {_exc}")
+
+with exp_col6:
+    if st.button("📘 Export Employees (Excel)", use_container_width=True):
+        if not employee_stats.empty:
+            try:
+                from services.report_service import ReportService, ReportUnavailableError
+                rows = [
+                    {
+                        "ID": r.get("employee_id", ""),
+                        "Name": r.get("name", ""),
+                        "Department": r.get("department", ""),
+                        "Total Marks": r.get("total_attendance", 0),
+                    }
+                    for r in employee_stats.to_dict("records")
+                ]
+                xlsx = ReportService._excel_table(
+                    "Employee Directory",
+                    ["ID", "Name", "Department", "Total Marks"],
+                    rows,
+                    sheet_name="Employees",
+                )
+                st.download_button(
+                    "Download Employees Excel",
+                    xlsx,
+                    file_name=f"employees_report_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            except ReportUnavailableError as _exc:
+                st.error(f"⚠️ {_exc}")
 
 # ── Technical Details ──────────────────────────────────────────
 with st.expander("ℹ️ Data Sources & Technical Details"):

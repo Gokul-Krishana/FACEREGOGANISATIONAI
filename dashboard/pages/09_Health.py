@@ -13,6 +13,8 @@ Provides diagnostics, auto-refresh, and quick-fix buttons.
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 import sys
 import time
@@ -37,6 +39,8 @@ st.set_page_config(page_title="System Health", page_icon="🩺", layout="wide")
 # ── Health Check Functions ─────────────────────────────────────
 
 from sqlalchemy import text as _sa_text
+
+logger = logging.getLogger(__name__)
 
 
 @st.cache_resource(ttl=10)
@@ -158,8 +162,97 @@ def check_disk_space() -> dict:
             "free_gb": round(free_gb, 1),
             "total_gb": round(total / (1024 ** 3), 1),
         }
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Disk-space check failed: %s", _exc)
         return {"status": "unknown", "free_gb": "?", "total_gb": "?"}
+
+
+@st.cache_resource(ttl=10)
+def check_redis() -> dict:
+    """Check Redis availability (cached 10s).
+
+    Redis is optional (job queue / caching); a missing Redis degrades
+    gracefully, so this reports ``unknown`` when the package is absent
+    and ``error`` only when Redis is installed but unreachable.
+    """
+    try:
+        import redis as redis_lib
+        url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        client = redis_lib.Redis.from_url(url, socket_timeout=2, socket_connect_timeout=2)
+        pong = client.ping()
+        server_version = client.info("server").get("redis_version", "?")
+        client.close()
+        if pong:
+            return {"status": "ok", "version": server_version}
+        return {"status": "error", "message": "Redis ping failed"}
+    except ImportError:
+        return {"status": "unknown", "message": "redis package not installed"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@st.cache_resource(ttl=10)
+def check_gpu() -> dict:
+    """Check GPU (CUDA) availability for inference acceleration (cached 10s)."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return {
+                "status": "ok",
+                "device": torch.cuda.get_device_name(0),
+                "cuda": torch.version.cuda or "?",
+            }
+        return {
+            "status": "warning",
+            "device": "CPU",
+            "message": "CUDA not available — running on CPU (slower inference)",
+        }
+    except ImportError:
+        return {"status": "unknown", "message": "torch not installed"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@st.cache_resource(ttl=10)
+def check_spoof_attempts() -> dict:
+    """Count recorded spoof (rejected) recognition attempts (cached 10s)."""
+    try:
+        from datetime import datetime, timezone
+        from sqlalchemy import func as _sa_func
+        from database.models import RecognitionLog
+
+        # Naive UTC (matches database timestamps); datetime.utcnow() is deprecated.
+        _now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        start_of_day = _now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        with get_session() as session:
+            today = session.query(_sa_func.count(RecognitionLog.id)).filter(
+                RecognitionLog.is_spoof.is_(True),
+                RecognitionLog.timestamp >= start_of_day,
+            ).scalar() or 0
+            total = session.query(_sa_func.count(RecognitionLog.id)).filter(
+                RecognitionLog.is_spoof.is_(True),
+            ).scalar() or 0
+        return {"status": "ok", "today": int(today), "total": int(total)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def get_live_pipeline_status() -> dict:
+    """Read the active Live Recognition pipeline (from the Live page session)."""
+    try:
+        pipe = st.session_state.get("pipeline")
+        if pipe is None or not getattr(pipe, "is_running", False):
+            return {"status": "idle", "message": "No live recognition session active"}
+        latency = pipe.latency_stats()
+        return {
+            "status": pipe.status,
+            "fps": round(pipe.fps, 1),
+            "ai_fps": round(pipe.ai_fps, 1),
+            "people": pipe.people_count,
+            "latency_p50": round(latency.get("p50_ms", 0), 1),
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 # ── Render Status Indicator ────────────────────────────────────
@@ -220,6 +313,9 @@ _checks = [
     ("FAISS", check_faiss),
     ("Pipeline", check_recognition_pipeline),
     ("Disk", check_disk_space),
+    ("Redis", check_redis),
+    ("GPU", check_gpu),
+    ("Spoof", check_spoof_attempts),
 ]
 db_health = {}
 cam_health = {}
@@ -228,6 +324,9 @@ arcface_health = {}
 faiss_health = {}
 pipeline_health = {}
 disk_health = {}
+redis_health = {}
+gpu_health = {}
+spoof_health = {}
 
 for _name, _fn in _checks:
     try:
@@ -248,9 +347,41 @@ for _name, _fn in _checks:
         pipeline_health = _result
     elif _name == "Disk":
         disk_health = _result
+    elif _name == "Redis":
+        redis_health = _result
+    elif _name == "GPU":
+        gpu_health = _result
+    elif _name == "Spoof":
+        spoof_health = _result
 
 # Clear the "Running diagnostics..." placeholder now that checks are done
 _status_placeholder.empty()
+
+# ── Best-effort operational alerts (throttled; never block/raise) ──
+try:
+    from services.alert_service import send_operational_alert
+
+    if db_health.get("status") == "error":
+        send_operational_alert(
+            "db_down",
+            f"Database health check FAILED: {db_health.get('message', 'unknown error')}",
+            severity="CRITICAL",
+        )
+    if disk_health.get("status") == "warning":
+        send_operational_alert(
+            "low_disk",
+            f"Low disk space: {disk_health.get('free_gb', '?')} GB free on {cfg.ROOT_DIR}",
+            severity="WARNING",
+        )
+    if cam_health.get("status") == "error":
+        send_operational_alert(
+            "camera_offline",
+            f"Camera check FAILED: {cam_health.get('message', 'unknown error')}",
+            severity="ERROR",
+            throttle_key="camera_offline:health_page",
+        )
+except Exception:
+    pass  # Alert dispatch is best-effort — never break the health page
 
 # ── Overall Status Banner ──────────────────────────────────────
 all_ok = all(
@@ -303,6 +434,37 @@ with col3:
     disk_detail = f"{disk_health.get('free_gb', '?')} GB free" if disk_health["status"] in ("ok", "warning") else ""
     disk_error = "Low disk space" if disk_health["status"] == "warning" else ""
     render_status(disk_health["status"], "Disk Space", disk_detail, disk_error)
+
+# ── Extended health grid: Redis, GPU, Live Recognition ────────
+col4, col5, col6 = st.columns(3)
+
+with col4:
+    st.markdown("### 🔄 Redis")
+    redis_detail = f"v{redis_health.get('version', '?')}" if redis_health["status"] == "ok" else ""
+    redis_error = redis_health.get("message", "") if redis_health["status"] != "ok" else ""
+    render_status(redis_health["status"], "Cache / Job Queue", redis_detail, redis_error)
+
+with col5:
+    st.markdown("### 🎮 GPU")
+    gpu_detail = gpu_health.get("device", "") if gpu_health["status"] in ("ok", "warning") else ""
+    gpu_error = gpu_health.get("message", "") if gpu_health["status"] not in ("ok", "warning") else gpu_health.get("message", "")
+    render_status(gpu_health["status"], "Inference Accelerator", gpu_detail, gpu_error)
+
+with col6:
+    st.markdown("### 📹 Live Recognition")
+    live_health = get_live_pipeline_status()
+    if live_health["status"] == "idle":
+        render_status("unknown", "No Active Session", "Start it from the Live Recognition page")
+    elif live_health["status"] == "error":
+        render_status("error", "Pipeline Unavailable", live_health.get("message", ""))
+    else:
+        _live_color = "ok" if live_health["status"] == "LIVE" else ("warning" if live_health["status"] in ("CONNECTING", "RECONNECTING") else "error")
+        render_status(
+            _live_color,
+            f"Camera {live_health['status']}",
+            f"{live_health.get('fps', 0)} FPS · AI {live_health.get('ai_fps', 0)} FPS · "
+            f"{live_health.get('people', 0)} people · P50 {live_health.get('latency_p50', 0)} ms",
+        )
 
 st.divider()
 
@@ -376,7 +538,7 @@ Retention Days:     {cfg.UNKNOWN_FACE_RETENTION_DAYS}
 
 # ── Health Log ─────────────────────────────────────────────────
 with st.expander("📊 Service Statistics"):
-    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
 
     with stat_col1:
         stats = AttendanceService.get_statistics()
@@ -391,6 +553,10 @@ with st.expander("📊 Service Statistics"):
     with stat_col3:
         total_emps = EmployeeService.count()
         st.metric("Registered Employees", total_emps)
+
+    with stat_col4:
+        spoof_today = spoof_health.get("today", 0) if spoof_health.get("status") == "ok" else "?"
+        st.metric("Spoof Attempts (Today)", spoof_today)
 
 # ── Troubleshooting Guide ─────────────────────────────────────
 with st.expander("🔧 Troubleshooting Guide"):

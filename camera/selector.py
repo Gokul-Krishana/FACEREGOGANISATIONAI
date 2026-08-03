@@ -33,6 +33,7 @@ import cv2
 
 from camera.base import CameraSource
 from camera.webcam import WebcamSource, USBAnySource
+from utils.logging_setup import get_logger
 from camera.phone import (
     AndroidUSBSource,
     AndroidWiFiSource,
@@ -40,6 +41,8 @@ from camera.phone import (
     iPhoneWiFiSource,
     IPCameraSource,
 )
+
+logger = get_logger(__name__)
 
 # ── Registry ───────────────────────────────────────────────────
 # Maps source type slugs to their class and a human label.
@@ -81,7 +84,7 @@ def create_camera(source_type: str, **kwargs) -> Optional[CameraSource]:
     """
     entry = CAMERA_REGISTRY.get(source_type)
     if entry is None:
-        print(f"[CameraSelector] Unknown source type: {source_type}")
+        logger.warning("Unknown camera source type: %s", source_type)
         return None
 
     label, cls = entry

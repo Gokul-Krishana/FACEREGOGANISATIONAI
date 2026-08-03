@@ -19,6 +19,9 @@ import cv2
 import numpy as np
 
 from camera.base import CameraSource, CameraError
+from utils.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebcamSource(CameraSource):
@@ -63,7 +66,7 @@ class WebcamSource(CameraSource):
                 if cap.isOpened():
                     self._cap = cap
                     self.set_resolution(self._width, self._height)
-                    print(f"[Webcam] Opened camera #{self.device_id} via {backend_name}")
+                    logger.info("Webcam opened camera #%s via %s", self.device_id, backend_name)
                     return True
             except Exception:
                 continue
@@ -263,7 +266,7 @@ class USBAnySource(CameraSource):
                                 self._found_index = idx
                                 self.set_resolution(self._width, self._height)
                                 backend_name = "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
-                                print(f"[USBAny] Found camera #{idx} via {backend_name}")
+                                logger.info("USBAny found camera #%s via %s", idx, backend_name)
                                 return True
                             cap.release()
                     except Exception:
@@ -271,7 +274,7 @@ class USBAnySource(CameraSource):
             except Exception:
                 continue
 
-        print(f"[USBAny] No camera found after scanning {self._max_devices} indices")
+        logger.warning("USBAny: no camera found after scanning %s indices", self._max_devices)
         return False
 
     def release(self) -> None:

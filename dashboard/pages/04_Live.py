@@ -34,6 +34,7 @@ Supports:
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 import threading
@@ -72,6 +73,8 @@ if _project_root not in sys.path:
 
 import config.config as cfg
 from app.amfr_engine import AMFRDecision
+
+logger = logging.getLogger(__name__)
 from services.recognition_service import RecognitionService
 from camera.base import CameraSource
 from camera.selector import create_camera
@@ -99,10 +102,10 @@ class SharedModelResources:
     def load() -> SharedModelResources:
         """Load (or retrieve cached) recognition models once."""
         if not hasattr(SharedModelResources, "_cache"):
-            print("[ModelCache] Loading shared AI models (YOLO, InsightFace, FAISS, AMFR)...")
+            logger.info("Loading shared AI models (YOLO, InsightFace, FAISS, AMFR)...")
             service = RecognitionService()
             SharedModelResources._cache = SharedModelResources(service=service)
-            print(f"[ModelCache] Models loaded — {service.enrollment.count()} enrolled faces")
+            logger.info("Models loaded — %d enrolled faces", service.enrollment.count())
         return SharedModelResources._cache
 
 
@@ -311,6 +314,18 @@ class LiveRecognitionPipeline:
 
         if self._reconnect_attempts >= max_reconnects:
             self._status = "DISCONNECTED"
+            # Best-effort operational alert (throttled per camera source).
+            try:
+                from services.alert_service import send_operational_alert
+                send_operational_alert(
+                    "camera_offline",
+                    f"Camera '{self.source_type}' ({self.camera_kwargs}) went offline "
+                    f"after {max_reconnects} reconnect attempts and is now DISCONNECTED.",
+                    severity="ERROR",
+                    throttle_key=f"camera_offline:{self.source_type}",
+                )
+            except Exception:
+                logger.debug("Camera-offline alert dispatch failed", exc_info=True)
 
     # ── Recognition worker (independent of capture) ───────────
 

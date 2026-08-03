@@ -24,20 +24,26 @@ Checks:
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
+
+# UTF-8 output (Windows consoles default to cp1252, which breaks on emoji)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 # ── Ensure project root is on path ────────────────────────────
 _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import config.config as cfg
-from database.database import DB_TYPE, DATABASE_URL, get_session, run_migrations
+import config.config as cfg  # noqa: E402  (needs sys.path setup above)
+from database.database import DB_TYPE, DATABASE_URL, get_session  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +105,7 @@ def check_config() -> Check:
     if not (0 <= cfg.RECOGNITION_THRESHOLD <= 5):
         issues.append(f"RECOGNITION_THRESHOLD={cfg.RECOGNITION_THRESHOLD} seems extreme")
     if not (0 <= cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD <= 1):
-        issues.append(f"AMFR threshold out of range")
+        issues.append("AMFR threshold out of range")
     if cfg.FAISS_INDEX_TYPE not in ("flat", "hnsw", "ivf"):
         issues.append(f"Unknown FAISS index type: {cfg.FAISS_INDEX_TYPE}")
 
@@ -301,7 +307,7 @@ def print_report(checks: List[Check]) -> None:
     """Print a formatted validation report."""
     emoji = {"PASS": "✅", "FAIL": "❌", "WARN": "⚠️ ", "SKIP": "⏭️"}
     print(f"\n{'='*60}")
-    print(f"  System Validation Report")
+    print("  System Validation Report")
     print(f"{'='*60}")
     print()
 
@@ -324,11 +330,11 @@ def print_report(checks: List[Check]) -> None:
     print(f"{'='*60}")
     print(f"  Results: {passed}/{total} passed, {failed} failed, {warned} warnings")
     if failed > 0:
-        print(f"  ❌ SYSTEM NOT READY — fix FAIL items above")
+        print("  ❌ SYSTEM NOT READY — fix FAIL items above")
     elif warned > 0:
-        print(f"  ⚠️  System ready (with warnings)")
+        print("  ⚠️  System ready (with warnings)")
     else:
-        print(f"  ✅ SYSTEM READY")
+        print("  ✅ SYSTEM READY")
     print(f"{'='*60}\n")
 
 

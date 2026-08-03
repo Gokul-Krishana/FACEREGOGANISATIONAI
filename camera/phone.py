@@ -30,6 +30,9 @@ import numpy as np
 import requests
 
 from camera.base import CameraSource, CameraError
+from utils.logging_setup import get_logger, redact_url
+
+logger = get_logger(__name__)
 
 
 # ==================================================================
@@ -74,21 +77,21 @@ class AndroidWiFiSource(CameraSource):
         try:
             resp = requests.get(self._base_url, timeout=5)
             if resp.status_code != 200:
-                print(f"[AndroidWiFi] Server unreachable (HTTP {resp.status_code})")
+                logger.warning("IP Webcam server unreachable (HTTP %s)", resp.status_code)
                 return False
-            print(f"[AndroidWiFi] IP Webcam reachable at {self._base_url}")
+            logger.info("IP Webcam reachable at %s", redact_url(self._base_url))
         except requests.RequestException as exc:
-            print(f"[AndroidWiFi] Connection failed: {exc}")
+            logger.error("IP Webcam connection failed: %s", redact_url(str(exc)))
             return False
 
         # Open the video stream via OpenCV
         self._cap = cv2.VideoCapture(self._url)
         if not self._cap.isOpened():
-            print("[AndroidWiFi] Failed to open video stream")
+            logger.error("Failed to open IP Webcam video stream")
             return False
 
         self.set_resolution(self._width, self._height)
-        print(f"[AndroidWiFi] Stream opened from {self._url}")
+        logger.info("IP Webcam stream opened from %s", redact_url(self._url))
         return True
 
     def release(self) -> None:
@@ -183,7 +186,7 @@ class AndroidUSBSource(CameraSource):
                 self._cap = cap
                 self._mode = "usb"
                 self.set_resolution(self._width, self._height)
-                print(f"[AndroidUSB] DroidCam USB opened at device #{self._device_id}")
+                logger.info("DroidCam USB opened at device #%s", self._device_id)
                 return True
         except Exception:
             pass
@@ -195,12 +198,12 @@ class AndroidUSBSource(CameraSource):
             if cap.isOpened():
                 self._cap = cap
                 self._mode = "wifi"
-                print(f"[AndroidUSB] DroidCam Wi-Fi fallback at {wifi_url}")
+                logger.info("DroidCam Wi-Fi fallback at %s", redact_url(wifi_url))
                 return True
         except Exception:
             pass
 
-        print("[AndroidUSB] DroidCam not found (tried USB and Wi-Fi)")
+        logger.warning("DroidCam not found (tried USB and Wi-Fi)")
         return False
 
     def release(self) -> None:
@@ -288,10 +291,10 @@ class iPhoneWiFiSource(CameraSource):
             self._cap = cv2.VideoCapture(self._rtsp_url)
             if self._cap.isOpened():
                 self.set_resolution(self._width, self._height)
-                print(f"[iPhoneWiFi] EpocCam stream opened at {self._rtsp_url}")
+                logger.info("EpocCam stream opened at %s", redact_url(self._rtsp_url))
                 return True
         except Exception as exc:
-            print(f"[iPhoneWiFi] Failed: {exc}")
+            logger.error("EpocCam connection failed: %s", redact_url(str(exc)))
         return False
 
     def release(self) -> None:
@@ -390,10 +393,10 @@ class IPCameraSource(CameraSource):
             self._cap = cv2.VideoCapture(self._url)
             if self._cap.isOpened():
                 self.set_resolution(self._width, self._height)
-                print(f"[IPCamera] Stream opened: {self._url}")
+                logger.info("IP camera stream opened: %s", redact_url(self._url))
                 return True
         except Exception as exc:
-            print(f"[IPCamera] Failed to open: {exc}")
+            logger.error("IP camera failed to open: %s", redact_url(str(exc)))
         return False
 
     def release(self) -> None:
@@ -488,7 +491,7 @@ class iPhoneUSBSource(CameraSource):
                 if cap.isOpened():
                     self._cap = cap
                     self.set_resolution(self._width, self._height)
-                    print(f"[iPhoneUSB] Opened via {backend_name}")
+                    logger.info("iPhone USB camera opened via %s", backend_name)
                     return True
             except Exception:
                 continue

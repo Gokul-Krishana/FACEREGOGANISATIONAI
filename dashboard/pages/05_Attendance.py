@@ -18,6 +18,7 @@ Phone camera sources:
 
 from __future__ import annotations
 
+import logging
 import time
 import threading
 from datetime import date, datetime
@@ -50,6 +51,8 @@ from camera.base import CameraSource
 from camera.selector import create_camera, CAMERA_CHOICES
 
 import config.config as cfg
+
+logger = logging.getLogger(__name__)
 
 # streamlit_webrtc is an OPTIONAL dependency — the page must still load
 # (and show a helpful message) when it is not installed.
@@ -188,7 +191,8 @@ def get_attendance_data(target_date: date, limit: int = 200, skip: int = 0):
                     "Confidence": f"{r.confidence:.1%}",
                 })
             return data
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load attendance records: %s", _exc)
         return []
 
 
@@ -197,7 +201,8 @@ def get_today_stats():
     """Get today's attendance statistics."""
     try:
         return AttendanceService.get_statistics()
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load attendance stats: %s", _exc)
         return {}
 
 
@@ -453,6 +458,50 @@ with dcol3:
             )
         else:
             st.warning("No data to export")
+
+# ── Professional formats: PDF / Excel for the selected date ──
+_export_pdf = st.button("📕 Export PDF", key="att_export_pdf")
+_export_xlsx = st.button("📗 Export Excel", key="att_export_xlsx")
+if _export_pdf or _export_xlsx:
+    hist_rows = get_attendance_data(selected_date)
+    if not hist_rows:
+        st.warning("No data to export")
+    else:
+        try:
+            from services.report_service import ReportService, ReportUnavailableError
+            rows = [
+                {
+                    "ID": r.get("ID", ""),
+                    "Name": r.get("Name", ""),
+                    "Department": r.get("Department", ""),
+                    "Time": r.get("Time", ""),
+                    "Confidence": r.get("Confidence", ""),
+                }
+                for r in hist_rows
+            ]
+            title = f"Attendance Register — {format_date(selected_date)}"
+            if _export_pdf:
+                pdf = ReportService._pdf_table(
+                    title, ["ID", "Name", "Department", "Time", "Confidence"], rows,
+                    subtitle=f"{len(rows)} record(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                )
+                st.download_button(
+                    "Download PDF", pdf,
+                    file_name=f"attendance_{selected_date.strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                )
+            else:
+                xlsx = ReportService._excel_table(
+                    title, ["ID", "Name", "Department", "Time", "Confidence"],
+                    rows, sheet_name="Attendance",
+                )
+                st.download_button(
+                    "Download Excel", xlsx,
+                    file_name=f"attendance_{selected_date.strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+        except ReportUnavailableError as _exc:
+            st.error(f"⚠️ {_exc}")
 
 with dcol4:
     if st.button("🔄 Refresh", use_container_width=True):
