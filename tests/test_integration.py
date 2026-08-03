@@ -22,9 +22,7 @@ Tests:
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
-from typing import Generator, Optional
 
 import pytest
 
@@ -54,6 +52,7 @@ def _check_postgres() -> bool:
     """Try connecting to PostgreSQL."""
     try:
         import sqlalchemy
+
         eng = sqlalchemy.create_engine(POSTGRES_URL, connect_args={"connect_timeout": 3})
         with eng.connect() as conn:
             conn.execute(sqlalchemy.text("SELECT 1"))
@@ -67,6 +66,7 @@ def _check_redis() -> bool:
     """Try connecting to Redis."""
     try:
         import redis as _redis
+
         client = _redis.from_url(REDIS_URL, socket_connect_timeout=2)
         client.ping()
         client.close()
@@ -153,6 +153,7 @@ class TestPostgresConnection:
     def test_connection(self, pg_engine):
         """Test basic PostgreSQL connection."""
         import sqlalchemy
+
         with pg_engine.connect() as conn:
             result = conn.execute(sqlalchemy.text("SELECT 1 AS val"))
             row = result.fetchone()
@@ -163,9 +164,18 @@ class TestPostgresConnection:
         """Verify that all expected tables were created."""
         import sqlalchemy
         from database.models import (
-            Attendance, AuditLog, Camera, Employee, RecognitionLog,
-            Student, UnknownFace, User, Role, Permission,
+            Attendance,
+            AuditLog,
+            Camera,
+            Employee,
+            RecognitionLog,
+            Student,
+            UnknownFace,
+            User,
+            Role,
+            Permission,
         )
+
         inspector = sqlalchemy.inspect(pg_engine)
         tables = inspector.get_table_names()
         expected = [
@@ -193,6 +203,7 @@ class TestPostgresAttendance:
 
         # Create employee first
         from database.repository import EmployeeRepo
+
         emp = EmployeeRepo.create(pg_session, employee_id="IT-001", name="Test User")
 
         record = AttendanceRepo.create(
@@ -207,6 +218,7 @@ class TestPostgresAttendance:
     def test_attendance_read_today(self, pg_session):
         """Read today's attendance records."""
         from database.repository import AttendanceRepo, EmployeeRepo
+
         emp = EmployeeRepo.create(pg_session, employee_id="IT-002", name="Test User 2")
         AttendanceRepo.create(pg_session, employee_id=emp.id, confidence=0.90)
 
@@ -217,6 +229,7 @@ class TestPostgresAttendance:
     def test_attendance_pagination(self, pg_session):
         """Verify pagination works with PostgreSQL."""
         from database.repository import AttendanceRepo, EmployeeRepo
+
         emp = EmployeeRepo.create(pg_session, employee_id="IT-003", name="Test User 3")
 
         for i in range(25):
@@ -233,6 +246,7 @@ class TestPostgresAttendance:
     def test_attendance_statistics(self, pg_session):
         """Verify attendance statistics aggregation."""
         from database.repository import AttendanceRepo, EmployeeRepo
+
         emp = EmployeeRepo.create(pg_session, employee_id="IT-004", name="Test User 4")
         AttendanceRepo.create(pg_session, employee_id=emp.id, confidence=0.85)
         AttendanceRepo.create(pg_session, employee_id=emp.id, confidence=0.90)
@@ -249,6 +263,7 @@ class TestPostgresRecognition:
     def test_recognition_write(self, pg_session):
         """Write a recognition event and verify it persists."""
         from database.repository import RecognitionLogRepo, EmployeeRepo
+
         emp = EmployeeRepo.create(pg_session, employee_id="IT-010", name="Test Recognition")
 
         log = RecognitionLogRepo.create(
@@ -263,6 +278,7 @@ class TestPostgresRecognition:
     def test_recognition_recent(self, pg_session):
         """Read recent recognition logs."""
         from database.repository import RecognitionLogRepo
+
         logs = RecognitionLogRepo.get_recent(pg_session, limit=10)
         # May be empty if no logs — that's fine
         assert isinstance(logs, list)
@@ -274,7 +290,6 @@ class TestPostgresMigrations:
     def test_migration_revision(self):
         """Verify alembic can read migration history (not running them)."""
         skip_no_postgres()
-        import sqlalchemy
         from alembic.config import Config
         from alembic.script import ScriptDirectory
 
@@ -294,6 +309,7 @@ class TestPostgresReconnect:
     def test_pool_pre_ping(self, pg_engine):
         """Verify pool_pre_ping works (stale connection recovery)."""
         import sqlalchemy
+
         # Force a connection to break, then try again with pre_ping
         with pg_engine.connect() as conn:
             conn.execute(sqlalchemy.text("SELECT 1"))
@@ -342,19 +358,13 @@ class TestRedisAttendanceCache:
         date_str = "2026-07-28"
 
         # Should not be marked initially
-        assert redis_client.exists(
-            f"attendance:marked:{student_id}:{section_id}:{date_str}"
-        ) == 0
+        assert redis_client.exists(f"attendance:marked:{student_id}:{section_id}:{date_str}") == 0
 
         # Mark attendance
-        redis_client.setex(
-            f"attendance:marked:{student_id}:{section_id}:{date_str}", 86400, "1"
-        )
+        redis_client.setex(f"attendance:marked:{student_id}:{section_id}:{date_str}", 86400, "1")
 
         # Should now be marked
-        assert redis_client.exists(
-            f"attendance:marked:{student_id}:{section_id}:{date_str}"
-        ) > 0
+        assert redis_client.exists(f"attendance:marked:{student_id}:{section_id}:{date_str}") > 0
 
 
 class TestRedisCooldown:

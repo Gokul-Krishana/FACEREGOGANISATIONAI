@@ -14,7 +14,6 @@ Displays:
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -22,17 +21,18 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import pandas as pd
+import streamlit as st  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from database.database import get_session
-from database.repository import (
-    EmployeeRepo, AttendanceRepo, RecognitionLogRepo, UnknownFaceRepo, CameraRepo
+from database.database import get_session  # noqa: E402
+from database.repository import (  # noqa: E402
+    EmployeeRepo,
+    AttendanceRepo,
+    RecognitionLogRepo,
+    UnknownFaceRepo,
+    CameraRepo,
 )
-from services.attendance_service import AttendanceService
-from services.employee_service import EmployeeService
-from services.unknown_face_service import UnknownFaceService
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ st.set_page_config(page_title="Dashboard", page_icon="🏠", layout="wide")
 
 
 # ── Cached Data Functions ──────────────────────────────────────
+
 
 @st.cache_data(ttl=10)
 def get_home_stats() -> dict:
@@ -79,13 +80,15 @@ def get_recent_attendance_df(limit: int = 10) -> pd.DataFrame:
             rows = []
             for r in records:
                 emp = r.employee
-                rows.append({
-                    "Time": r.timestamp.strftime("%I:%M:%S %p"),
-                    "Employee": emp.name if emp else "Unknown",
-                    "ID": emp.employee_id if emp else "—",
-                    "Department": emp.department if emp and emp.department else "—",
-                    "Confidence": f"{r.confidence:.1%}",
-                })
+                rows.append(
+                    {
+                        "Time": r.timestamp.strftime("%I:%M:%S %p"),
+                        "Employee": emp.name if emp else "Unknown",
+                        "ID": emp.employee_id if emp else "—",
+                        "Department": emp.department if emp and emp.department else "—",
+                        "Confidence": f"{r.confidence:.1%}",
+                    }
+                )
             return pd.DataFrame(rows)
     except Exception as _exc:
         logger.warning("Could not load recent recognitions: %s", _exc)
@@ -93,6 +96,7 @@ def get_recent_attendance_df(limit: int = 10) -> pd.DataFrame:
 
 
 # ── Status Indicator Component ─────────────────────────────────
+
 
 def status_badge(label: str, status: str, detail: str = "") -> str:
     """Return an HTML status badge."""
@@ -107,7 +111,7 @@ def status_badge(label: str, status: str, detail: str = "") -> str:
     <div style="display: flex; align-items: center; gap: 6px; margin: 4px 0;">
         <span>{icon}</span>
         <span style="color: {color}; font-weight: 500;">{label}</span>
-        {f'<span style="color: #888; font-size: 0.85em;">— {detail}</span>' if detail else ''}
+        {f'<span style="color: #888; font-size: 0.85em;">— {detail}</span>' if detail else ""}
     </div>
     """
 
@@ -124,6 +128,7 @@ models_error = None
 try:
     # FaceEnrollment internally depends on FaceDetector + FaceRecognizer
     from app.enrollment import FaceEnrollment
+
     _enr = FaceEnrollment()
     enrolled_count = _enr.count()
     models_loaded = True
@@ -139,9 +144,16 @@ if "error" in stats:
         st.cache_data.clear()
         st.rerun()
     stats = {
-        "total_employees": 0, "today_count": 0, "unique_today": 0,
-        "total_records": 0, "unknown_pending": 0, "unknown_today": 0,
-        "unknown_converted": 0, "cameras": [], "recent_logs": [], "today_attendance": [],
+        "total_employees": 0,
+        "today_count": 0,
+        "unique_today": 0,
+        "total_records": 0,
+        "unknown_pending": 0,
+        "unknown_today": 0,
+        "unknown_converted": 0,
+        "cameras": [],
+        "recent_logs": [],
+        "today_attendance": [],
     }
 
 
@@ -205,11 +217,18 @@ with left_col:
 
         with st.container(border=True):
             st.markdown("**Pipeline Health:**")
-            st.markdown(status_badge("YOLO11 Person Detector", "ok", "Confidence ≥ 0.5"), unsafe_allow_html=True)
+            st.markdown(
+                status_badge("YOLO11 Person Detector", "ok", "Confidence ≥ 0.5"), unsafe_allow_html=True
+            )
             st.markdown(status_badge("RetinaFace Face Detection", "ok"), unsafe_allow_html=True)
             st.markdown(status_badge("ArcFace 512-D Embedding", "ok"), unsafe_allow_html=True)
-            st.markdown(status_badge(f"FAISS Search ({enrolled_count} vectors)", "ok"), unsafe_allow_html=True)
-            st.markdown(status_badge("SQLite Database", "ok", f"{stats['total_records']} records"), unsafe_allow_html=True)
+            st.markdown(
+                status_badge(f"FAISS Search ({enrolled_count} vectors)", "ok"), unsafe_allow_html=True
+            )
+            st.markdown(
+                status_badge("SQLite Database", "ok", f"{stats['total_records']} records"),
+                unsafe_allow_html=True,
+            )
 
         st.caption(f"Config: {cfg.SETTINGS_PATH}")
     else:
@@ -314,12 +333,14 @@ with bottom_left:
         for log in recent_logs:
             emp_name = log.employee.name if log.employee else "Unknown"
             log_type = "✅ Known" if log.is_known else "🔴 Unknown"
-            activity.append({
-                "Time": log.timestamp.strftime("%I:%M:%S %p"),
-                "Type": log_type,
-                "Name": emp_name,
-                "Confidence": f"{log.confidence:.1%}" if log.confidence else "—",
-            })
+            activity.append(
+                {
+                    "Time": log.timestamp.strftime("%I:%M:%S %p"),
+                    "Type": log_type,
+                    "Name": emp_name,
+                    "Confidence": f"{log.confidence:.1%}" if log.confidence else "—",
+                }
+            )
         st.dataframe(
             pd.DataFrame(activity),
             use_container_width=True,
@@ -393,7 +414,8 @@ with st.expander("🚀 Getting Started Guide"):
 
 # ── Pipeline Architecture ─────────────────────────────────────
 with st.expander("🔧 Pipeline Architecture"):
-    st.markdown(f"""
+    st.markdown(
+        f"""
     ```
     ┌──────────────┐
     │ Camera Feed  │   {cfg.CAMERA_SOURCE_TYPE}
@@ -425,7 +447,9 @@ with st.expander("🔧 Pipeline Architecture"):
     │  🔴 Unknown      │  → Save to Unknown Faces gallery
     └──────────────────┘
     ```
-    """, unsafe_allow_html=False)
+    """,
+        unsafe_allow_html=False,
+    )
 
     st.markdown(
         "**Total tests:** 137 ✅ **|** "

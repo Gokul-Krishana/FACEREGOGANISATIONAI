@@ -42,12 +42,12 @@ _DEFAULT_QUALITY_WEIGHTS: Dict[str, float] = {
 }
 
 # Soft thresholds (below this → score starts dropping)
-_BLUR_LAPLACIAN_MIN = 50.0       # Min Laplacian variance for a sharp face
-_BRIGHTNESS_IDEAL = 128.0        # Ideal mean pixel value
-_BRIGHTNESS_TOLERANCE = 60.0     # Allowed deviation from ideal
-_FACE_SIZE_MIN_RATIO = 0.02      # Minimum face area / image area
-_FACE_SIZE_IDEAL_RATIO = 0.08    # Ideal ratio
-_CONTRAST_MIN = 30.0             # Min pixel stddev
+_BLUR_LAPLACIAN_MIN = 50.0  # Min Laplacian variance for a sharp face
+_BRIGHTNESS_IDEAL = 128.0  # Ideal mean pixel value
+_BRIGHTNESS_TOLERANCE = 60.0  # Allowed deviation from ideal
+_FACE_SIZE_MIN_RATIO = 0.02  # Minimum face area / image area
+_FACE_SIZE_IDEAL_RATIO = 0.08  # Ideal ratio
+_CONTRAST_MIN = 30.0  # Min pixel stddev
 
 
 class FaceQualityAssessment:
@@ -292,13 +292,15 @@ class FaceQualityAssessment:
 
         # 2. Nose centered between eyes
         eye_center_x = (left_eye[0] + right_eye[0]) / 2.0
-        nose_offset = abs(float(nose[0] - eye_center_x)) / max(eye_dist, 1)
+        nose_offset = abs(float(nose[0] - eye_center_x)) / max(float(eye_dist), 1)
         nose_centered = max(0.0, 1.0 - nose_offset * 2.0)
 
         # 3. Mouth symmetry (similar to eyes)
         mouth_y_diff = abs(float(left_mouth[1] - right_mouth[1]))
         mouth_dist = np.linalg.norm(left_mouth - right_mouth)
-        mouth_symmetry = max(0.0, 1.0 - mouth_y_diff / (max(mouth_dist, 1) * 0.5)) if mouth_dist > 1 else 0.5
+        mouth_symmetry = (
+            max(0.0, 1.0 - mouth_y_diff / (max(float(mouth_dist), 1) * 0.5)) if mouth_dist > 1 else 0.5
+        )
 
-        combined = eye_symmetry * 0.4 + nose_centered * 0.4 + mouth_symmetry * 0.2
+        combined = eye_symmetry * 0.4 + nose_centered * 0.4 + mouth_symmetry * 0.2  # type: ignore[operator]
         return float(np.clip(combined * 0.9, 0.0, 1.0))

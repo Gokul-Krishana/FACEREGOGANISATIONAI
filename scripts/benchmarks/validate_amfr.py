@@ -33,12 +33,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import config.config as cfg
-from app.recognizer import FaceRecognizer
-from app.face_quality import FaceQualityAssessment
-from app.liveness_detector import LivenessDetector
-from app.enrollment import FaceEnrollment
-from app.amfr_engine import AMFREngine, AMFRDecision
+import config.config as cfg  # noqa: E402
+from app.recognizer import FaceRecognizer  # noqa: E402
+from app.face_quality import FaceQualityAssessment  # noqa: E402
+from app.liveness_detector import LivenessDetector  # noqa: E402
+from app.enrollment import FaceEnrollment  # noqa: E402
+from app.amfr_engine import AMFREngine, AMFRDecision  # noqa: E402
 
 
 def extract_embeddings(image_dir: Path) -> Tuple[List[np.ndarray], List[str], List[str]]:
@@ -60,10 +60,16 @@ def extract_embeddings(image_dir: Path) -> Tuple[List[np.ndarray], List[str], Li
     return embeddings, names, image_paths
 
 
-def validate_variant(variant: str, embeddings: np.ndarray, names: List[str],
-                     enrollment: FaceEnrollment, quality: Optional[FaceQualityAssessment] = None,
-                     liveness: Optional[LivenessDetector] = None,
-                     amfr: Optional[AMFREngine] = None, num_queries: int = 10) -> Dict[str, Any]:
+def validate_variant(
+    variant: str,
+    embeddings: np.ndarray,
+    names: List[str],
+    enrollment: FaceEnrollment,
+    quality: Optional[FaceQualityAssessment] = None,
+    liveness: Optional[LivenessDetector] = None,
+    amfr: Optional[AMFREngine] = None,
+    num_queries: int = 10,
+) -> Dict[str, Any]:
     if len(embeddings) == 0:
         return {"variant": variant, "error": "No query embeddings", "n_queries": 0}
 
@@ -92,23 +98,32 @@ def validate_variant(variant: str, embeddings: np.ndarray, names: List[str],
             # NOTE: Synthetic face crop - quality/liveness scores are not
             # representative of real pipeline performance. In production,
             # RetinaFace provides the actual face crop.
-            qr = quality.assess(face_img=np.ones((100, 100, 3), dtype=np.uint8) * 128,
-                                det_score=0.95, face_bbox=(10, 10, 90, 90),
-                                img_shape=(480, 640),
-                                landmarks=np.array([[30, 40], [70, 40], [50, 60], [35, 80], [65, 80]]))
+            qr = quality.assess(
+                face_img=np.ones((100, 100, 3), dtype=np.uint8) * 128,
+                det_score=0.95,
+                face_bbox=(10, 10, 90, 90),
+                img_shape=(480, 640),
+                landmarks=np.array([[30, 40], [70, 40], [50, 60], [35, 80], [65, 80]]),
+            )
             quality_score = qr["overall"]
 
         if variant in ("C", "D") and liveness is not None:
-            lr = liveness.analyze_frame(face_img=np.ones((100, 100, 3), dtype=np.uint8) * 128,
-                                        landmarks=np.array([[30, 40], [70, 40], [50, 60], [35, 80], [65, 80]]))
+            lr = liveness.analyze_frame(
+                face_img=np.ones((100, 100, 3), dtype=np.uint8) * 128,
+                landmarks=np.array([[30, 40], [70, 40], [50, 60], [35, 80], [65, 80]]),
+            )
             liveness_score = lr.liveness_score
             is_live = lr.is_live
 
         if variant == "D" and amfr is not None and matches:
             arcface_dist = matches[0].get("distance", 1.0)
             decision, risk_score, _ = amfr._decide(
-                arcface_distance=arcface_dist, liveness_score=liveness_score,
-                quality_score=quality_score, is_live=is_live, faiss_confidence=faiss_conf)
+                arcface_distance=arcface_dist,
+                liveness_score=liveness_score,
+                quality_score=quality_score,
+                is_live=is_live,
+                faiss_confidence=faiss_conf,
+            )
             prediction = faiss_name if decision == AMFRDecision.ACCEPT else "Unknown"
             is_accepted = decision == AMFRDecision.ACCEPT
         else:
@@ -136,19 +151,32 @@ def validate_variant(variant: str, embeddings: np.ndarray, names: List[str],
     frr = false_rejects / max(n_known, 1) if n_known > 0 else 0.0
     tar = true_accepts / max(n_known, 1) if n_known > 0 else 0.0
 
-    return {"variant": variant,
-            "description": {"A": "ArcFace + FAISS (baseline)", "B": "Quality + ArcFace + FAISS",
-                            "C": "Quality + Liveness + ArcFace + FAISS",
-                            "D": "Full AMFR (Quality+Liveness+ArcFace+FAISS+Tracking+Decision)"}[variant],
-            "n_queries": n, "n_known": n_known, "n_unknown": n_unknown,
-            "accuracy": round(accuracy, 4), "precision": round(precision, 4),
-            "recall": round(recall, 4), "f1_score": round(f1, 4),
-            "far": round(far, 4), "frr": round(frr, 4), "tar": round(tar, 4),
-            "avg_latency_ms": round(float(np.mean(latencies)), 4),
-            "p50_latency_ms": round(float(np.median(latencies)), 4),
-            "p95_latency_ms": round(float(latencies[int(n * 0.95)]), 4),
-            "correct": int(correct), "false_accepts": int(false_accepts),
-            "false_rejects": int(false_rejects), "true_accepts": int(true_accepts)}
+    return {
+        "variant": variant,
+        "description": {
+            "A": "ArcFace + FAISS (baseline)",
+            "B": "Quality + ArcFace + FAISS",
+            "C": "Quality + Liveness + ArcFace + FAISS",
+            "D": "Full AMFR (Quality+Liveness+ArcFace+FAISS+Tracking+Decision)",
+        }[variant],
+        "n_queries": n,
+        "n_known": n_known,
+        "n_unknown": n_unknown,
+        "accuracy": round(accuracy, 4),
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "f1_score": round(f1, 4),
+        "far": round(far, 4),
+        "frr": round(frr, 4),
+        "tar": round(tar, 4),
+        "avg_latency_ms": round(float(np.mean(latencies)), 4),
+        "p50_latency_ms": round(float(np.median(latencies)), 4),
+        "p95_latency_ms": round(float(latencies[int(n * 0.95)]), 4),
+        "correct": int(correct),
+        "false_accepts": int(false_accepts),
+        "false_rejects": int(false_rejects),
+        "true_accepts": int(true_accepts),
+    }
 
 
 def main() -> int:
@@ -157,7 +185,7 @@ def main() -> int:
     print("=" * 72)
 
     print("\n[1/3] Loading models and data...")
-    recognizer = FaceRecognizer()
+    _recognizer = FaceRecognizer()
     enrollment = FaceEnrollment()
     quality = FaceQualityAssessment()
     liveness = LivenessDetector(use_deep_liveness=False)
@@ -174,43 +202,53 @@ def main() -> int:
     print(f"\n  Enrolled: {enrollment.all_persons()} ({enrollment.count()} total)")
     print(f"  Query images: {query_names}")
 
-    print(f"\n[2/3] Running A/B/C/D comparison...")
+    print("\n[2/3] Running A/B/C/D comparison...")
     results: Dict[str, Any] = {}
     for v in ["A", "B", "C", "D"]:
         print(f"\n  Variant {v}...")
-        r = validate_variant(v, query_embs_arr, query_names, enrollment,
-                             quality if v in ("B", "C", "D") else None,
-                             liveness if v in ("C", "D") else None,
-                             amfr if v == "D" else None, num_queries=len(query_embs))
+        r = validate_variant(
+            v,
+            query_embs_arr,
+            query_names,
+            enrollment,
+            quality if v in ("B", "C", "D") else None,
+            liveness if v in ("C", "D") else None,
+            amfr if v == "D" else None,
+            num_queries=len(query_embs),
+        )
         results[v] = r
-        print(f"  Accuracy: {r.get('accuracy', 'N/A')}  |  Precision: {r.get('precision', 'N/A')}  |  "
-              f"Recall: {r.get('recall', 'N/A')}  |  FAR: {r.get('far', 'N/A')}  |  FRR: {r.get('frr', 'N/A')}")
+        print(
+            f"  Accuracy: {r.get('accuracy', 'N/A')}  |  Precision: {r.get('precision', 'N/A')}  |  "
+            f"Recall: {r.get('recall', 'N/A')}  |  FAR: {r.get('far', 'N/A')}  |  FRR: {r.get('frr', 'N/A')}"
+        )
 
-    print(f"\n[3/3] Saving results...")
+    print("\n[3/3] Saving results...")
     output_path = ROOT / "outputs" / "amfr_validation.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(results, indent=2, default=str))
     print(f"  Saved to: {output_path}")
 
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * 72}")
     print("  AMFR COMPARISON SUMMARY")
-    print(f"{'='*72}")
+    print(f"{'=' * 72}")
     dash = "-" * 70
     print(f"  {'Var':<5} {'Acc':<8} {'Prec':<8} {'Rec':<8} {'F1':<8} {'FAR':<8} {'FRR':<8} {'P95ms':<8}")
     print(f"  {dash}")
     for v in ["A", "B", "C", "D"]:
         r = results.get(v, {})
-        print(f"  {v:<5} {str(r.get('accuracy', 'N/A')):<8} {str(r.get('precision', 'N/A')):<8} "
-              f"{str(r.get('recall', 'N/A')):<8} {str(r.get('f1_score', 'N/A')):<8} "
-              f"{str(r.get('far', 'N/A')):<8} {str(r.get('frr', 'N/A')):<8} "
-              f"{str(r.get('p95_latency_ms', 'N/A')):<8}")
-    print(f"\n  LEGEND:")
-    print(f"  A: ArcFace + FAISS (baseline)")
-    print(f"  B: Quality + ArcFace + FAISS")
-    print(f"  C: Quality + Liveness + ArcFace + FAISS")
-    print(f"  D: Full AMFR")
-    print(f"\n  NOTE: Quality/liveness use synthetic face crops (RetinaFace not called).")
-    print(f"  Real performance may differ from these numbers.")
+        print(
+            f"  {v:<5} {str(r.get('accuracy', 'N/A')):<8} {str(r.get('precision', 'N/A')):<8} "
+            f"{str(r.get('recall', 'N/A')):<8} {str(r.get('f1_score', 'N/A')):<8} "
+            f"{str(r.get('far', 'N/A')):<8} {str(r.get('frr', 'N/A')):<8} "
+            f"{str(r.get('p95_latency_ms', 'N/A')):<8}"
+        )
+    print("\n  LEGEND:")
+    print("  A: ArcFace + FAISS (baseline)")
+    print("  B: Quality + ArcFace + FAISS")
+    print("  C: Quality + Liveness + ArcFace + FAISS")
+    print("  D: Full AMFR")
+    print("\n  NOTE: Quality/liveness use synthetic face crops (RetinaFace not called).")
+    print("  Real performance may differ from these numbers.")
     return 0
 
 

@@ -15,24 +15,22 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-import pytest
 
 _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dashboard.frame_buffer import FrameBuffer, ResultsBuffer, frame_buffer, results_buffer
+from dashboard.frame_buffer import FrameBuffer, ResultsBuffer, frame_buffer, results_buffer  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════
 #  FrameBuffer — latest-only semantics
 # ═══════════════════════════════════════════════════════════════
 
-class TestFrameBufferBasics:
 
+class TestFrameBufferBasics:
     def test_empty_get_returns_none(self):
         b = FrameBuffer()
         assert b.get() is None
@@ -131,8 +129,8 @@ class TestFrameBufferBasics:
 #  FrameBuffer — thread-safety
 # ═══════════════════════════════════════════════════════════════
 
-class TestFrameBufferThreadSafety:
 
+class TestFrameBufferThreadSafety:
     def test_concurrent_producers_consumers(self):
         """Many threads putting/getting must never crash or grow unboundedly."""
         b = FrameBuffer()
@@ -196,8 +194,8 @@ class TestFrameBufferThreadSafety:
 #  ResultsBuffer
 # ═══════════════════════════════════════════════════════════════
 
-class TestResultsBuffer:
 
+class TestResultsBuffer:
     def test_empty_get_returns_none(self):
         b = ResultsBuffer()
         assert b.get() is None
@@ -250,8 +248,8 @@ class TestResultsBuffer:
 #  Module-level singletons (used by 04_Live.py)
 # ═══════════════════════════════════════════════════════════════
 
-class TestSingletons:
 
+class TestSingletons:
     def test_singletons_exist(self):
         assert frame_buffer is not None
         assert results_buffer is not None
@@ -260,6 +258,7 @@ class TestSingletons:
 
     def test_singleton_identity(self):
         from dashboard import frame_buffer as fb_mod
+
         assert fb_mod.frame_buffer is frame_buffer
         assert fb_mod.results_buffer is results_buffer
 

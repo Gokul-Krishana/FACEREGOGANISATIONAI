@@ -7,10 +7,8 @@ audit logging for every action.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List, Optional
 
-import config.config as cfg
 from database.database import get_session
 from database.models import Employee
 from database.repository import EmployeeRepo
@@ -70,7 +68,7 @@ class EmployeeService:
             "ENROLL",
             f"Enrolled employee '{name}' ({employee_id})",
             operator=operator,
-            employee_id=emp.id,
+            employee_id=emp.id,  # type: ignore[arg-type]
         )
         return emp
 
@@ -132,7 +130,7 @@ class EmployeeService:
             if not emp:
                 return None
             old_name = emp.name
-            updated = EmployeeRepo.update(session, emp.id, **fields)
+            updated = EmployeeRepo.update(session, emp.id, **fields)  # type: ignore[arg-type]
 
         if updated is not None and name is not None and name != old_name:
             # Keep FAISS in sync so recognition keeps matching after a rename.
@@ -140,13 +138,17 @@ class EmployeeService:
             # a DB-only rename would silently break recognition/attendance.
             try:
                 from app.enrollment import FaceEnrollment
+
                 enrollment = FaceEnrollment()
-                enrollment.rename(old_name, name)
+                enrollment.rename(old_name, name)  # type: ignore[arg-type]
             except Exception as exc:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Failed to rename '%s' → '%s' in FAISS: %s",
-                    old_name, name, exc,
+                    old_name,
+                    name,
+                    exc,
                 )
 
         if updated is not None:
@@ -188,7 +190,7 @@ class EmployeeService:
 
         if success:
             # Keep FAISS in sync so the deleted employee is no longer recognised.
-            EmployeeService.remove_faiss_embedding(emp_name, fallback=employee_id)
+            EmployeeService.remove_faiss_embedding(emp_name, fallback=employee_id)  # type: ignore[arg-type]
 
             AuditService.log(
                 "DELETE_EMPLOYEE",
@@ -215,6 +217,7 @@ class EmployeeService:
         """
         try:
             from app.enrollment import FaceEnrollment
+
             enrollment = FaceEnrollment()
             removed = enrollment.remove_by_name(name)
             if not removed and fallback:
@@ -222,8 +225,11 @@ class EmployeeService:
             return removed
         except Exception as exc:
             import logging
+
             logging.getLogger(__name__).warning(
-                "Failed to remove '%s' from FAISS: %s", name, exc,
+                "Failed to remove '%s' from FAISS: %s",
+                name,
+                exc,
             )
             return False
 

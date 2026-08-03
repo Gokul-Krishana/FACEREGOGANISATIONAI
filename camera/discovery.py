@@ -33,10 +33,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
-import re
 import socket
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import List
 
 import requests
 
@@ -94,8 +93,7 @@ _CAMERA_SIGNATURES: List[dict] = [
         "port": 4747,
         "path": "/",
         "check": lambda resp: (
-            "droidcam" in resp.text.lower()
-            or "droidcam" in resp.headers.get("Server", "").lower()
+            "droidcam" in resp.text.lower() or "droidcam" in resp.headers.get("Server", "").lower()
         ),
     },
     {
@@ -104,10 +102,7 @@ _CAMERA_SIGNATURES: List[dict] = [
         "url_template": "http://{ip}:8080/video",
         "port": 8080,
         "path": "/",
-        "check": lambda resp: (
-            "epoccam" in resp.text.lower()
-            or "elgato" in resp.text.lower()
-        ),
+        "check": lambda resp: "epoccam" in resp.text.lower() or "elgato" in resp.text.lower(),
     },
 ]
 
@@ -175,13 +170,15 @@ def _probe_ip(ip: str, timeout: float = 2.0) -> List[DiscoveredCamera]:
             if sig["check"](resp):
                 stream_url = sig["url_template"].format(ip=ip)
                 display_name = sig["display_template"].format(ip=ip)
-                found.append(DiscoveredCamera(
-                    source_type=sig["source_type"],
-                    display_name=display_name,
-                    stream_url=stream_url,
-                    ip=ip,
-                    port=port,
-                ))
+                found.append(
+                    DiscoveredCamera(
+                        source_type=sig["source_type"],
+                        display_name=display_name,
+                        stream_url=stream_url,
+                        ip=ip,
+                        port=port,
+                    )
+                )
 
         except (socket.timeout, ConnectionRefusedError, OSError):
             continue

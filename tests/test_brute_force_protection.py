@@ -7,7 +7,6 @@ recording, lockout info retrieval, and cleanup of old attempts.
 
 from __future__ import annotations
 
-import time
 from datetime import timedelta
 
 import pytest
@@ -74,9 +73,7 @@ class TestBruteForceProtection:
         BruteForceProtection.record_failed_attempt("alice", "192.168.1.1", "Mozilla/5.0")
 
         with get_session() as session:
-            records = session.query(FailedLoginAttempt).filter(
-                FailedLoginAttempt.username == "alice"
-            ).all()
+            records = session.query(FailedLoginAttempt).filter(FailedLoginAttempt.username == "alice").all()
             assert len(records) == 1
             assert records[0].ip_address == "192.168.1.1"
             assert records[0].success is False
@@ -88,9 +85,7 @@ class TestBruteForceProtection:
             BruteForceProtection.record_failed_attempt("alice", "192.168.1.1")
 
         with get_session() as session:
-            count = session.query(FailedLoginAttempt).filter(
-                FailedLoginAttempt.username == "alice"
-            ).count()
+            count = session.query(FailedLoginAttempt).filter(FailedLoginAttempt.username == "alice").count()
             assert count == 3
 
     def test_record_failed_attempt_username_lowercase(self):

@@ -24,33 +24,29 @@ import threading
 from datetime import date, datetime
 from pathlib import Path
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import pandas as pd
-import cv2
-import numpy as np
+import streamlit as st  # noqa: E402
+import pandas as pd  # noqa: E402
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
 
 # streamlit_webrtc is an OPTIONAL dependency. It is imported below inside a
 # try/except so the page still loads (and shows a helpful message) when the
 # package is not installed.
 
-from services.attendance_service import AttendanceService
-from services.employee_service import EmployeeService
-from database.database import get_session
-from database.repository import AttendanceRepo, EmployeeRepo
-from app.live_detection import LiveDetection
-from app.face_detector import FaceDetector
-from app.recognizer import FaceRecognizer
-from app.enrollment import FaceEnrollment
-from camera.base import CameraSource
-from camera.selector import create_camera, CAMERA_CHOICES
+from services.attendance_service import AttendanceService  # noqa: E402
+from database.database import get_session  # noqa: E402
+from database.repository import AttendanceRepo, EmployeeRepo  # noqa: E402
+from app.live_detection import LiveDetection  # noqa: E402
+from camera.base import CameraSource  # noqa: E402
+from camera.selector import create_camera, CAMERA_CHOICES  # noqa: E402
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +54,7 @@ logger = logging.getLogger(__name__)
 # (and show a helpful message) when it is not installed.
 try:
     from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, RTCConfiguration
+
     _WEBRTC_AVAILABLE = True
 except ImportError:  # pragma: no cover
     webrtc_streamer = None  # type: ignore[assignment]
@@ -69,10 +66,10 @@ except ImportError:  # pragma: no cover
 # ── Video Transformer for Real-time Recognition ─────────────────
 class AttendanceVideoTransformer(VideoTransformerBase):
     """Streamlit-webrtc video transformer for live attendance."""
-    
+
     def __init__(self):
         self.pipeline = LiveDetection()
-    
+
     def transform(self, frame):
         """Process frame through recognition pipeline."""
         img = frame.to_ndarray(format="bgr24")
@@ -183,13 +180,15 @@ def get_attendance_data(target_date: date, limit: int = 200, skip: int = 0):
             data = []
             for r in records:
                 emp = r.employee
-                data.append({
-                    "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
-                    "Name": emp.name if emp else "Unknown",
-                    "Department": emp.department if emp and emp.department else "—",
-                    "Time": r.timestamp.strftime("%I:%M:%S %p"),
-                    "Confidence": f"{r.confidence:.1%}",
-                })
+                data.append(
+                    {
+                        "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
+                        "Name": emp.name if emp else "Unknown",
+                        "Department": emp.department if emp and emp.department else "—",
+                        "Time": r.timestamp.strftime("%I:%M:%S %p"),
+                        "Confidence": f"{r.confidence:.1%}",
+                    }
+                )
             return data
     except Exception as _exc:
         logger.warning("Could not load attendance records: %s", _exc)
@@ -272,7 +271,8 @@ if st.session_state.att_cam_mode == "phone":
             current_id = phone_id if phone_id is not None else default_ids.get(phone_src, 0)
             phone_id = st.number_input(
                 "Device Index",
-                min_value=0, max_value=10,
+                min_value=0,
+                max_value=10,
                 value=current_id,
                 step=1,
                 key="phone_id_input",
@@ -281,7 +281,10 @@ if st.session_state.att_cam_mode == "phone":
             current_id = phone_id if phone_id is not None else -1
             phone_id = st.number_input(
                 "Preferred Device Index (-1 = auto)",
-                min_value=-1, max_value=10, value=current_id, step=1,
+                min_value=-1,
+                max_value=10,
+                value=current_id,
+                step=1,
                 key="phone_id_auto",
             )
 
@@ -323,11 +326,13 @@ col_camera, col_attendance = st.columns([2, 1], gap="large")
 # ─── LEFT: Live Camera ──────────────────────────────────────────
 with col_camera:
     st.markdown("### 📹 Live Camera")
-    
+
     # Camera controls
     cam_col1, cam_col2, cam_col3 = st.columns([2, 1, 1])
     with cam_col1:
-        camera_active_label = "📱 Phone Camera" if st.session_state.att_cam_mode == "phone" else "💻 Browser Webcam"
+        camera_active_label = (
+            "📱 Phone Camera" if st.session_state.att_cam_mode == "phone" else "💻 Browser Webcam"
+        )
         camera_active = st.checkbox(f"Start {camera_active_label}", value=True, key="att_cam_active")
     with cam_col2:
         if st.button("🔄 Reset Session", use_container_width=True):
@@ -339,7 +344,7 @@ with col_camera:
         st.session_state["auto_refresh"] = st.checkbox(
             "Auto-refresh", value=st.session_state.get("auto_refresh", True)
         )
-    
+
     if camera_active:
         if st.session_state.att_cam_mode == "phone":
             # ── Phone / IP Camera mode (server-side capture) ──
@@ -350,8 +355,10 @@ with col_camera:
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     st.image(rgb, channels="RGB", use_container_width=True)
                     # Show pipeline stats
-                    st.success(f"🟢 {feed.pipeline.enrollment.count()} enrolled | "
-                               f"{len(feed.pipeline._marked_this_session)} marked today")
+                    st.success(
+                        f"🟢 {feed.pipeline.enrollment.count()} enrolled | "
+                        f"{len(feed.pipeline._marked_this_session)} marked today"
+                    )
                 else:
                     st.warning("🟡 Waiting for first frame...")
             else:
@@ -365,9 +372,7 @@ with col_camera:
                     "use the Phone / IP Camera mode instead."
                 )
             else:
-                RTC_CONFIG = RTCConfiguration({
-                    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-                })
+                RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
 
                 webrtc_ctx = webrtc_streamer(
                     key="attendance-camera",
@@ -388,25 +393,25 @@ with col_camera:
 # ─── RIGHT: Today's Attendance Summary ──────────────────────────
 with col_attendance:
     st.markdown("### 📅 Today's Attendance")
-    
+
     stats = get_today_stats()
     today_data = get_attendance_data(date.today())
-    
+
     # Summary cards
     mcol1, mcol2 = st.columns(2)
     with mcol1:
         st.metric("Total Marks", stats.get("today_count", 0))
     with mcol2:
         st.metric("Unique Present", stats.get("unique_today", 0))
-    
+
     mcol3, mcol4 = st.columns(2)
     with mcol3:
         st.metric("All Time Records", stats.get("total_records", 0))
     with mcol4:
         st.metric("Employees Ever Marked", stats.get("unique_employees", 0))
-    
+
     st.divider()
-    
+
     # Today's attendance table
     if today_data:
         df_today = pd.DataFrame(today_data)
@@ -469,6 +474,7 @@ if _export_pdf or _export_xlsx:
     else:
         try:
             from services.report_service import ReportService, ReportUnavailableError
+
             rows = [
                 {
                     "ID": r.get("ID", ""),
@@ -482,21 +488,27 @@ if _export_pdf or _export_xlsx:
             title = f"Attendance Register — {format_date(selected_date)}"
             if _export_pdf:
                 pdf = ReportService._pdf_table(
-                    title, ["ID", "Name", "Department", "Time", "Confidence"], rows,
+                    title,
+                    ["ID", "Name", "Department", "Time", "Confidence"],
+                    rows,
                     subtitle=f"{len(rows)} record(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}",
                 )
                 st.download_button(
-                    "Download PDF", pdf,
+                    "Download PDF",
+                    pdf,
                     file_name=f"attendance_{selected_date.strftime('%Y%m%d')}.pdf",
                     mime="application/pdf",
                 )
             else:
                 xlsx = ReportService._excel_table(
-                    title, ["ID", "Name", "Department", "Time", "Confidence"],
-                    rows, sheet_name="Attendance",
+                    title,
+                    ["ID", "Name", "Department", "Time", "Confidence"],
+                    rows,
+                    sheet_name="Attendance",
                 )
                 st.download_button(
-                    "Download Excel", xlsx,
+                    "Download Excel",
+                    xlsx,
                     file_name=f"attendance_{selected_date.strftime('%Y%m%d')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
@@ -513,7 +525,7 @@ hist_data = get_attendance_data(selected_date)
 if hist_data:
     df_hist = pd.DataFrame(hist_data)
     df_hist.insert(0, "Date", format_date(selected_date))
-    
+
     st.dataframe(
         df_hist,
         use_container_width=True,
@@ -527,12 +539,12 @@ if hist_data:
             "Confidence": st.column_config.TextColumn("Conf", width="small"),
         },
     )
-    
+
     # Summary stats for selected date
     unique_emps = df_hist["Name"].nunique()
     total_marks = len(df_hist)
-    avg_conf = df_hist["Confidence"].apply(lambda x: float(x.rstrip('%')) / 100).mean()
-    
+    avg_conf = df_hist["Confidence"].apply(lambda x: float(x.rstrip("%")) / 100).mean()
+
     scol1, scol2, scol3 = st.columns(3)
     with scol1:
         st.metric("Total Marks", total_marks)
@@ -546,7 +558,7 @@ else:
 # ─── Pipeline Status & Debug ────────────────────────────────────
 with st.expander("🔧 Pipeline Status & Debug"):
     col_s1, col_s2 = st.columns(2)
-    
+
     with col_s1:
         st.markdown("**Configuration**")
         st.code(f"""
@@ -556,7 +568,7 @@ Frame Skip: {cfg.FRAME_SKIP}
 Cooldown: {cfg.COOLDOWN_SECONDS}s
 Camera ID: {cfg.CAMERA_ID}
         """)
-    
+
     with col_s2:
         st.markdown("**System Status**")
         with get_session() as session:

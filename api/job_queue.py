@@ -79,9 +79,7 @@ class Job:
             "progress": self.progress,
             "result": self.result,
             "error": self.error,
-            "created_at": datetime.fromtimestamp(
-                self.created_at, tz=timezone.utc
-            ).isoformat(),
+            "created_at": datetime.fromtimestamp(self.created_at, tz=timezone.utc).isoformat(),
             "started_at": (
                 datetime.fromtimestamp(self.started_at, tz=timezone.utc).isoformat()
                 if self.started_at
@@ -158,10 +156,7 @@ class JobQueue:
         self._jobs[job.id] = job
         await self._queue.put(job)
 
-        logger.info(
-            "Job enqueued: %s (type=%s, by=%s)",
-            job.id, job_type, created_by
-        )
+        logger.info("Job enqueued: %s (type=%s, by=%s)", job.id, job_type, created_by)
         return job.id
 
     async def status(self, job_id: str) -> Optional[dict]:
@@ -234,10 +229,7 @@ class JobQueue:
                 job.completed_at = time.time()
                 self._queue.task_done()
 
-            logger.info(
-                "Job %s completed: status=%s",
-                job.id, job.status.value
-            )
+            logger.info("Job %s completed: status=%s", job.id, job.status.value)
 
     def stats(self) -> dict:
         """Return queue statistics."""
@@ -258,7 +250,7 @@ class JobQueue:
 
 async def _batch_enroll_handler(job: Job, cancel: asyncio.Event) -> dict:
     """Handler for batch face enrollment from CSV."""
-    csv_path = job.params.get("csv_path", "")
+    _csv_path = job.params.get("csv_path", "")
     # Placeholder: in production, iterate CSV, enroll each face
     total = job.params.get("total_records", 10)
     enrolled = 0

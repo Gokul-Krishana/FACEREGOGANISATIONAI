@@ -29,9 +29,8 @@ is transparently added inside ``analyze_frame()``.
 
 from __future__ import annotations
 
-import math
 from collections import deque
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Deque, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -59,9 +58,9 @@ _DEFAULT_WEIGHTS_NO_DL = {
 }
 
 # Eye Aspect Ratio (EAR) thresholds
-_EAR_CLOSED_THRESHOLD = 0.22       # Below this → eye is closed
-_BLINK_FRAMES_MIN = 1              # Min consecutive closed frames for a blink
-_BLINK_FRAMES_MAX = 6              # Max consecutive closed frames (prevents sleep = blink)
+_EAR_CLOSED_THRESHOLD = 0.22  # Below this → eye is closed
+_BLINK_FRAMES_MIN = 1  # Min consecutive closed frames for a blink
+_BLINK_FRAMES_MAX = 6  # Max consecutive closed frames (prevents sleep = blink)
 _EYE_LANDMARK_INDICES = (0, 1, 3, 4)  # left-eye, right-eye doesn't map simply
 # Actually for 5-point landmarks: left-eye(0), right-eye(1), nose(2), left-mouth(3), right-mouth(4)
 # We approximate EAR using left_eye <-> right_eye distance ratio to nose
@@ -79,17 +78,23 @@ _OPTICAL_FLOW_FEATURE_PARAMS = dict(
 )
 
 # Screen detection
-_SCREEN_EDGE_THRESHOLD = 0.15       # Fraction of bright edge pixels to flag
+_SCREEN_EDGE_THRESHOLD = 0.15  # Fraction of bright edge pixels to flag
 
 
 class LivenessResult:
     """Result of a liveness analysis (hybrid: 4 software + 1 deep-learning factor)."""
 
     __slots__ = (
-        "is_live", "liveness_score", "texture_score",
-        "blink_score", "motion_score", "screen_score",
-        "dl_score", "dl_time_ms",
-        "blink_detected", "reasons",
+        "is_live",
+        "liveness_score",
+        "texture_score",
+        "blink_score",
+        "motion_score",
+        "screen_score",
+        "dl_score",
+        "dl_time_ms",
+        "blink_detected",
+        "reasons",
     )
 
     def __init__(
@@ -147,9 +152,10 @@ class LivenessDetector:
         use_deep = cfg.DEEP_LIVENESS_ENABLED if use_deep_liveness is None else use_deep_liveness
         if use_deep:
             from app.deep_liveness import get_deep_liveness_detector
+
             self._deep_liveness = get_deep_liveness_detector()
         else:
-            self._deep_liveness = None
+            self._deep_liveness = None  # type: ignore[assignment]
 
         # ── Blink tracking ───────────────────────────────────
         self._ear_history: Deque[float] = deque(maxlen=30)
@@ -333,18 +339,19 @@ class LivenessDetector:
         neighbours = [
             gray_small[:-2, :-2].astype(np.int32),  # top-left
             gray_small[:-2, 1:-1].astype(np.int32),  # top
-            gray_small[:-2, 2:].astype(np.int32),    # top-right
-            gray_small[1:-1, 2:].astype(np.int32),   # right
-            gray_small[2:, 2:].astype(np.int32),     # bottom-right
-            gray_small[2:, 1:-1].astype(np.int32),   # bottom
-            gray_small[2:, :-2].astype(np.int32),     # bottom-left
+            gray_small[:-2, 2:].astype(np.int32),  # top-right
+            gray_small[1:-1, 2:].astype(np.int32),  # right
+            gray_small[2:, 2:].astype(np.int32),  # bottom-right
+            gray_small[2:, 1:-1].astype(np.int32),  # bottom
+            gray_small[2:, :-2].astype(np.int32),  # bottom-left
             gray_small[1:-1, :-2].astype(np.int32),  # left
         ]
 
         # Build LBP code: threshold neighbours against center, shift, and sum
         lbp = np.zeros_like(center, dtype=np.int32)
-        for n, (bit_val, nb) in enumerate([(128, 0), (64, 1), (32, 2), (16, 3),
-                                            (8, 4), (4, 5), (2, 6), (1, 7)]):
+        for n, (bit_val, nb) in enumerate(
+            [(128, 0), (64, 1), (32, 2), (16, 3), (8, 4), (4, 5), (2, 6), (1, 7)]
+        ):
             lbp += (neighbours[nb] >= center) * bit_val
 
         # Histogram of LBP codes
@@ -397,7 +404,7 @@ class LivenessDetector:
         vertical_gap = max(float(nose[1]) - avg_eye_y, 0.0)
 
         # Scale into roughly [0, 1] for the test landmarks.
-        normalised = (vertical_gap / max(eye_dist, 1.0)) * 1.2
+        normalised = (vertical_gap / max(float(eye_dist), 1.0)) * 1.2
         return float(max(0.0, min(1.0, normalised)))
 
     def _update_blink_state(self, ear: float) -> float:
@@ -448,8 +455,8 @@ class LivenessDetector:
         """
         # Compute dense optical flow for a central region (where face is)
         h, w = curr_gray.shape
-        roi = curr_gray[int(h * 0.1):int(h * 0.9), int(w * 0.1):int(w * 0.9)]
-        prev_roi = prev_gray[int(h * 0.1):int(h * 0.9), int(w * 0.1):int(w * 0.9)]
+        roi = curr_gray[int(h * 0.1) : int(h * 0.9), int(w * 0.1) : int(w * 0.9)]
+        prev_roi = prev_gray[int(h * 0.1) : int(h * 0.9), int(w * 0.1) : int(w * 0.9)]
 
         if roi.size < 100:
             return 0.5
@@ -493,10 +500,7 @@ class LivenessDetector:
         right_strip = edges[:, -border_margin:]
 
         # Ratio of edge pixels in border regions
-        total_border_pixels = (
-            top_strip.size + bottom_strip.size
-            + left_strip.size + right_strip.size
-        )
+        total_border_pixels = top_strip.size + bottom_strip.size + left_strip.size + right_strip.size
         edge_pixels = (
             int(np.sum(top_strip > 0))
             + int(np.sum(bottom_strip > 0))
@@ -514,10 +518,14 @@ class LivenessDetector:
                 x1, y1, x2, y2 = line[0]
                 # Check if line is near borders
                 near_border = (
-                    x1 < border_margin or x2 < border_margin
-                    or x1 > w - border_margin or x2 > w - border_margin
-                    or y1 < border_margin or y2 < border_margin
-                    or y1 > h - border_margin or y2 > h - border_margin
+                    x1 < border_margin
+                    or x2 < border_margin
+                    or x1 > w - border_margin
+                    or x2 > w - border_margin
+                    or y1 < border_margin
+                    or y2 < border_margin
+                    or y1 > h - border_margin
+                    or y2 > h - border_margin
                 )
                 if near_border:
                     strong_lines += 1

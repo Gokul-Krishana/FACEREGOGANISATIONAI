@@ -31,9 +31,14 @@ def resize_to_height(img: np.ndarray, target_height: int) -> np.ndarray:
     return cv2.resize(img, (new_width, target_height))
 
 
-def draw_rounded_rect(img: np.ndarray, top_left: Tuple[int, int],
-                      bottom_right: Tuple[int, int], color: Tuple[int, int, int],
-                      thickness: int = 2, radius: int = 10) -> None:
+def draw_rounded_rect(
+    img: np.ndarray,
+    top_left: Tuple[int, int],
+    bottom_right: Tuple[int, int],
+    color: Tuple[int, int, int],
+    thickness: int = 2,
+    radius: int = 10,
+) -> None:
     """Draw a rounded rectangle on an image."""
     x1, y1 = top_left
     x2, y2 = bottom_right

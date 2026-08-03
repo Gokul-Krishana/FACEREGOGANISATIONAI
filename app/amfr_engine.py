@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import enum
 import logging
-import time
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -53,11 +52,11 @@ logger = logging.getLogger(__name__)
 class AMFRDecision(str, enum.Enum):
     """The four possible outcomes of the AMFR engine."""
 
-    ACCEPT = "ACCEPT"               # High confidence, live — mark attendance
-    BORDERLINE = "BORDERLINE"       # Reasonable but uncertain — collect more frames
+    ACCEPT = "ACCEPT"  # High confidence, live — mark attendance
+    BORDERLINE = "BORDERLINE"  # Reasonable but uncertain — collect more frames
     LOW_CONFIDENCE = "LOW_CONFIDENCE"  # Poor match or quality — treat as unknown
-    REJECT_SPOOF = "REJECT_SPOOF"   # Spoof detected — reject + security alert
-    PENDING = "PENDING"             # Not enough data yet
+    REJECT_SPOOF = "REJECT_SPOOF"  # Spoof detected — reject + security alert
+    PENDING = "PENDING"  # Not enough data yet
 
 
 class AMFREngine:
@@ -101,7 +100,7 @@ class AMFREngine:
         detections: List[Dict],
         embeddings: List[Optional[np.ndarray]],
         faiss_results: List[List[Dict]],
-        face_data: List[Optional[Dict]],    # from recognizer.detect_face()
+        face_data: List[Optional[Dict]],  # from recognizer.detect_face()
     ) -> List[Dict]:
         """Run the full AMFR pipeline on a frame's detections.
 
@@ -155,7 +154,11 @@ class AMFREngine:
             track_id = det_to_track[i]
 
             result = self._evaluate_person(
-                frame, det, embedding, faiss, face,
+                frame,
+                det,
+                embedding,
+                faiss,
+                face,
                 track_id=track_id,
             )
             results.append(result)
@@ -315,7 +318,9 @@ class AMFREngine:
                     "screen_score": round(liveness_result.screen_score, 4) if liveness_result else None,
                     "blink_detected": liveness_result.blink_detected if liveness_result else False,
                     "reasons": liveness_result.reasons if liveness_result else [],
-                } if liveness_result else None,
+                }
+                if liveness_result
+                else None,
             },
             "trigger_security_alert": amfr_decision == AMFRDecision.REJECT_SPOOF,
         }

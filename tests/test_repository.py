@@ -86,9 +86,7 @@ class TestEmployeeRepo:
         assert len(results) == 1
 
     def test_search_by_department(self):
-        EmployeeRepo.create(
-            self.s, employee_id="EMP001", name="Alice", department="Engineering"
-        )
+        EmployeeRepo.create(self.s, employee_id="EMP001", name="Alice", department="Engineering")
         results = EmployeeRepo.search(self.s, "Engineer")
         assert len(results) == 1
 
@@ -147,8 +145,7 @@ class TestCameraRepo:
         assert len(cameras) == 2
 
     def test_get_active(self):
-        from database.models import Camera
-        cam1 = CameraRepo.create(self.s, name="Active Cam", camera_index=0)
+        _cam1 = CameraRepo.create(self.s, name="Active Cam", camera_index=0)
         cam2 = CameraRepo.create(self.s, name="Inactive Cam", camera_index=1)
         cam2.is_active = False
         self.s.commit()

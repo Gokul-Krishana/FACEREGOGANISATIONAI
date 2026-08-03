@@ -20,6 +20,7 @@ Usage:
     python scripts/benchmarks/fake_camera_validation.py --fps 30 --seconds 8
     python scripts/benchmarks/fake_camera_validation.py --fps 60 --cadence 0.03
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,8 +34,8 @@ ROOT = str(Path(__file__).resolve().parents[2])
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from camera.fake import FakeCameraSource
-from dashboard.frame_buffer import frame_buffer
+from camera.fake import FakeCameraSource  # noqa: E402
+from dashboard.frame_buffer import frame_buffer  # noqa: E402
 
 DISPLAY_CADENCE = 0.05  # matches 04_Live.py time.sleep(0.05) + st.rerun()
 
@@ -55,8 +56,7 @@ def _pct(values: List[float], p: float) -> float:
     return s[lo] * (1 - frac) + s[hi] * frac
 
 
-def measure_raw_camera(fake: FakeCameraSource, seconds: float,
-                       cadence: float) -> Dict:
+def measure_raw_camera(fake: FakeCameraSource, seconds: float, cadence: float) -> Dict:
     """Producer thread → frame_buffer → consumer loop (same shape as the
     real-camera Phase A harness)."""
     print("\n" + "=" * 70)
@@ -136,25 +136,31 @@ def measure_raw_camera(fake: FakeCameraSource, seconds: float,
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Hardware-free Camera → FrameBuffer → display benchmark")
-    parser.add_argument("--fps", type=float, default=30.0,
-                        help="Target synthetic capture rate (default 30)")
-    parser.add_argument("--seconds", type=float, default=8.0,
-                        help="Measurement window in seconds (default 8)")
-    parser.add_argument("--width", type=int, default=640,
-                        help="Frame width (default 640)")
-    parser.add_argument("--height", type=int, default=480,
-                        help="Frame height (default 480)")
-    parser.add_argument("--cadence", type=float, default=DISPLAY_CADENCE,
-                        help="Consumer read cadence in seconds "
-                             "(default 0.05, matches the Live page)")
-    parser.add_argument("--pattern", choices=["gradient", "solid"],
-                        default="gradient",
-                        help="Synthetic test pattern (default gradient)")
-    parser.add_argument("--jitter", type=float, default=0.0,
-                        help="Random read delay in ms per frame to simulate "
-                             "USB timing (default 0)")
+    parser = argparse.ArgumentParser(description="Hardware-free Camera → FrameBuffer → display benchmark")
+    parser.add_argument("--fps", type=float, default=30.0, help="Target synthetic capture rate (default 30)")
+    parser.add_argument(
+        "--seconds", type=float, default=8.0, help="Measurement window in seconds (default 8)"
+    )
+    parser.add_argument("--width", type=int, default=640, help="Frame width (default 640)")
+    parser.add_argument("--height", type=int, default=480, help="Frame height (default 480)")
+    parser.add_argument(
+        "--cadence",
+        type=float,
+        default=DISPLAY_CADENCE,
+        help="Consumer read cadence in seconds (default 0.05, matches the Live page)",
+    )
+    parser.add_argument(
+        "--pattern",
+        choices=["gradient", "solid"],
+        default="gradient",
+        help="Synthetic test pattern (default gradient)",
+    )
+    parser.add_argument(
+        "--jitter",
+        type=float,
+        default=0.0,
+        help="Random read delay in ms per frame to simulate USB timing (default 0)",
+    )
     args = parser.parse_args()
 
     print("Fake-Camera Validation — Face Recognition AI")

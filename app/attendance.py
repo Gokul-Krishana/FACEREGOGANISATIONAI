@@ -16,7 +16,7 @@ from __future__ import annotations
 import csv
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import config.config as cfg
 

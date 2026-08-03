@@ -22,8 +22,8 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import config.config as cfg
-from app.enrollment import FaceEnrollment
+import config.config as cfg  # noqa: E402
+from app.enrollment import FaceEnrollment  # noqa: E402
 
 
 def main() -> int:
@@ -46,7 +46,9 @@ def main() -> int:
         # 2. Verify config is now HNSW
         new_type = cfg.FAISS_INDEX_TYPE.lower()
         print(f"Configured index type: {new_type}")
-        print(f"HNSW M={cfg.FAISS_HNSW_M}, efConstruction={cfg.FAISS_HNSW_EF_CONSTRUCTION}, efSearch={cfg.FAISS_HNSW_EF_SEARCH}")
+        print(
+            f"HNSW M={cfg.FAISS_HNSW_M}, efConstruction={cfg.FAISS_HNSW_EF_CONSTRUCTION}, efSearch={cfg.FAISS_HNSW_EF_SEARCH}"
+        )
 
         # 3. Rebuild with new config
         print("Rebuilding index with new configuration...")
@@ -68,17 +70,19 @@ def main() -> int:
     final_type = type(enroll.index).__name__
     final_count = enroll.index.ntotal
 
-    print(f"\n[OK] Migration complete!")
+    print("\n[OK] Migration complete!")
     print(f"   Index type: {old_type} -> {final_type}")
     print(f"   Vectors: {old_count} -> {final_count}")
     print(f"   Metadata: {len(enroll.metadata)} entries")
 
     if enroll.index.ntotal > 0:
         # Quick search test
-        test_vec = embeddings[0:1] if old_count > 0 else np.random.randn(1, cfg.EMBEDDING_DIM).astype(np.float32)
+        test_vec = (
+            embeddings[0:1] if old_count > 0 else np.random.randn(1, cfg.EMBEDDING_DIM).astype(np.float32)
+        )
         faiss.normalize_L2(test_vec)
-        D, I = enroll.index.search(test_vec, min(5, enroll.index.ntotal))
-        print(f"   Search test: top-1 distance={D[0][0]:.4f}, index={I[0][0]}")
+        D, idx = enroll.index.search(test_vec, min(5, enroll.index.ntotal))
+        print(f"   Search test: top-1 distance={D[0][0]:.4f}, index={idx[0][0]}")
 
     # Show status
     status = enroll.status()

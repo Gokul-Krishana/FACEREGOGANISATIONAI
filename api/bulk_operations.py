@@ -18,14 +18,12 @@ import io
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from sqlalchemy.orm import Session
 
 from database.database import get_session
 from database.models import (
     Camera,
-    Department,
     Employee,
     Student,
     _utcnow,
@@ -37,6 +35,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BulkResult:
     """Result of a bulk operation."""
+
     total: int = 0
     success: int = 0
     failed: int = 0
@@ -102,18 +101,15 @@ class BulkOperations:
                     name = row.get("name", "").strip()
 
                     if not student_id or not name:
-                        result.errors.append({
-                            "row": row_num,
-                            "error": "Missing required field: student_id or name"
-                        })
+                        result.errors.append(
+                            {"row": row_num, "error": "Missing required field: student_id or name"}
+                        )
                         result.failed += 1
                         continue
 
                     # Check for duplicate
                     if skip_duplicates:
-                        existing = session.query(Student).filter(
-                            Student.student_id == student_id
-                        ).first()
+                        existing = session.query(Student).filter(Student.student_id == student_id).first()
                         if existing:
                             result.skipped += 1
                             continue
@@ -125,20 +121,10 @@ class BulkOperations:
                         email=row.get("email", "").strip() or None,
                         phone=row.get("phone", "").strip() or None,
                         department_id=(
-                            int(row["department_id"])
-                            if row.get("department_id")
-                            else default_department_id
+                            int(row["department_id"]) if row.get("department_id") else default_department_id
                         ),
-                        enrollment_year=(
-                            int(row["enrollment_year"])
-                            if row.get("enrollment_year")
-                            else None
-                        ),
-                        graduation_year=(
-                            int(row["graduation_year"])
-                            if row.get("graduation_year")
-                            else None
-                        ),
+                        enrollment_year=(int(row["enrollment_year"]) if row.get("enrollment_year") else None),
+                        graduation_year=(int(row["graduation_year"]) if row.get("graduation_year") else None),
                     )
                     session.add(student)
                     session.flush()
@@ -146,11 +132,13 @@ class BulkOperations:
                     result.success += 1
 
                 except Exception as exc:
-                    result.errors.append({
-                        "row": row_num,
-                        "student_id": row.get("student_id", "?"),
-                        "error": str(exc),
-                    })
+                    result.errors.append(
+                        {
+                            "row": row_num,
+                            "student_id": row.get("student_id", "?"),
+                            "error": str(exc),
+                        }
+                    )
                     result.failed += 1
 
             session.commit()
@@ -158,7 +146,10 @@ class BulkOperations:
         result.elapsed_ms = (time.time() - start) * 1000
         logger.info(
             "Student import: %d/%d success, %d failed, %d skipped",
-            result.success, result.total, result.failed, result.skipped
+            result.success,
+            result.total,
+            result.failed,
+            result.skipped,
         )
         return result
 
@@ -192,17 +183,14 @@ class BulkOperations:
                     name = row.get("name", "").strip()
 
                     if not employee_id or not name:
-                        result.errors.append({
-                            "row": row_num,
-                            "error": "Missing required field: employee_id or name"
-                        })
+                        result.errors.append(
+                            {"row": row_num, "error": "Missing required field: employee_id or name"}
+                        )
                         result.failed += 1
                         continue
 
                     if skip_duplicates:
-                        existing = session.query(Employee).filter(
-                            Employee.employee_id == employee_id
-                        ).first()
+                        existing = session.query(Employee).filter(Employee.employee_id == employee_id).first()
                         if existing:
                             result.skipped += 1
                             continue
@@ -218,11 +206,13 @@ class BulkOperations:
                     result.success += 1
 
                 except Exception as exc:
-                    result.errors.append({
-                        "row": row_num,
-                        "employee_id": row.get("employee_id", "?"),
-                        "error": str(exc),
-                    })
+                    result.errors.append(
+                        {
+                            "row": row_num,
+                            "employee_id": row.get("employee_id", "?"),
+                            "error": str(exc),
+                        }
+                    )
                     result.failed += 1
 
             session.commit()
@@ -245,10 +235,7 @@ class BulkOperations:
                 try:
                     camera = session.get(Camera, cam_id)
                     if not camera:
-                        result.errors.append({
-                            "camera_id": cam_id,
-                            "error": "Camera not found"
-                        })
+                        result.errors.append({"camera_id": cam_id, "error": "Camera not found"})
                         result.failed += 1
                         continue
 
@@ -258,10 +245,12 @@ class BulkOperations:
                     result.success += 1
 
                 except Exception as exc:
-                    result.errors.append({
-                        "camera_id": cam_id,
-                        "error": str(exc),
-                    })
+                    result.errors.append(
+                        {
+                            "camera_id": cam_id,
+                            "error": str(exc),
+                        }
+                    )
                     result.failed += 1
 
             session.commit()
@@ -292,17 +281,35 @@ class BulkOperations:
 
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow([
-                "id", "student_id", "employee_id", "timestamp",
-                "confidence", "method", "status", "section_id",
-                "course_id", "classroom_id",
-            ])
+            writer.writerow(
+                [
+                    "id",
+                    "student_id",
+                    "employee_id",
+                    "timestamp",
+                    "confidence",
+                    "method",
+                    "status",
+                    "section_id",
+                    "course_id",
+                    "classroom_id",
+                ]
+            )
             for r in records:
-                writer.writerow([
-                    r.id, r.student_id, r.employee_id, r.timestamp,
-                    r.confidence, r.method, r.status, r.section_id,
-                    r.course_id, r.classroom_id,
-                ])
+                writer.writerow(
+                    [
+                        r.id,
+                        r.student_id,
+                        r.employee_id,
+                        r.timestamp,
+                        r.confidence,
+                        r.method,
+                        r.status,
+                        r.section_id,
+                        r.course_id,
+                        r.classroom_id,
+                    ]
+                )
 
             return output.getvalue()
 

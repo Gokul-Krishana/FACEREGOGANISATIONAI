@@ -25,7 +25,8 @@ if _project_root not in sys.path:
 config = context.config
 
 # Support DATABASE_URL environment variable for PostgreSQL in production
-import os
+import os  # noqa: E402
+
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)

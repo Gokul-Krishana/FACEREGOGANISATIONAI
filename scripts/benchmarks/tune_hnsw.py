@@ -40,10 +40,10 @@ def _search_per_query(index, queries: np.ndarray, k: int) -> Tuple[np.ndarray, D
     for i in range(n):
         q = queries[i : i + 1]
         t0 = time.perf_counter()
-        _, I = index.search(q, k)
+        _, idx = index.search(q, k)
         t1 = time.perf_counter()
         per_times[i] = (t1 - t0) * 1000
-        all_indices[i] = I[0]
+        all_indices[i] = idx[0]
     per_times.sort()
     return all_indices, {
         "avg_ms": round(float(per_times.mean()), 4),
@@ -72,9 +72,16 @@ def _serialize_size(index) -> Dict[str, float]:
     return {"index_size_mb": round(mb, 2)}
 
 
-def tune_hnsw(size: int, dim: int, queries: int, k: int,
-              m_values: List[int], ef_construction_values: List[int],
-              ef_search_values: List[int], seed: int = 42) -> List[Dict[str, Any]]:
+def tune_hnsw(
+    size: int,
+    dim: int,
+    queries: int,
+    k: int,
+    m_values: List[int],
+    ef_construction_values: List[int],
+    ef_search_values: List[int],
+    seed: int = 42,
+) -> List[Dict[str, Any]]:
     rng = np.random.default_rng(seed)
     vectors = _normalize(rng.random((size, dim), dtype=np.float32))
     probe = _normalize(rng.random((queries, dim), dtype=np.float32))
@@ -94,7 +101,7 @@ def tune_hnsw(size: int, dim: int, queries: int, k: int,
             hnsw.add(vectors)
             build_time = time.perf_counter() - t0
             mem = _serialize_size(hnsw)
-            print(f"build={build_time*1000:.0f}ms, size={mem['index_size_mb']:.1f}MB")
+            print(f"build={build_time * 1000:.0f}ms, size={mem['index_size_mb']:.1f}MB")
 
             for ef_search in ef_search_values:
                 hnsw.hnsw.efSearch = ef_search
@@ -103,24 +110,41 @@ def tune_hnsw(size: int, dim: int, queries: int, k: int,
                 r5 = _recall(gt, actual_idx, 5)
                 r10 = _recall(gt, actual_idx, 10)
                 qps = round(1000.0 / max(lat["avg_ms"], 1e-9), 2)
-                print(f"    efSearch={ef_search:3d} | "
-                      f"Recall@1={r1:.4f}  Recall@5={r5:.4f}  "
-                      f"avg={lat['avg_ms']:.4f}ms  P95={lat['p95_ms']:.4f}ms  QPS={qps}")
-                results.append({
-                    "M": m, "efConstruction": ef_construction, "efSearch": ef_search,
-                    "size": size, "dimension": dim,
-                    "recall_at_1": round(r1, 4), "recall_at_5": round(r5, 4), "recall_at_10": round(r10, 4),
-                    "build_ms": round(build_time * 1000, 2), "queries_per_sec": qps,
-                    **lat, **mem,
-                })
+                print(
+                    f"    efSearch={ef_search:3d} | "
+                    f"Recall@1={r1:.4f}  Recall@5={r5:.4f}  "
+                    f"avg={lat['avg_ms']:.4f}ms  P95={lat['p95_ms']:.4f}ms  QPS={qps}"
+                )
+                results.append(
+                    {
+                        "M": m,
+                        "efConstruction": ef_construction,
+                        "efSearch": ef_search,
+                        "size": size,
+                        "dimension": dim,
+                        "recall_at_1": round(r1, 4),
+                        "recall_at_5": round(r5, 4),
+                        "recall_at_10": round(r10, 4),
+                        "build_ms": round(build_time * 1000, 2),
+                        "queries_per_sec": qps,
+                        **lat,
+                        **mem,
+                    }
+                )
     return results
 
 
-def test_incremental_insertion(size: int, dim: int, batch_sizes: List[int],
-                                m: int = 32, ef_construction: int = 200, seed: int = 42) -> Dict[str, Any]:
+def test_incremental_insertion(
+    size: int, dim: int, batch_sizes: List[int], m: int = 32, ef_construction: int = 200, seed: int = 42
+) -> Dict[str, Any]:
     rng = np.random.default_rng(seed)
     all_vectors = _normalize(rng.random((size, dim), dtype=np.float32))
-    results: Dict[str, Any] = {"M": m, "efConstruction": ef_construction, "total_vectors": size, "batches": []}
+    results: Dict[str, Any] = {
+        "M": m,
+        "efConstruction": ef_construction,
+        "total_vectors": size,
+        "batches": [],
+    }
     hnsw = faiss.IndexHNSWFlat(dim, m)
     hnsw.hnsw.efConstruction = ef_construction
     inserted = 0
@@ -132,11 +156,14 @@ def test_incremental_insertion(size: int, dim: int, batch_sizes: List[int],
         hnsw.add(batch)
         elapsed = time.perf_counter() - t0
         inserted += len(batch)
-        results["batches"].append({
-            "batch_size": len(batch), "total_after": inserted,
-            "insert_ms": round(elapsed * 1000, 2),
-            "insert_per_vec_ms": round((elapsed / len(batch)) * 1000, 4),
-        })
+        results["batches"].append(
+            {
+                "batch_size": len(batch),
+                "total_after": inserted,
+                "insert_ms": round(elapsed * 1000, 2),
+                "insert_per_vec_ms": round((elapsed / len(batch)) * 1000, 4),
+            }
+        )
     results["total_insert_ms"] = round(sum(b["insert_ms"] for b in results["batches"]), 2)
     return results
 
@@ -167,13 +194,24 @@ def main() -> int:
     print("  PARAMETER SWEEP")
     print(dash)
 
-    tuning_results = tune_hnsw(args.size, args.dim, args.queries, args.k,
-                                args.m_values, args.ef_construction_values, args.ef_search_values)
+    tuning_results = tune_hnsw(
+        args.size,
+        args.dim,
+        args.queries,
+        args.k,
+        args.m_values,
+        args.ef_construction_values,
+        args.ef_search_values,
+    )
 
     output: Dict[str, Any] = {
         "config": {
-            "size": args.size, "dimension": args.dim, "queries": args.queries, "k": args.k,
-            "m_values": args.m_values, "ef_construction_values": args.ef_construction_values,
+            "size": args.size,
+            "dimension": args.dim,
+            "queries": args.queries,
+            "k": args.k,
+            "m_values": args.m_values,
+            "ef_construction_values": args.ef_construction_values,
             "ef_search_values": args.ef_search_values,
             "note": "Synthetic L2-normalized 512-D vectors. Final selection needs real data validation.",
         },
@@ -189,8 +227,10 @@ def main() -> int:
         output["incremental_insertion"] = inc_result
         print(f"  Total insert time: {inc_result['total_insert_ms']:.2f} ms")
         for b in inc_result["batches"]:
-            print(f"    Batch {b['batch_size']:>6}: {b['insert_ms']:>8.2f} ms  "
-                  f"({b['insert_per_vec_ms']:.4f} ms/vec)")
+            print(
+                f"    Batch {b['batch_size']:>6}: {b['insert_ms']:>8.2f} ms  "
+                f"({b['insert_per_vec_ms']:.4f} ms/vec)"
+            )
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

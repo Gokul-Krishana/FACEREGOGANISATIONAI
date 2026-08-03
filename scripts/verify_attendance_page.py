@@ -49,9 +49,7 @@ def run_page_with_webrtc_neutralized() -> None:
         src = src.split(_AUTO_REFRESH_MARKER)[0]
         src += "\n# [auto-refresh tail stripped for headless verification]\n"
 
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".py", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
         f.write(src)
         tmp_path = f.name
     try:

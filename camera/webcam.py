@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from camera.base import CameraSource, CameraError
+from camera.base import CameraSource
 from utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -170,13 +170,15 @@ def list_all_cameras(max_devices: int = 10) -> List[Dict]:
                     h, w = frame.shape[:2] if has_frame else (0, 0)
                     cap.release()
                     backend_name = "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
-                    results.append({
-                        "index": idx,
-                        "name": f"Camera #{idx} ({backend_name}, {w}x{h})",
-                        "has_frame": has_frame,
-                        "resolution": (w, h),
-                        "backend": backend_name,
-                    })
+                    results.append(
+                        {
+                            "index": idx,
+                            "name": f"Camera #{idx} ({backend_name}, {w}x{h})",
+                            "has_frame": has_frame,
+                            "resolution": (w, h),
+                            "backend": backend_name,
+                        }
+                    )
                     break  # Found on this backend, don't try the other
             except Exception:
                 continue
@@ -186,6 +188,7 @@ def list_all_cameras(max_devices: int = 10) -> List[Dict]:
 # ═══════════════════════════════════════════════════════════════
 #  USB Auto — auto-detect any USB camera (plug & play)
 # ═══════════════════════════════════════════════════════════════
+
 
 class USBAnySource(CameraSource):
     """Auto-detect any USB-connected camera by scanning device indices.
@@ -244,10 +247,7 @@ class USBAnySource(CameraSource):
             indices_to_try.append(self._prefer_index)
 
         # Then scan all indices to find the first working camera
-        indices_to_try.extend(
-            i for i in range(self._max_devices)
-            if i != self._prefer_index
-        )
+        indices_to_try.extend(i for i in range(self._max_devices) if i != self._prefer_index)
 
         for idx in indices_to_try:
             try:
@@ -321,4 +321,3 @@ class USBAnySource(CameraSource):
 
     def __exit__(self, *args):
         self.release()
-

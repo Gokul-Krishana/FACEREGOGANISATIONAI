@@ -30,7 +30,7 @@ Usage::
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Optional, Tuple
 
 from sqlalchemy import and_, func
@@ -53,12 +53,16 @@ class BruteForceProtection:
     @staticmethod
     def _last_success_at(session, username: str):
         """Return the most recent successful login time for a user."""
-        return session.query(func.max(FailedLoginAttempt.attempted_at)).filter(
-            and_(
-                FailedLoginAttempt.username == username.lower(),
-                FailedLoginAttempt.success == True,
+        return (
+            session.query(func.max(FailedLoginAttempt.attempted_at))
+            .filter(
+                and_(
+                    FailedLoginAttempt.username == username.lower(),
+                    FailedLoginAttempt.success.is_(True),
+                )
             )
-        ).scalar()
+            .scalar()
+        )
 
     @staticmethod
     def is_locked_out(username: str, ip_address: str) -> Tuple[bool, Optional[str]]:
@@ -75,13 +79,11 @@ class BruteForceProtection:
             last_success = BruteForceProtection._last_success_at(session, username)
 
             # Check username-based lockout
-            query = session.query(
-                func.count(FailedLoginAttempt.id)
-            ).filter(
+            query = session.query(func.count(FailedLoginAttempt.id)).filter(
                 and_(
                     FailedLoginAttempt.username == username.lower(),
-                    FailedLoginAttempt.success == False,
-                    FailedLoginAttempt.attempted_at >= lockout_threshold
+                    FailedLoginAttempt.success.is_(False),
+                    FailedLoginAttempt.attempted_at >= lockout_threshold,
                 )
             )
             if last_success is not None:
@@ -90,33 +92,38 @@ class BruteForceProtection:
 
             if username_failures >= BruteForceProtection.MAX_FAILED_ATTEMPTS:
                 remaining = BruteForceProtection.LOCKOUT_DURATION_MINUTES
-                return True, f"Account locked due to too many failed attempts. Try again in {remaining} minutes."
+                return (
+                    True,
+                    f"Account locked due to too many failed attempts. Try again in {remaining} minutes.",
+                )
 
             # Check IP-based rate limiting
-            ip_attempts = session.query(
-                func.count(FailedLoginAttempt.id)
-            ).filter(
-                and_(
-                    FailedLoginAttempt.ip_address == ip_address,
-                    FailedLoginAttempt.attempted_at >= now - timedelta(minutes=1)
+            ip_attempts = (
+                session.query(func.count(FailedLoginAttempt.id))
+                .filter(
+                    and_(
+                        FailedLoginAttempt.ip_address == ip_address,
+                        FailedLoginAttempt.attempted_at >= now - timedelta(minutes=1),
+                    )
                 )
-            ).scalar()
+                .scalar()
+            )
 
             if ip_attempts >= BruteForceProtection.IP_RATE_LIMIT_PER_MINUTE:
                 return True, "Too many requests from your IP. Please wait a moment."
 
             # Check if user has any failed attempts (for progressive delay warning)
-            total_failures_query = session.query(
-                func.count(FailedLoginAttempt.id)
-            ).filter(
+            total_failures_query = session.query(func.count(FailedLoginAttempt.id)).filter(
                 and_(
                     FailedLoginAttempt.username == username.lower(),
-                    FailedLoginAttempt.success == False,
-                    FailedLoginAttempt.attempted_at >= lockout_threshold
+                    FailedLoginAttempt.success.is_(False),
+                    FailedLoginAttempt.attempted_at >= lockout_threshold,
                 )
             )
             if last_success is not None:
-                total_failures_query = total_failures_query.filter(FailedLoginAttempt.attempted_at > last_success)
+                total_failures_query = total_failures_query.filter(
+                    FailedLoginAttempt.attempted_at > last_success
+                )
             total_failures = total_failures_query.scalar()
 
             if total_failures >= 3:
@@ -126,11 +133,7 @@ class BruteForceProtection:
             return False, None
 
     @staticmethod
-    def record_failed_attempt(
-        username: str,
-        ip_address: str,
-        user_agent: Optional[str] = None
-    ) -> None:
+    def record_failed_attempt(username: str, ip_address: str, user_agent: Optional[str] = None) -> None:
         """
         Record a failed login attempt.
 
@@ -144,27 +147,28 @@ class BruteForceProtection:
                 username=username.lower(),
                 ip_address=ip_address,
                 user_agent=user_agent[:500] if user_agent else None,
-                success=False
+                success=False,
             )
             session.add(attempt)
             session.commit()
 
             # Check if this triggers a lockout
             lockout_threshold = _utcnow() - timedelta(minutes=BruteForceProtection.LOCKOUT_DURATION_MINUTES)
-            failure_count = session.query(
-                func.count(FailedLoginAttempt.id)
-            ).filter(
-                and_(
-                    FailedLoginAttempt.username == username.lower(),
-                    FailedLoginAttempt.success == False,
-                    FailedLoginAttempt.attempted_at >= lockout_threshold
+            failure_count = (
+                session.query(func.count(FailedLoginAttempt.id))
+                .filter(
+                    and_(
+                        FailedLoginAttempt.username == username.lower(),
+                        FailedLoginAttempt.success.is_(False),
+                        FailedLoginAttempt.attempted_at >= lockout_threshold,
+                    )
                 )
-            ).scalar()
+                .scalar()
+            )
 
             if failure_count >= BruteForceProtection.MAX_FAILED_ATTEMPTS:
                 logger.warning(
-                    "Account locked: %s from %s after %d failed attempts",
-                    username, ip_address, failure_count
+                    "Account locked: %s from %s after %d failed attempts", username, ip_address, failure_count
                 )
 
     @staticmethod
@@ -178,11 +182,7 @@ class BruteForceProtection:
         """
         with get_session() as session:
             # Record successful attempt
-            attempt = FailedLoginAttempt(
-                username=username.lower(),
-                ip_address=ip_address,
-                success=True
-            )
+            attempt = FailedLoginAttempt(username=username.lower(), ip_address=ip_address, success=True)
             session.add(attempt)
             session.commit()
 
@@ -200,28 +200,31 @@ class BruteForceProtection:
         with get_session() as session:
             last_success = BruteForceProtection._last_success_at(session, username)
             # Get recent failed attempts for display purposes
-            all_recent_failures = session.query(
-                FailedLoginAttempt
-            ).filter(
-                and_(
-                    FailedLoginAttempt.username == username.lower(),
-                    FailedLoginAttempt.success == False,
-                    FailedLoginAttempt.attempted_at >= lockout_threshold
+            all_recent_failures = (
+                session.query(FailedLoginAttempt)
+                .filter(
+                    and_(
+                        FailedLoginAttempt.username == username.lower(),
+                        FailedLoginAttempt.success.is_(False),
+                        FailedLoginAttempt.attempted_at >= lockout_threshold,
+                    )
                 )
-            ).order_by(FailedLoginAttempt.attempted_at.desc()).all()
+                .order_by(FailedLoginAttempt.attempted_at.desc())
+                .all()
+            )
 
             # Failures that still count toward an active lockout
-            active_failures_query = session.query(
-                FailedLoginAttempt
-            ).filter(
+            active_failures_query = session.query(FailedLoginAttempt).filter(
                 and_(
                     FailedLoginAttempt.username == username.lower(),
-                    FailedLoginAttempt.success == False,
-                    FailedLoginAttempt.attempted_at >= lockout_threshold
+                    FailedLoginAttempt.success.is_(False),
+                    FailedLoginAttempt.attempted_at >= lockout_threshold,
                 )
             )
             if last_success is not None:
-                active_failures_query = active_failures_query.filter(FailedLoginAttempt.attempted_at > last_success)
+                active_failures_query = active_failures_query.filter(
+                    FailedLoginAttempt.attempted_at > last_success
+                )
             active_failures = active_failures_query.order_by(FailedLoginAttempt.attempted_at.desc()).all()
 
             if not all_recent_failures:
@@ -229,12 +232,14 @@ class BruteForceProtection:
                     "locked_out": False,
                     "failed_attempts": 0,
                     "remaining_attempts": BruteForceProtection.MAX_FAILED_ATTEMPTS,
-                    "lockout_remaining_seconds": 0
+                    "lockout_remaining_seconds": 0,
                 }
 
             # Find the most recent failure
             most_recent = active_failures[0] if active_failures else all_recent_failures[0]
-            lockout_end = most_recent.attempted_at + timedelta(minutes=BruteForceProtection.LOCKOUT_DURATION_MINUTES)
+            lockout_end = most_recent.attempted_at + timedelta(
+                minutes=BruteForceProtection.LOCKOUT_DURATION_MINUTES
+            )
             if len(active_failures) >= BruteForceProtection.MAX_FAILED_ATTEMPTS and now < lockout_end:
                 remaining_seconds = int((lockout_end - now).total_seconds())
                 return {
@@ -242,14 +247,14 @@ class BruteForceProtection:
                     "failed_attempts": len(all_recent_failures),
                     "remaining_attempts": 0,
                     "lockout_remaining_seconds": remaining_seconds,
-                    "lockout_end": lockout_end.isoformat()
+                    "lockout_end": lockout_end.isoformat(),
                 }
 
             return {
                 "locked_out": False,
                 "failed_attempts": len(all_recent_failures),
                 "remaining_attempts": max(0, BruteForceProtection.MAX_FAILED_ATTEMPTS - len(active_failures)),
-                "lockout_remaining_seconds": 0
+                "lockout_remaining_seconds": 0,
             }
 
     @staticmethod
@@ -263,9 +268,9 @@ class BruteForceProtection:
         cutoff = _utcnow() - timedelta(days=BruteForceProtection.CLEANUP_DAYS)
 
         with get_session() as session:
-            deleted = session.query(FailedLoginAttempt).filter(
-                FailedLoginAttempt.attempted_at < cutoff
-            ).delete()
+            deleted = (
+                session.query(FailedLoginAttempt).filter(FailedLoginAttempt.attempted_at < cutoff).delete()
+            )
             session.commit()
 
             if deleted > 0:

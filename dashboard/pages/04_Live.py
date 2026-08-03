@@ -52,6 +52,7 @@ import streamlit as st
 # in the Streamlit hot path (~20 reruns/sec when live).
 try:
     import psutil
+
     _PSUTIL_AVAILABLE = True
 except ImportError:
     psutil = None  # type: ignore[assignment]
@@ -71,18 +72,18 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import config.config as cfg
-from app.amfr_engine import AMFRDecision
+import config.config as cfg  # noqa: E402
+from app.amfr_engine import AMFRDecision  # noqa: E402
 
 logger = logging.getLogger(__name__)
-from services.recognition_service import RecognitionService
-from camera.base import CameraSource
-from camera.selector import create_camera
-from camera.discovery import scan_network
-from services.attendance_service import AttendanceService
-from dashboard.camera_owner import CameraOwner
-from dashboard.frame_buffer import frame_buffer, results_buffer
-from dashboard.latency_logger import LatencyLogger
+from services.recognition_service import RecognitionService  # noqa: E402
+from camera.base import CameraSource  # noqa: E402
+from camera.selector import create_camera  # noqa: E402
+from camera.discovery import scan_network  # noqa: E402
+from services.attendance_service import AttendanceService  # noqa: E402
+from dashboard.camera_owner import CameraOwner  # noqa: E402
+from dashboard.frame_buffer import frame_buffer, results_buffer  # noqa: E402
+from dashboard.latency_logger import LatencyLogger  # noqa: E402
 
 # ── Page Config ────────────────────────────────────────────────
 st.set_page_config(page_title="Live Recognition", page_icon="📹", layout="wide")
@@ -91,6 +92,7 @@ st.set_page_config(page_title="Live Recognition", page_icon="📹", layout="wide
 # ═══════════════════════════════════════════════════════════════
 #  Shared Model Resources — loaded once, shared across pipelines
 # ═══════════════════════════════════════════════════════════════
+
 
 @dataclass
 class SharedModelResources:
@@ -112,6 +114,7 @@ class SharedModelResources:
 # ═══════════════════════════════════════════════════════════════
 #  Camera Pipeline — runs AMFR pipeline in background thread
 # ═══════════════════════════════════════════════════════════════
+
 
 class LiveRecognitionPipeline:
     """Manages a single camera + recognition pipeline in a background thread."""
@@ -144,12 +147,12 @@ class LiveRecognitionPipeline:
         # the displayed video always shows the most recent RAW frame while
         # inference happens at its own cadence.
         self._worker_thread: Optional[threading.Thread] = None
-        self._worker_interval: float = 0.10        # normal cadence (~10 AI runs/s max)
-        self._verified_interval: float = 0.60      # verified-only scenes → run less often
-        self._verified_at: Dict[str, float] = {}    # track_id → last ACCEPT wall-clock
-        self._identity_ttl: float = getattr(cfg, 'IDENTITY_TTL', 3.0)
+        self._worker_interval: float = 0.10  # normal cadence (~10 AI runs/s max)
+        self._verified_interval: float = 0.60  # verified-only scenes → run less often
+        self._verified_at: Dict[str, float] = {}  # track_id → last ACCEPT wall-clock
+        self._identity_ttl: float = getattr(cfg, "IDENTITY_TTL", 3.0)
         self._last_worker_run: float = 0.0
-        self._worker_errors: int = 0   # persistent inference failures (observability)
+        self._worker_errors: int = 0  # persistent inference failures (observability)
 
     # ── Lifecycle ────────────────────────────────────────────
 
@@ -233,7 +236,7 @@ class LiveRecognitionPipeline:
             self._cam = None
         self._status = "STOPPED"
         self._reconnect_attempts = 0
-        
+
         # Clear global buffers
         frame_buffer.clear()
         results_buffer.clear()
@@ -317,6 +320,7 @@ class LiveRecognitionPipeline:
             # Best-effort operational alert (throttled per camera source).
             try:
                 from services.alert_service import send_operational_alert
+
                 send_operational_alert(
                     "camera_offline",
                     f"Camera '{self.source_type}' ({self.camera_kwargs}) went offline "
@@ -502,7 +506,7 @@ class LiveRecognitionPipeline:
 
             # Determine visual treatment based on AMFR decision
             if decision == AMFRDecision.ACCEPT.value:
-                color = (50, 200, 50)       # Green
+                color = (50, 200, 50)  # Green
                 status_text = "ALREADY PRESENT" if attended else "PRESENT"
                 label = f"\u2713 {display_name}"
                 sublines = [status_text]
@@ -514,19 +518,19 @@ class LiveRecognitionPipeline:
                     sublines.append(detail_line)
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
-                color = (50, 50, 200)       # Red
+                color = (50, 50, 200)  # Red
                 label = "\u26a0 SPOOF DETECTED"
                 sublines = ["Attendance Rejected"]
 
             elif decision == AMFRDecision.BORDERLINE.value:
-                color = (50, 180, 200)      # Yellow (BGR)
+                color = (50, 180, 200)  # Yellow (BGR)
                 label = f"{display_name}?"
                 sublines = ["COLLECTING FRAMES..."]
                 if department:
                     sublines.insert(0, f"{department}")
 
             elif is_known:
-                color = (50, 200, 50)       # Green
+                color = (50, 200, 50)  # Green
                 if attended:
                     label = f"\u2713 {display_name}"
                     sublines = ["ALREADY PRESENT"]
@@ -541,7 +545,7 @@ class LiveRecognitionPipeline:
                     sublines.append(detail_line)
 
             else:
-                color = (150, 150, 150)     # Grey
+                color = (150, 150, 150)  # Grey
                 label = "\uff1f UNKNOWN"
                 sublines = ["Not Enrolled"]
 
@@ -552,14 +556,12 @@ class LiveRecognitionPipeline:
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
             label_bg_y1 = max(y1 - 32, 0)
             cv2.rectangle(frame, (x1, label_bg_y1), (x1 + tw + 10, y1), color, -1)
-            cv2.putText(frame, label, (x1 + 5, y1 - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, label, (x1 + 5, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
             # Draw sublines below the box
             for i, sub in enumerate(sublines):
                 sy = y2 + 20 + (i * 18)
-                cv2.putText(frame, sub, (x1, sy),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+                cv2.putText(frame, sub, (x1, sy), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
 
         return frame
 
@@ -628,6 +630,7 @@ class LiveRecognitionPipeline:
 #  Camera Discovery — probe local PC/USB cameras
 # ═══════════════════════════════════════════════════════════════
 
+
 def scan_local_cameras(max_devices: int = 5) -> List[Dict]:
     """Detect available local PC/USB cameras by probing indices 0-4."""
     available = []
@@ -638,12 +641,14 @@ def scan_local_cameras(max_devices: int = 5) -> List[Dict]:
                 # Try reading a test frame
                 ret, _ = cap.read()
                 backend = cap.getBackendName()
-                available.append({
-                    "index": idx,
-                    "label": f"Camera {idx} ({backend})",
-                    "type": "webcam",
-                    "has_frame": ret,
-                })
+                available.append(
+                    {
+                        "index": idx,
+                        "label": f"Camera {idx} ({backend})",
+                        "type": "webcam",
+                        "has_frame": ret,
+                    }
+                )
                 cap.release()
         except Exception:
             pass
@@ -654,6 +659,7 @@ def scan_local_cameras(max_devices: int = 5) -> List[Dict]:
 #  Attendance Helpers
 # ═══════════════════════════════════════════════════════════════
 
+
 @st.cache_data(ttl=3)  # Refresh every 3 seconds
 def _get_today_attendance_df() -> pd.DataFrame:
     """Return today's attendance as a DataFrame."""
@@ -661,12 +667,14 @@ def _get_today_attendance_df() -> pd.DataFrame:
     rows = []
     for record in records:
         d = AttendanceService.to_dict(record)
-        rows.append({
-            "time": d.get("timestamp", "")[11:16] if d.get("timestamp") else "",
-            "name": d.get("employee_name", ""),
-            "id": d.get("employee_id", ""),
-            "status": "Present",
-        })
+        rows.append(
+            {
+                "time": d.get("timestamp", "")[11:16] if d.get("timestamp") else "",
+                "name": d.get("employee_name", ""),
+                "id": d.get("employee_id", ""),
+                "status": "Present",
+            }
+        )
     df = pd.DataFrame(rows)
     if df.empty:
         return pd.DataFrame(columns=["time", "name", "id", "status"])
@@ -738,7 +746,11 @@ def _render_camera_config(source_type: str) -> dict:
         else:
             config["source_type"] = "android_usb"
             config["device_id"] = st.number_input(
-                "Device Index", 0, 10, 1, key="android_dev",
+                "Device Index",
+                0,
+                10,
+                1,
+                key="android_dev",
                 help="Device index for DroidCam (typically 1)",
             )
         if st.button("\U0001f517 Test Connection", key="android_test", use_container_width=True):
@@ -763,7 +775,11 @@ def _render_camera_config(source_type: str) -> dict:
         else:
             config["source_type"] = "iphone_usb"
             config["device_id"] = st.number_input(
-                "Device Index", 0, 10, 2, key="iphone_dev",
+                "Device Index",
+                0,
+                10,
+                2,
+                key="iphone_dev",
                 help="Device index for EpocCam (typically 2)",
             )
         if st.button("\U0001f517 Test Connection", key="iphone_test", use_container_width=True):
@@ -812,6 +828,7 @@ def _test_camera_connection(config: dict) -> None:
 # ═══════════════════════════════════════════════════════════════
 #  Recognition Start/Stop Functions
 # ═══════════════════════════════════════════════════════════════
+
 
 def _start_recognition() -> None:
     """Start the camera and recognition pipeline with CameraOwner."""
@@ -920,9 +937,7 @@ if "camera_manager_active" not in st.session_state:
 # ═══════════════════════════════════════════════════════════════
 
 st.markdown(
-    "<h1 style='margin-bottom:0'>"
-    "\U0001f4f9 Live Recognition"
-    "</h1>",
+    "<h1 style='margin-bottom:0'>\U0001f4f9 Live Recognition</h1>",
     unsafe_allow_html=True,
 )
 
@@ -1036,7 +1051,7 @@ if is_running:
     _has_frame = frame_buffer.has_frame()
     raw_frame = frame_buffer.get()
     results = results_buffer.get()
-    
+
     if results is None:
         results = []
     frame = pipeline._draw_overlays(raw_frame, results) if raw_frame is not None else None
@@ -1061,8 +1076,13 @@ if is_running:
             placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
             placeholder[:] = (25, 25, 25)
             cv2.putText(
-                placeholder, "Waiting for camera...",
-                (180, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (180, 180, 180), 2,
+                placeholder,
+                "Waiting for camera...",
+                (180, 240),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (180, 180, 180),
+                2,
             )
             st.image(placeholder, channels="BGR", use_container_width=True)
 
@@ -1087,8 +1107,14 @@ if is_running:
         st.markdown(f"**Queue:** {_q}/1")
 
         # Camera Health
-        _health_color = "green" if pipeline.status == "LIVE" else ("orange" if pipeline.status in ("CONNECTING", "RECONNECTING") else "red")
-        st.markdown(f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}")
+        _health_color = (
+            "green"
+            if pipeline.status == "LIVE"
+            else ("orange" if pipeline.status in ("CONNECTING", "RECONNECTING") else "red")
+        )
+        st.markdown(
+            f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}"
+        )
 
         # CPU / RAM (psutil optional)
         if _PSUTIL_AVAILABLE:
@@ -1113,7 +1139,7 @@ if is_running:
                     st.caption(f"ID: {emp_id_str}")
                 st.success("PRESENT")
             elif decision == AMFRDecision.REJECT_SPOOF.value:
-                st.markdown(f"\U0001f6ab **SPOOF DETECTED**")
+                st.markdown("\U0001f6ab **SPOOF DETECTED**")
                 st.error("Attendance Rejected")
             elif decision == AMFRDecision.BORDERLINE.value:
                 st.markdown(f"\u23f3 **{name}?**")
@@ -1147,7 +1173,7 @@ if is_running:
     with st.expander("\U0001f52c Recognition Details"):
         if results:
             for i, r in enumerate(results):
-                display_name = (r.get("emp_name") or r.get("name", "?"))
+                display_name = r.get("emp_name") or r.get("name", "?")
                 if r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
                     check = "\u2705 "
                 elif r.get("amfr_decision") == AMFRDecision.REJECT_SPOOF.value:
@@ -1179,8 +1205,8 @@ if is_running:
 
                 st.caption(
                     f"AMFR Score: {r.get('risk_score', 0):.3f} | "
-                    f"Decision: {r.get('amfr_decision', '\u2014')} | "
-                    f"Track: {r.get('track_id', '\u2014')[:10] if r.get('track_id') else '\u2014'}"
+                    f"Decision: {r.get('amfr_decision', '—')} | "
+                    f"Track: {r.get('track_id', '—')[:10] if r.get('track_id') else '—'}"
                 )
                 st.divider()
         else:
@@ -1198,12 +1224,16 @@ if is_running:
         if pipeline.worker_errors:
             st.warning(f"\u26a0\ufe0f Worker errors (transient): {pipeline.worker_errors}")
         if _PSUTIL_AVAILABLE:
-            st.markdown(f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
-                        f"**RAM:** {psutil.virtual_memory().percent:.0f}%")
+            st.markdown(
+                f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
+                f"**RAM:** {psutil.virtual_memory().percent:.0f}%"
+            )
         _e2e = pipeline.latency_stats()
         if _e2e.get("count", 0):
-            st.markdown(f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
-                        f"{_e2e['p95_ms']:.1f} ms ({_e2e['count']:.0f} samples)")
+            st.markdown(
+                f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
+                f"{_e2e['p95_ms']:.1f} ms ({_e2e['count']:.0f} samples)"
+            )
         else:
             st.markdown("**E2E Latency (P50/P95):** measuring…")
         st.markdown(f"**Status:** {pipeline.status}")
@@ -1220,7 +1250,9 @@ if is_running:
         st.markdown(f"- AMFR borderline: {cfg.AMFR_BORDERLINE_THRESHOLD}")
         st.markdown(f"- Frame skip: {getattr(cfg, 'FRAME_SKIP', 2)}")
         st.markdown(f"- Cooldown: {cfg.COOLDOWN_SECONDS}s")
-        st.markdown(f"- FAISS: {cfg.FAISS_INDEX_TYPE} M={cfg.FAISS_HNSW_M}, {cfg.FAISS_HNSW_EF_SEARCH} efSearch")
+        st.markdown(
+            f"- FAISS: {cfg.FAISS_INDEX_TYPE} M={cfg.FAISS_HNSW_M}, {cfg.FAISS_HNSW_EF_SEARCH} efSearch"
+        )
 
         st.markdown("**Model Status**")
         try:
@@ -1247,12 +1279,22 @@ else:
         placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
         placeholder[:] = (18, 18, 18)
         cv2.putText(
-            placeholder, "Camera Stopped",
-            (180, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (140, 140, 140), 2,
+            placeholder,
+            "Camera Stopped",
+            (180, 220),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (140, 140, 140),
+            2,
         )
         cv2.putText(
-            placeholder, "Select camera and press START",
-            (140, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (90, 90, 90), 1,
+            placeholder,
+            "Select camera and press START",
+            (140, 260),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (90, 90, 90),
+            1,
         )
         st.image(placeholder, channels="BGR", use_container_width=True)
 
@@ -1285,18 +1327,20 @@ else:
     try:
         res = SharedModelResources.load()
         model_cols = st.columns(4)
-        model_cols[0].success(f"\u2705 **YOLO11** \u2014 Detection")
-        model_cols[1].success(f"\u2705 **InsightFace** \u2014 Recognition")
+        model_cols[0].success("\u2705 **YOLO11** \u2014 Detection")
+        model_cols[1].success("\u2705 **InsightFace** \u2014 Recognition")
         model_cols[2].success(f"\u2705 **FAISS** \u2014 {res.service.enrollment.count()} emb.")
-        model_cols[3].success(f"\u2705 **AMFR** \u2014 Active")
+        model_cols[3].success("\u2705 **AMFR** \u2014 Active")
 
         # Database status
-        from database.database import DB_TYPE, DATABASE_URL
+        from database.database import DATABASE_URL
+
         masked_url = DATABASE_URL
         if "sqlite" in masked_url:
             masked_url = "SQLite (development)"
         elif "postgresql" in masked_url:
             from urllib.parse import urlparse
+
             parsed = urlparse(DATABASE_URL)
             masked_url = f"PostgreSQL @ {parsed.hostname}:{parsed.port}/{parsed.path.split('/')[-1]}"
         st.info(f"**Database:** {masked_url}")

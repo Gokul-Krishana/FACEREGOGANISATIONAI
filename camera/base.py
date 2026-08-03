@@ -26,9 +26,8 @@ Usage::
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
-import cv2
 import numpy as np
 
 

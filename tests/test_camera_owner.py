@@ -23,7 +23,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dashboard.camera_owner import CameraOwner
+from dashboard.camera_owner import CameraOwner  # noqa: E402
 
 
 class _MockCamera:
@@ -50,6 +50,7 @@ class _MockPipeline:
 #  Fixture — fresh singleton per test
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(autouse=True)
 def _reset_owner():
     """Reset the singleton before and after every test."""
@@ -62,8 +63,8 @@ def _reset_owner():
 #  Singleton behavior
 # ═══════════════════════════════════════════════════════════════
 
-class TestSingleton:
 
+class TestSingleton:
     def test_get_returns_same_instance(self):
         a = CameraOwner.get()
         b = CameraOwner.get()
@@ -85,8 +86,8 @@ class TestSingleton:
 #  Acquisition semantics
 # ═══════════════════════════════════════════════════════════════
 
-class TestAcquisition:
 
+class TestAcquisition:
     def test_can_acquire_when_free(self):
         owner = CameraOwner.get()
         assert owner.can_acquire() is True
@@ -137,8 +138,8 @@ class TestAcquisition:
 #  Release semantics
 # ═══════════════════════════════════════════════════════════════
 
-class TestRelease:
 
+class TestRelease:
     def test_release_stops_pipeline(self):
         owner = CameraOwner.get()
         pipe = _MockPipeline()
@@ -192,8 +193,8 @@ class TestRelease:
 #  START → STOP → START cycles
 # ═══════════════════════════════════════════════════════════════
 
-class TestStartStopStart:
 
+class TestStartStopStart:
     def test_start_stop_start_works(self):
         owner = CameraOwner.get()
         # First cycle
@@ -238,8 +239,8 @@ class TestStartStopStart:
 #  Thread safety
 # ═══════════════════════════════════════════════════════════════
 
-class TestThreadSafety:
 
+class TestThreadSafety:
     def test_concurrent_acquire_only_one_wins(self):
         owner = CameraOwner.get()
         results = []

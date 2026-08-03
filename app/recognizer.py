@@ -13,13 +13,10 @@ Pipeline role:  YOLO → RetinaFace → ArcFace → FAISS
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-import cv2
 import numpy as np
 
-import insightface
 from insightface.app import FaceAnalysis
 
 import config.config as cfg

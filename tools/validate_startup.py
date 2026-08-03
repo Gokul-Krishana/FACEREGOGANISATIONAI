@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 
 # ── Result Model ──────────────────────────────────────────────
 
+
 @dataclass
 class Check:
     """Result of a single startup validation check."""
@@ -64,22 +65,22 @@ class Check:
         return self.status == "PASS"
 
     @classmethod
-    def pass_(cls, name: str, message: str = "", duration_ms: float = 0.0,
-              details: Optional[dict] = None) -> "Check":
-        return cls(name=name, status="PASS", message=message,
-                   duration_ms=duration_ms, details=details)
+    def pass_(
+        cls, name: str, message: str = "", duration_ms: float = 0.0, details: Optional[dict] = None
+    ) -> "Check":
+        return cls(name=name, status="PASS", message=message, duration_ms=duration_ms, details=details)
 
     @classmethod
-    def fail(cls, name: str, message: str = "", duration_ms: float = 0.0,
-             details: Optional[dict] = None) -> "Check":
-        return cls(name=name, status="FAIL", message=message,
-                   duration_ms=duration_ms, details=details)
+    def fail(
+        cls, name: str, message: str = "", duration_ms: float = 0.0, details: Optional[dict] = None
+    ) -> "Check":
+        return cls(name=name, status="FAIL", message=message, duration_ms=duration_ms, details=details)
 
     @classmethod
-    def warn(cls, name: str, message: str = "", duration_ms: float = 0.0,
-             details: Optional[dict] = None) -> "Check":
-        return cls(name=name, status="WARN", message=message,
-                   duration_ms=duration_ms, details=details)
+    def warn(
+        cls, name: str, message: str = "", duration_ms: float = 0.0, details: Optional[dict] = None
+    ) -> "Check":
+        return cls(name=name, status="WARN", message=message, duration_ms=duration_ms, details=details)
 
     @classmethod
     def skip(cls, name: str, message: str = "", details: Optional[dict] = None) -> "Check":
@@ -89,6 +90,7 @@ class Check:
 # ═══════════════════════════════════════════════════════════════
 #  Check Functions
 # ═══════════════════════════════════════════════════════════════
+
 
 def check_config() -> Check:
     """Validate configuration files and critical settings."""
@@ -112,8 +114,7 @@ def check_config() -> Check:
     elapsed = (time.time() - start) * 1000
     if issues:
         return Check.warn("Configuration", "; ".join(issues), duration_ms=elapsed)
-    return Check.pass_("Configuration", f"Valid: {cfg.SETTINGS_PATH.name}",
-                       duration_ms=elapsed)
+    return Check.pass_("Configuration", f"Valid: {cfg.SETTINGS_PATH.name}", duration_ms=elapsed)
 
 
 def check_directories() -> Check:
@@ -133,11 +134,13 @@ def check_directories() -> Check:
         d.mkdir(parents=True, exist_ok=True)
     elapsed = (time.time() - start) * 1000
     if missing:
-        return Check.pass_("Directories", f"Created {len(missing)} missing dir(s)",
-                           duration_ms=elapsed,
-                           details={"created": [str(d) for d in missing]})
-    return Check.pass_("Directories", f"All {len(required)} directories ready",
-                       duration_ms=elapsed)
+        return Check.pass_(
+            "Directories",
+            f"Created {len(missing)} missing dir(s)",
+            duration_ms=elapsed,
+            details={"created": [str(d) for d in missing]},
+        )
+    return Check.pass_("Directories", f"All {len(required)} directories ready", duration_ms=elapsed)
 
 
 def check_yolo_model() -> Check:
@@ -154,14 +157,15 @@ def check_yolo_model() -> Check:
     # Try to instantiate — catches corrupt models
     try:
         from app.face_detector import FaceDetector
+
         _ = FaceDetector()
         elapsed = (time.time() - start) * 1000
         return Check.pass_("YOLO Model", f"Loaded ({size_mb:.1f} MB)", duration_ms=elapsed)
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
-        return Check.warn("YOLO Model",
-                          f"File exists ({size_mb:.1f} MB) but load failed: {exc}",
-                          duration_ms=elapsed)
+        return Check.warn(
+            "YOLO Model", f"File exists ({size_mb:.1f} MB) but load failed: {exc}", duration_ms=elapsed
+        )
 
 
 def check_insightface_model() -> Check:
@@ -169,12 +173,11 @@ def check_insightface_model() -> Check:
     start = time.time()
     try:
         from app.recognizer import FaceRecognizer
+
         rec = FaceRecognizer()
         dim = rec.embedding_dim()
         elapsed = (time.time() - start) * 1000
-        return Check.pass_("InsightFace",
-                           f"Model={rec.model_name}, dim={dim}",
-                           duration_ms=elapsed)
+        return Check.pass_("InsightFace", f"Model={rec.model_name}, dim={dim}", duration_ms=elapsed)
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
         return Check.fail("InsightFace", str(exc), duration_ms=elapsed)
@@ -192,6 +195,7 @@ def check_faiss_index() -> Check:
 
     try:
         from app.enrollment import FaceEnrollment
+
         enrollment = FaceEnrollment()
         total = enrollment.count()
         persons = enrollment.unique_count()
@@ -200,16 +204,19 @@ def check_faiss_index() -> Check:
 
         # Validate metadata matches index
         if total != meta_count:
-            return Check.warn("FAISS Index",
-                              f"Index={total} embeddings vs Metadata={meta_count} entries — mismatch!",
-                              duration_ms=elapsed,
-                              details={"embeddings": total, "metadata": meta_count})
+            return Check.warn(
+                "FAISS Index",
+                f"Index={total} embeddings vs Metadata={meta_count} entries — mismatch!",
+                duration_ms=elapsed,
+                details={"embeddings": total, "metadata": meta_count},
+            )
 
-        return Check.pass_("FAISS Index",
-                           f"{total} embeddings, {persons} persons ({cfg.FAISS_INDEX_TYPE})",
-                           duration_ms=elapsed,
-                           details={"embeddings": total, "persons": persons,
-                                    "index_type": cfg.FAISS_INDEX_TYPE})
+        return Check.pass_(
+            "FAISS Index",
+            f"{total} embeddings, {persons} persons ({cfg.FAISS_INDEX_TYPE})",
+            duration_ms=elapsed,
+            details={"embeddings": total, "persons": persons, "index_type": cfg.FAISS_INDEX_TYPE},
+        )
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
         return Check.fail("FAISS Index", str(exc), duration_ms=elapsed)
@@ -220,17 +227,20 @@ def check_database() -> Check:
     start = time.time()
     try:
         with get_session() as session:
-            session.execute(__import__('sqlalchemy').text("SELECT 1"))
+            session.execute(__import__("sqlalchemy").text("SELECT 1"))
         elapsed = (time.time() - start) * 1000
         masked_url = DATABASE_URL
         if "postgresql" in masked_url:
             from urllib.parse import urlparse
+
             parsed = urlparse(DATABASE_URL)
             masked_url = f"postgresql://{parsed.hostname}:{parsed.port}/{parsed.path.lstrip('/')}"
-        return Check.pass_("Database",
-                           f"Connected ({DB_TYPE})",
-                           duration_ms=elapsed,
-                           details={"type": DB_TYPE, "url": masked_url})
+        return Check.pass_(
+            "Database",
+            f"Connected ({DB_TYPE})",
+            duration_ms=elapsed,
+            details={"type": DB_TYPE, "url": masked_url},
+        )
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
         return Check.fail("Database", f"{DB_TYPE}: {exc}", duration_ms=elapsed)
@@ -241,15 +251,16 @@ def check_redis() -> Check:
     start = time.time()
     try:
         from api.redis_client import get_redis
+
         redis = get_redis()
         redis.client.ping()
         elapsed = (time.time() - start) * 1000
         return Check.pass_("Redis", "Connected", duration_ms=elapsed)
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
-        return Check.warn("Redis",
-                          f"Not available — running with in-memory fallback: {exc}",
-                          duration_ms=elapsed)
+        return Check.warn(
+            "Redis", f"Not available — running with in-memory fallback: {exc}", duration_ms=elapsed
+        )
 
 
 def check_amfr() -> Check:
@@ -257,11 +268,11 @@ def check_amfr() -> Check:
     start = time.time()
     try:
         from app.amfr_engine import AMFREngine
+
         engine = AMFREngine()
         status = engine.status()
         elapsed = (time.time() - start) * 1000
-        return Check.pass_("AMFR Engine", "Ready", duration_ms=elapsed,
-                           details=status)
+        return Check.pass_("AMFR Engine", "Ready", duration_ms=elapsed, details=status)
     except Exception as exc:
         elapsed = (time.time() - start) * 1000
         return Check.fail("AMFR Engine", str(exc), duration_ms=elapsed)
@@ -270,6 +281,7 @@ def check_amfr() -> Check:
 # ═══════════════════════════════════════════════════════════════
 #  Runner
 # ═══════════════════════════════════════════════════════════════
+
 
 def run_all(verbose: bool = False) -> Tuple[List[Check], bool]:
     """Run all startup validation checks.
@@ -306,9 +318,9 @@ def run_all(verbose: bool = False) -> Tuple[List[Check], bool]:
 def print_report(checks: List[Check]) -> None:
     """Print a formatted validation report."""
     emoji = {"PASS": "✅", "FAIL": "❌", "WARN": "⚠️ ", "SKIP": "⏭️"}
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  System Validation Report")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print()
 
     for c in checks:
@@ -327,7 +339,7 @@ def print_report(checks: List[Check]) -> None:
     warned = sum(1 for c in checks if c.status == "WARN")
     total = len(checks)
 
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Results: {passed}/{total} passed, {failed} failed, {warned} warnings")
     if failed > 0:
         print("  ❌ SYSTEM NOT READY — fix FAIL items above")
@@ -335,12 +347,13 @@ def print_report(checks: List[Check]) -> None:
         print("  ⚠️  System ready (with warnings)")
     else:
         print("  ✅ SYSTEM READY")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 def main() -> int:
     """Run startup validation and return exit code."""
     import argparse
+
     parser = argparse.ArgumentParser(description="Face Recognition AI — Startup Validation")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
     args = parser.parse_args()

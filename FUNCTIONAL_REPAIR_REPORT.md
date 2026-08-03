@@ -34,9 +34,9 @@ EmployeeService.create(employee_id="EMP001", name="Gokul", ...)
 
 **Broken recognition flow:**
 ```python
-name = amfr_detection["name"]        # "Gokul" from FAISS
+name = amfr_detection["name"]  # "Gokul" from FAISS
 emp = EmployeeService.get_by_employee_id(name)  # get_by_employee_id("Gokul") → None!
-emp_id = None                         # ALWAYS None
+emp_id = None  # ALWAYS None
 # → _maybe_mark_attendance skipped → attendance NEVER marked
 ```
 

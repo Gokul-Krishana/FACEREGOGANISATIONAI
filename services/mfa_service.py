@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
@@ -59,6 +58,7 @@ class MFAService:
             The provisioning URI should be shown as a QR code.
         """
         import pyotp
+
         secret = pyotp.random_base32()
         uri = pyotp.totp.TOTP(secret).provisioning_uri(
             name=email,
@@ -79,6 +79,7 @@ class MFAService:
             ``True`` if the code is valid.
         """
         import pyotp
+
         if not secret or not code:
             return False
         totp = pyotp.TOTP(secret)
@@ -150,15 +151,15 @@ class MFAService:
             ``(secret, qr_uri, plaintext_backup_codes)``.
             Show these to the user exactly once.
         """
-        secret, uri = MFAService.generate_secret(user.email or user.username)
+        secret, uri = MFAService.generate_secret(user.email or user.username)  # type: ignore[arg-type]
         plaintext_codes, hashed_codes = MFAService.generate_backup_codes()
 
         with get_session() as session:
             db_user = session.query(User).filter(User.id == user.id).first()
             if db_user:
-                db_user.mfa_totp_secret = secret
-                db_user.mfa_backup_codes = hashed_codes
-                db_user.is_mfa_enabled = True
+                db_user.mfa_totp_secret = secret  # type: ignore[assignment]
+                db_user.mfa_backup_codes = hashed_codes  # type: ignore[assignment]
+                db_user.is_mfa_enabled = True  # type: ignore[assignment]
                 session.commit()
 
         return secret, uri, plaintext_codes
@@ -169,10 +170,10 @@ class MFAService:
         with get_session() as session:
             db_user = session.query(User).filter(User.id == user.id).first()
             if db_user:
-                db_user.is_mfa_enabled = False
-                db_user.mfa_totp_secret = None
-                db_user.mfa_backup_codes = None
-                db_user.mfa_last_verified = None
+                db_user.is_mfa_enabled = False  # type: ignore[assignment]
+                db_user.mfa_totp_secret = None  # type: ignore[assignment]
+                db_user.mfa_backup_codes = None  # type: ignore[assignment]
+                db_user.mfa_last_verified = None  # type: ignore[assignment]
                 session.commit()
                 return True
         return False
@@ -193,20 +194,20 @@ class MFAService:
 
         if use_backup:
             # Check backup codes
-            hashes = user.mfa_backup_codes or []
-            valid, matched_hash = MFAService.verify_backup_code(hashes, code)
+            hashes = user.mfa_backup_codes or []  # type: ignore[var-annotated]
+            valid, matched_hash = MFAService.verify_backup_code(hashes, code)  # type: ignore[arg-type]
             if not valid:
                 return False, "Invalid backup code"
 
             # Remove used code
-            remaining = MFAService.remove_used_backup_code(hashes, matched_hash)
+            remaining = MFAService.remove_used_backup_code(hashes, matched_hash)  # type: ignore[arg-type]
 
             # Check if user has any backup codes left
             with get_session() as session:
                 db_user = session.query(User).filter(User.id == user.id).first()
                 if db_user:
-                    db_user.mfa_backup_codes = remaining
-                    db_user.mfa_last_verified = now
+                    db_user.mfa_backup_codes = remaining  # type: ignore[assignment]
+                    db_user.mfa_last_verified = now  # type: ignore[assignment]
                     session.commit()
 
             return True, "Backup code accepted"
@@ -215,14 +216,14 @@ class MFAService:
         if not user.mfa_totp_secret:
             return False, "MFA not configured"
 
-        if not MFAService.verify_totp(user.mfa_totp_secret, code):
+        if not MFAService.verify_totp(user.mfa_totp_secret, code):  # type: ignore[arg-type]
             return False, "Invalid TOTP code"
 
         # Update verification timestamp
         with get_session() as session:
             db_user = session.query(User).filter(User.id == user.id).first()
             if db_user:
-                db_user.mfa_last_verified = now
+                db_user.mfa_last_verified = now  # type: ignore[assignment]
                 session.commit()
 
         return True, "TOTP code accepted"

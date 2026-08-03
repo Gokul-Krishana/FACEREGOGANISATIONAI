@@ -22,7 +22,6 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -35,7 +34,6 @@ from app.recognizer import FaceRecognizer
 from app.enrollment import FaceEnrollment
 from database.database import get_session
 from database.repository import (
-    AttendanceRepo,
     RecognitionLogRepo,
     UnknownFaceRepo,
 )
@@ -43,6 +41,7 @@ from services.attendance_service import AttendanceService
 from services.audit_service import AuditService
 from services.employee_service import EmployeeService
 from services.alert_service import send_security_alert
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,7 +94,7 @@ class RecognitionService:
         self._prev_time = time.time()
 
     @classmethod
-    def with_shared_models(cls, models: 'RecognitionService') -> 'RecognitionService':
+    def with_shared_models(cls, models: "RecognitionService") -> "RecognitionService":
         """Create a new pipeline instance sharing the AI models from *models*.
 
         Use this when you want independent per-camera state (frame counter,
@@ -129,9 +128,7 @@ class RecognitionService:
         annotated, _ = self.process_frame_detailed(frame)
         return annotated
 
-    def process_frame_detailed(
-        self, frame: np.ndarray
-    ) -> Tuple[np.ndarray, List[Dict]]:
+    def process_frame_detailed(self, frame: np.ndarray) -> Tuple[np.ndarray, List[Dict]]:
         """Process a frame through the full AMFR pipeline.
 
         The pipeline is now:
@@ -197,7 +194,9 @@ class RecognitionService:
             face = self.recognizer.detect_face(person_crop)
             face_data.append(face)
             if face is not None:
-                logger.debug("  [PIPELINE] RetinaFace: face detected, det_score=%.3f", face.get("det_score", 0.0))
+                logger.debug(
+                    "  [PIPELINE] RetinaFace: face detected, det_score=%.3f", face.get("det_score", 0.0)
+                )
             else:
                 logger.debug("  [PIPELINE] RetinaFace: NO face detected in person crop")
 
@@ -215,9 +214,13 @@ class RecognitionService:
                 matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
                 faiss_results.append(matches)
                 if matches:
-                    logger.debug("  [PIPELINE] FAISS: matched '%s' confidence=%.4f distance=%.4f (threshold=%.2f)",
-                                matches[0]["name"], matches[0]["confidence"],
-                                matches[0].get("distance", 0), self.recog_threshold)
+                    logger.debug(
+                        "  [PIPELINE] FAISS: matched '%s' confidence=%.4f distance=%.4f (threshold=%.2f)",
+                        matches[0]["name"],
+                        matches[0]["confidence"],
+                        matches[0].get("distance", 0),
+                        self.recog_threshold,
+                    )
                 else:
                     logger.debug("  [PIPELINE] FAISS: no match within threshold %.2f", self.recog_threshold)
             else:
@@ -243,8 +246,15 @@ class RecognitionService:
             quality_score = amfr_detection["quality_score"]
             arcface_distance = amfr_detection["arcface_distance"]
 
-            logger.debug("  [PIPELINE] AMFR decision: %s | name='%s' | risk=%.4f | liveness=%.4f | quality=%.4f | arcface_dist=%.4f",
-                        decision, name, risk_score, liveness_score, quality_score, arcface_distance)
+            logger.debug(
+                "  [PIPELINE] AMFR decision: %s | name='%s' | risk=%.4f | liveness=%.4f | quality=%.4f | arcface_dist=%.4f",
+                decision,
+                name,
+                risk_score,
+                liveness_score,
+                quality_score,
+                arcface_distance,
+            )
 
             if decision == AMFRDecision.ACCEPT.value:
                 # ── High confidence + live — mark attendance ──
@@ -258,40 +268,49 @@ class RecognitionService:
                 emp_name = emp.name if emp else name
                 emp_dept = emp.department if emp else None
 
-                logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s emp_name='%s'",
-                            name, emp_id, emp_name)
+                logger.debug(
+                    "  [PIPELINE] Employee lookup: name='%s' → emp_id=%s emp_name='%s'",
+                    name,
+                    emp_id,
+                    emp_name,
+                )
 
                 attendance_marked = self._maybe_mark_attendance(
                     name=name,
-                    employee_id=emp_id,
+                    employee_id=emp_id,  # type: ignore[arg-type]
                     confidence=risk_score,
                 )
-                logger.debug("  [PIPELINE] Attendance: %s", "MARKED" if attendance_marked else "ALREADY_PRESENT/SKIPPED")
+                logger.debug(
+                    "  [PIPELINE] Attendance: %s",
+                    "MARKED" if attendance_marked else "ALREADY_PRESENT/SKIPPED",
+                )
 
                 self._log_recognition(
-                    employee_id=emp_id,
+                    employee_id=emp_id,  # type: ignore[arg-type]
                     is_known=True,
                     confidence=risk_score,
                     liveness_score=liveness_score,
                     quality_score=quality_score,
                     track_id=amfr_detection.get("track_id"),
                 )
-                results.append({
-                    "bbox": bbox,
-                    "name": name,  # FAISS name (display name or employee_id string)
-                    "emp_name": emp_name,  # Database display name
-                    "emp_id": emp_id,  # Database primary key
-                    "department": emp_dept,  # Department for overlay display
-                    "confidence": risk_score,
-                    "is_known": True,
-                    "attendance_marked": attendance_marked,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                    "arcface_distance": arcface_distance,
-                    "track_id": amfr_detection.get("track_id"),
-                })
+                results.append(
+                    {
+                        "bbox": bbox,
+                        "name": name,  # FAISS name (display name or employee_id string)
+                        "emp_name": emp_name,  # Database display name
+                        "emp_id": emp_id,  # Database primary key
+                        "department": emp_dept,  # Department for overlay display
+                        "confidence": risk_score,
+                        "is_known": True,
+                        "attendance_marked": attendance_marked,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                        "arcface_distance": arcface_distance,
+                        "track_id": amfr_detection.get("track_id"),
+                    }
+                )
 
             elif decision == AMFRDecision.BORDERLINE.value:
                 # ── Uncertain — known name but needs more frames ──
@@ -310,26 +329,30 @@ class RecognitionService:
                     quality_score=quality_score,
                     track_id=amfr_detection.get("track_id"),
                 )
-                results.append({
-                    "bbox": bbox,
-                    "name": name,
-                    "emp_name": emp.name if emp else name,
-                    "emp_id": emp_id,
-                    "department": emp_dept,
-                    "confidence": risk_score,
-                    "is_known": False,
-                    "attendance_marked": False,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                    "arcface_distance": arcface_distance,
-                    "track_id": amfr_detection.get("track_id"),
-                })
+                results.append(
+                    {
+                        "bbox": bbox,
+                        "name": name,
+                        "emp_name": emp.name if emp else name,
+                        "emp_id": emp_id,
+                        "department": emp_dept,
+                        "confidence": risk_score,
+                        "is_known": False,
+                        "attendance_marked": False,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                        "arcface_distance": arcface_distance,
+                        "track_id": amfr_detection.get("track_id"),
+                    }
+                )
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 # ── Spoof detected — reject + security alert ──
-                logger.debug("  [PIPELINE] SPOOF rejected — liveness=%.4f below spoof threshold", liveness_score)
+                logger.debug(
+                    "  [PIPELINE] SPOOF rejected — liveness=%.4f below spoof threshold", liveness_score
+                )
                 self._log_recognition(
                     employee_id=None,
                     is_known=False,
@@ -358,21 +381,23 @@ class RecognitionService:
                     )
                 except Exception:
                     logger.debug("Security alert dispatch failed", exc_info=True)
-                results.append({
-                    "bbox": bbox,
-                    "name": "SPOOF",
-                    "emp_name": "SPOOF",
-                    "emp_id": None,
-                    "confidence": 0.0,
-                    "is_known": False,
-                    "attendance_marked": False,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                    "arcface_distance": arcface_distance,
-                    "track_id": amfr_detection.get("track_id"),
-                })
+                results.append(
+                    {
+                        "bbox": bbox,
+                        "name": "SPOOF",
+                        "emp_name": "SPOOF",
+                        "emp_id": None,
+                        "confidence": 0.0,
+                        "is_known": False,
+                        "attendance_marked": False,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                        "arcface_distance": arcface_distance,
+                        "track_id": amfr_detection.get("track_id"),
+                    }
+                )
 
             else:  # LOW_CONFIDENCE / no face
                 # ── Low confidence or no face — unknown ──
@@ -387,21 +412,23 @@ class RecognitionService:
                     quality_score=quality_score,
                     track_id=amfr_detection.get("track_id"),
                 )
-                results.append({
-                    "bbox": bbox,
-                    "name": "Unknown",
-                    "emp_name": "Unknown",
-                    "emp_id": None,
-                    "confidence": risk_score,
-                    "is_known": False,
-                    "attendance_marked": False,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                    "arcface_distance": arcface_distance,
-                    "track_id": amfr_detection.get("track_id"),
-                })
+                results.append(
+                    {
+                        "bbox": bbox,
+                        "name": "Unknown",
+                        "emp_name": "Unknown",
+                        "emp_id": None,
+                        "confidence": risk_score,
+                        "is_known": False,
+                        "attendance_marked": False,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                        "arcface_distance": arcface_distance,
+                        "track_id": amfr_detection.get("track_id"),
+                    }
+                )
 
         self._last_recognised = results
         return self._draw_overlay(frame, results), results
@@ -432,9 +459,7 @@ class RecognitionService:
         self._fps = 0.0
         self.amfr.reset()
 
-    def _maybe_mark_attendance(
-        self, name: str, employee_id: Optional[int], confidence: float
-    ) -> bool:
+    def _maybe_mark_attendance(self, name: str, employee_id: Optional[int], confidence: float) -> bool:
         """Mark attendance with cooldown to avoid spamming.
 
         Returns:
@@ -534,26 +559,26 @@ class RecognitionService:
             conf = item["confidence"]
             decision = item.get("amfr_decision", "")
             liveness = item.get("liveness_score", 0.0)
-            risk = item.get("risk_score", 0.0)
+            _risk = item.get("risk_score", 0.0)
 
             # ── Color by AMFR decision ───────────────────────
             if decision == AMFRDecision.ACCEPT.value:
-                color = (0, 220, 0)       # Green — accepted
+                color = (0, 220, 0)  # Green — accepted
             elif decision == AMFRDecision.BORDERLINE.value:
-                color = (0, 220, 220)     # Yellow — borderline
+                color = (0, 220, 220)  # Yellow — borderline
             elif decision == AMFRDecision.REJECT_SPOOF.value:
-                color = (0, 0, 200)       # Red — spoof
+                color = (0, 0, 200)  # Red — spoof
             elif name == "No Face":
-                color = (0, 165, 255)     # Orange — no face
+                color = (0, 165, 255)  # Orange — no face
             else:
-                color = (128, 128, 128)   # Grey — unknown/low confidence
+                color = (128, 128, 128)  # Grey — unknown/low confidence
 
             # ── Multi-line label with AMFR info ──────────────
             label = f"{name}"
             if conf > 0:
                 label += f" ({conf:.0%})"
             if decision in (AMFRDecision.ACCEPT.value, AMFRDecision.BORDERLINE.value):
-                badge = f"[LIVE]" if liveness > 0.5 else f"[live:{liveness:.0%}]"
+                badge = "[LIVE]" if liveness > 0.5 else f"[live:{liveness:.0%}]"
                 label = f"{badge} {label}"
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 label = f"[SPOOF] {name if name != 'SPOOF' else ''}"
@@ -561,12 +586,11 @@ class RecognitionService:
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
             cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 8, y1), color, -1)
-            cv2.putText(frame, label, (x1 + 4, y1 - 4),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(frame, label, (x1 + 4, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         # ── HUD ──────────────────────────────────────────────
         enrolled = self.enrollment.count()
-        amfr_tracks = len(self.amfr.get_all_tracks()) if hasattr(self, 'amfr') and self.amfr else 0
+        amfr_tracks = len(self.amfr.get_all_tracks()) if hasattr(self, "amfr") and self.amfr else 0
         lines = [
             f"FPS: {self._fps:.1f}",
             f"Enrolled: {enrolled}",
@@ -574,7 +598,6 @@ class RecognitionService:
         ]
         for i, line in enumerate(lines):
             y = 25 + i * 22
-            cv2.putText(frame, line, (10, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+            cv2.putText(frame, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
 
         return frame

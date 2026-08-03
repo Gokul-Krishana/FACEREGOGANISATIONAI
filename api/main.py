@@ -1,5 +1,3 @@
-
-
 """
 FastAPI Application for Face Recognition AI - College Deployment.
 Provides secure API layer with:
@@ -30,57 +28,50 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, status  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
+from enum import Enum  # noqa: E402
+from pydantic import BaseModel, EmailStr, Field, field_validator  # noqa: E402
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.middleware import SlowAPIMiddleware  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
 
-from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select  # noqa: E402
+from sqlalchemy.orm import Session, selectinload  # noqa: E402
 
 # Module-level logger
 logger = logging.getLogger(__name__)
 
-import config.config as cfg
-from database.database import get_session, init_db
-from database.models import (
+import config.config as cfg  # noqa: E402
+from database.database import get_session, init_db  # noqa: E402
+from database.models import (  # noqa: E402
     ActionType,
     AuditAction,
     AuditLog,
     Attendance,
     Camera,
-    Course,
-    Department,
     Employee,
     Enrollment,
-    Institution,
     Permission,
-    RecognitionLog,
     RefreshToken,
     Role,
     RoleName,
     Section,
-    Staff,
     Student,
-    Timetable,
     UnknownFace,
     User,
     _utcnow,
     role_permissions,
     user_roles,
 )
-from database.repository import EmployeeRepo, PageResult, StudentRepo
-from services.attendance_service import AttendanceService
-from services.employee_service import EmployeeService
-from utils.upload_security import UploadSecurityError, validate_image_upload
-from services.brute_force_protection import BruteForceProtection
+from database.repository import EmployeeRepo, PageResult, StudentRepo  # noqa: E402
+from services.employee_service import EmployeeService  # noqa: E402
+from utils.upload_security import UploadSecurityError, validate_image_upload  # noqa: E402
+from services.brute_force_protection import BruteForceProtection  # noqa: E402
 
 # ── Security setup ─────────────────────────────────────────────────
 security = HTTPBearer(auto_error=False)
@@ -91,8 +82,11 @@ limiter = Limiter(key_func=get_remote_address)
 
 class Settings(BaseModel):
     """Application settings loaded from environment (not user-facing)."""
+
     database_url: str = Field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
-    secret_key: str = Field(default_factory=lambda: os.getenv("SECRET_KEY", "dev-secret-change-in-production"))
+    secret_key: str = Field(
+        default_factory=lambda: os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+    )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     redis_url: str = Field(default_factory=lambda: os.getenv("REDIS_URL", "redis://localhost:6379/0"))
@@ -113,6 +107,7 @@ class Settings(BaseModel):
 
 settings = Settings()
 
+
 # ── Production Secret Key Validation ─────────────────────────────────
 def _validate_production_secret_key():
     """Fail loudly if the default secret key is used in production."""
@@ -121,13 +116,11 @@ def _validate_production_secret_key():
             raise ValueError(
                 "FATAL: Using default SECRET_KEY in production! "
                 "Set SECRET_KEY environment variable to a secure random string. "
-                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         if len(settings.secret_key) < 32:
-            raise ValueError(
-                "FATAL: SECRET_KEY is too short for production! "
-                "Must be at least 32 characters."
-            )
+            raise ValueError("FATAL: SECRET_KEY is too short for production! Must be at least 32 characters.")
+
 
 _validate_production_secret_key()
 
@@ -136,7 +129,6 @@ _validate_production_secret_key()
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     init_db()
-    from api.job_queue import register_default_handlers
     register_default_handlers()
     await job_queue.start()
     logger = logging.getLogger(__name__)
@@ -169,7 +161,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 
-
 # 2. CORS (configured via environment for flexible deployment)
 app.add_middleware(
     CORSMiddleware,
@@ -195,6 +186,7 @@ app.add_middleware(
 
 # ── Safe Error Handlers (no stack traces leaked to clients) ────────
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Return consistent JSON error responses without stack traces."""
@@ -212,7 +204,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch-all — returns a safe generic message, no internals leaked."""
     logger = logging.getLogger(__name__)
-    logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, str(exc), exc_info=True)
+    logger.error(
+        "Unhandled exception on %s %s: %s", request.method, request.url.path, str(exc), exc_info=True
+    )
     return JSONResponse(
         status_code=500,
         content={
@@ -225,6 +219,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 # ── Security Headers (response middleware) ──────────────────────────
 
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next) -> Response:
     """Add security headers to every response."""
@@ -233,9 +228,7 @@ async def add_security_headers(request: Request, call_next) -> Response:
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = (
-        "camera=(), microphone=(), geolocation=()"
-    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     # Content-Security-Policy (adjust for your env)
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
@@ -252,7 +245,8 @@ async def add_security_headers(request: Request, call_next) -> Response:
 
 # ── Request ID middleware ───────────────────────────────────────────
 
-import uuid
+import uuid  # noqa: E402
+
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next) -> Response:
@@ -267,6 +261,7 @@ async def add_request_id(request: Request, call_next) -> Response:
 
 MAX_BODY_SIZE = int(os.getenv("MAX_BODY_SIZE_BYTES", str(10 * 1024 * 1024)))  # 10 MB default
 
+
 @app.middleware("http")
 async def limit_request_body_size(request: Request, call_next) -> Response:
     """Reject requests with body larger than MAX_BODY_SIZE.
@@ -280,7 +275,7 @@ async def limit_request_body_size(request: Request, call_next) -> Response:
                 return JSONResponse(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     content={
-                        "error": f"Request body too large. Maximum size: {MAX_BODY_SIZE // (1024*1024)} MB",
+                        "error": f"Request body too large. Maximum size: {MAX_BODY_SIZE // (1024 * 1024)} MB",
                         "code": 413,
                     },
                 )
@@ -288,6 +283,7 @@ async def limit_request_body_size(request: Request, call_next) -> Response:
 
 
 # ── Security & RBAC ──────────────────────────────────────────────────
+
 
 async def get_current_user(
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
@@ -304,6 +300,7 @@ async def get_current_user(
     token = credentials.credentials
     try:
         from jose import jwt
+
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id: int = payload.get("sub")
         if user_id is None:
@@ -332,37 +329,38 @@ async def get_current_user(
 
 def require_permission(resource: str, action: ActionType):
     """Dependency to check if user has required permission."""
+
     def permission_checker(
         current_user: Annotated[User, Depends(get_current_user)],
         session: Session = Depends(get_session),
     ) -> User:
-        user_permissions = session.query(Permission).join(
-            role_permissions,
-            Permission.id == role_permissions.c.permission_id
-        ).join(
-            user_roles,
-            role_permissions.c.role_id == user_roles.c.role_id
-        ).filter(
-            user_roles.c.user_id == current_user.id,
-            Permission.resource == resource,
-            Permission.action == action.value
-        ).first()
-
-        if not user_permissions:
-            if not session.query(Permission).join(
-                role_permissions,
-                Permission.id == role_permissions.c.permission_id
-            ).join(
-                user_roles,
-                role_permissions.c.role_id == user_roles.c.role_id
-            ).filter(
+        user_permissions = (
+            session.query(Permission)
+            .join(role_permissions, Permission.id == role_permissions.c.permission_id)
+            .join(user_roles, role_permissions.c.role_id == user_roles.c.role_id)
+            .filter(
                 user_roles.c.user_id == current_user.id,
                 Permission.resource == resource,
-                Permission.action == ActionType.EXECUTE.value
-            ).first():
+                Permission.action == action.value,
+            )
+            .first()
+        )
+
+        if not user_permissions:
+            if (
+                not session.query(Permission)
+                .join(role_permissions, Permission.id == role_permissions.c.permission_id)
+                .join(user_roles, role_permissions.c.role_id == user_roles.c.role_id)
+                .filter(
+                    user_roles.c.user_id == current_user.id,
+                    Permission.resource == resource,
+                    Permission.action == ActionType.EXECUTE.value,
+                )
+                .first()
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Insufficient permissions: {resource}:{action.value}"
+                    detail=f"Insufficient permissions: {resource}:{action.value}",
                 )
 
         return current_user
@@ -372,22 +370,21 @@ def require_permission(resource: str, action: ActionType):
 
 def require_role(*roles: RoleName):
     """Dependency to check if user has any of the required roles."""
+
     def role_checker(
         current_user: Annotated[User, Depends(get_current_user)],
         session: Session = Depends(get_session),
     ) -> User:
-        user_roles_query = session.query(Role).join(
-            user_roles,
-            Role.id == user_roles.c.role_id
-        ).filter(
-            user_roles.c.user_id == current_user.id,
-            Role.name.in_([r.value for r in roles])
-        ).first()
+        user_roles_query = (
+            session.query(Role)
+            .join(user_roles, Role.id == user_roles.c.role_id)
+            .filter(user_roles.c.user_id == current_user.id, Role.name.in_([r.value for r in roles]))
+            .first()
+        )
 
         if not user_roles_query:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required role(s): {[r.value for r in roles]}"
+                status_code=status.HTTP_403_FORBIDDEN, detail=f"Required role(s): {[r.value for r in roles]}"
             )
 
         return current_user
@@ -426,6 +423,7 @@ async def log_audit(
 
 
 # ── Pydantic Schemas (with input validation) ─────────────────────
+
 
 class Token(BaseModel):
     access_token: str
@@ -466,14 +464,19 @@ def _validate_password_strength(v: str) -> str:
     if settings.password_require_special:
         special_chars = r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]"
         if not re.search(special_chars, v):
-            raise ValueError("Password must contain at least one special character (!@#$%^&*...)"
-                            )
+            raise ValueError("Password must contain at least one special character (!@#$%^&*...)")
 
     # Check for common weak passwords
     weak_passwords = {
-        "password123!", "password1234!", "changeme123!",
-        "admin123!", "letmein123!", "welcome123!",
-        "qwerty123!", "abc123456!", "password1!",
+        "password123!",
+        "password1234!",
+        "changeme123!",
+        "admin123!",
+        "letmein123!",
+        "welcome123!",
+        "qwerty123!",
+        "abc123456!",
+        "password1!",
     }
     if v.lower() in weak_passwords:
         raise ValueError("This password is too common. Please choose a different one.")
@@ -483,6 +486,7 @@ def _validate_password_strength(v: str) -> str:
 
 class UserCreate(BaseModel):
     """User registration request."""
+
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
@@ -495,6 +499,7 @@ class UserCreate(BaseModel):
 
 class LoginRequest(BaseModel):
     """Login request — username + password only (no email required)."""
+
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1, max_length=128)
 
@@ -510,6 +515,7 @@ class UserResponse(BaseModel):
 
 class StudentCreate(BaseModel):
     """Student creation request."""
+
     student_id: str = Field(..., min_length=1, max_length=20, pattern=r"^[a-zA-Z0-9\-]+$")
     name: str = Field(..., min_length=1, max_length=100)
     email: Optional[EmailStr] = None
@@ -527,8 +533,10 @@ class StudentResponse(BaseModel):
 
 # ── Employee Schemas ────────────────────────────────────────────────
 
+
 class EmployeeCreate(BaseModel):
     """Employee creation request."""
+
     employee_id: str = Field(..., min_length=1, max_length=20, pattern=r"^[a-zA-Z0-9\-]+$")
     name: str = Field(..., min_length=1, max_length=100)
     department: Optional[str] = Field(None, max_length=100)
@@ -537,6 +545,7 @@ class EmployeeCreate(BaseModel):
 
 class EmployeeUpdate(BaseModel):
     """Employee update request."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     department: Optional[str] = Field(None, max_length=100)
     photo_path: Optional[str] = Field(None, max_length=500)
@@ -555,6 +564,7 @@ class EmployeeResponse(BaseModel):
 
 class CameraCreate(BaseModel):
     """Camera registration request."""
+
     name: str = Field(..., min_length=1, max_length=100)
     camera_id: str = Field(..., min_length=1, max_length=50, pattern=r"^[a-zA-Z0-9\-_]+$")
     stream_url: Optional[str] = Field(None, max_length=500)
@@ -579,6 +589,7 @@ class CameraResponse(BaseModel):
 
 class AttendanceCreate(BaseModel):
     """Attendance marking request."""
+
     student_id: int = Field(..., gt=0)
     section_id: Optional[int] = Field(None, gt=0)
     course_id: Optional[int] = Field(None, gt=0)
@@ -620,6 +631,7 @@ class HealthResponse(BaseModel):
 
 class EnrollmentImageResponse(BaseModel):
     """Response after a successful enrollment image upload."""
+
     filename: str
     size_bytes: int
     message: str
@@ -627,8 +639,10 @@ class EnrollmentImageResponse(BaseModel):
 
 # ── MFA Schemas ────────────────────────────────────────────────────
 
+
 class MFAEnrollResponse(BaseModel):
     """Response after MFA enrollment."""
+
     secret: str
     qr_uri: str
     backup_codes: List[str]
@@ -637,12 +651,14 @@ class MFAEnrollResponse(BaseModel):
 
 class MFAVerifyRequest(BaseModel):
     """MFA verification request."""
+
     code: str = Field(..., min_length=6, max_length=10, description="TOTP code or backup code")
     use_backup: bool = Field(default=False, description="Use backup code instead of TOTP")
 
 
 class MFAStatusResponse(BaseModel):
     """MFA status response."""
+
     enabled: bool
     backup_codes_remaining: int
     requires_mfa: bool
@@ -650,14 +666,17 @@ class MFAStatusResponse(BaseModel):
 
 # ── OIDC Schemas ───────────────────────────────────────────────────
 
+
 class OIDCLoginResponse(BaseModel):
     """OIDC login URL response."""
+
     authorization_url: str
     state: str
 
 
 class OIDCCallbackResponse(BaseModel):
     """OIDC callback response with token."""
+
     access_token: str
     token_type: str
     is_new_user: bool
@@ -665,8 +684,10 @@ class OIDCCallbackResponse(BaseModel):
 
 # ── Token Schemas ──────────────────────────────────────────────────
 
+
 class TokenResponse(BaseModel):
     """Full token response with MFA status."""
+
     access_token: str
     token_type: str = "bearer"
     refresh_token: Optional[str] = None
@@ -676,8 +697,8 @@ class TokenResponse(BaseModel):
 
 # ── JWT + Password helpers ────────────────────────────────────────
 
-from jose import jwt
-from passlib.context import CryptContext
+from jose import jwt  # noqa: E402
+from passlib.context import CryptContext  # noqa: E402
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -737,6 +758,7 @@ def _create_refresh_token(session: Session, user: User, request: Request) -> str
 
 # ── Auth Endpoints ──────────────────────────────────────────────────
 
+
 @app.post("/auth/login", response_model=TokenResponse)
 @limiter.limit(os.getenv("LOGIN_RATE_LIMIT", "10/minute"))
 async def login(
@@ -767,11 +789,12 @@ async def login(
     is_locked, lockout_msg = BruteForceProtection.is_locked_out(form_data.username, client_ip)
     if is_locked:
         # Log the attempt even when locked
-        BruteForceProtection.record_failed_attempt(
-            form_data.username, client_ip, user_agent
-        )
+        BruteForceProtection.record_failed_attempt(form_data.username, client_ip, user_agent)
         await log_audit(
-            request, AuditAction.USER_LOGIN, form_data.username, 0,
+            request,
+            AuditAction.USER_LOGIN,
+            form_data.username,
+            0,
             description=f"Login blocked: {lockout_msg}",
             severity="WARNING",
             session=session,
@@ -784,9 +807,7 @@ async def login(
     user = session.query(User).filter(User.username == form_data.username).first()
     if not user or not pwd_context.verify(form_data.password, user.password_hash):
         # Record failed attempt for brute force protection
-        BruteForceProtection.record_failed_attempt(
-            form_data.username, client_ip, user_agent
-        )
+        BruteForceProtection.record_failed_attempt(form_data.username, client_ip, user_agent)
 
         # Get remaining attempts info
         lockout_info = BruteForceProtection.get_lockout_info(form_data.username)
@@ -794,7 +815,10 @@ async def login(
 
         # Log failed attempt
         await log_audit(
-            request, AuditAction.USER_LOGIN, form_data.username, 0,
+            request,
+            AuditAction.USER_LOGIN,
+            form_data.username,
+            0,
             description=f"Failed login attempt for {form_data.username} from {client_ip}",
             severity="WARNING",
             session=session,
@@ -824,13 +848,20 @@ async def login(
     if requires_mfa:
         # Issue a short-lived MFA token (2 min) that only allows MFA verification
         mfa_token = create_access_token(
-            data={"sub": user.id, "username": user.username,
-                   "roles": [r.name for r in user.roles], "mfa_pending": True},
+            data={
+                "sub": user.id,
+                "username": user.username,
+                "roles": [r.name for r in user.roles],
+                "mfa_pending": True,
+            },
             expires_delta=timedelta(minutes=2),
         )
 
         await log_audit(
-            request, AuditAction.USER_LOGIN, user.username, user.id,
+            request,
+            AuditAction.USER_LOGIN,
+            user.username,
+            user.id,
             description=f"User {user.username} requires MFA verification",
             session=session,
         )
@@ -843,13 +874,15 @@ async def login(
 
     # ── Issue full access + refresh tokens ────────────────────
     access_token = create_access_token(
-        data={"sub": user.id, "username": user.username,
-               "roles": [r.name for r in user.roles]}
+        data={"sub": user.id, "username": user.username, "roles": [r.name for r in user.roles]}
     )
     refresh_token_str = _create_refresh_token(session, user, request)
 
     await log_audit(
-        request, AuditAction.USER_LOGIN, user.username, user.id,
+        request,
+        AuditAction.USER_LOGIN,
+        user.username,
+        user.id,
         description=f"User {user.username} logged in",
         session=session,
     )
@@ -870,9 +903,12 @@ async def logout(
 ):
     """Log out the current user."""
     await log_audit(
-        request, AuditAction.USER_LOGOUT, current_user.username, current_user.id,
+        request,
+        AuditAction.USER_LOGOUT,
+        current_user.username,
+        current_user.id,
         description=f"User {current_user.username} logged out",
-        session=session
+        session=session,
     )
     return {"message": "Logged out successfully"}
 
@@ -917,7 +953,10 @@ async def change_password(
     # Verify current password
     if not pwd_context.verify(body.current_password, current_user.password_hash):
         await log_audit(
-            request, AuditAction.PASSWORD_CHANGE_FAILED, current_user.username, current_user.id,
+            request,
+            AuditAction.PASSWORD_CHANGE_FAILED,
+            current_user.username,
+            current_user.id,
             description=f"Password change failed: incorrect current password for {current_user.username}",
             severity="WARNING",
             session=session,
@@ -939,15 +978,22 @@ async def change_password(
     current_user.updated_at = _utcnow()
 
     # Revoke ALL refresh tokens for this user (force re-login on all devices)
-    revoked_count = session.query(RefreshToken).filter(
-        RefreshToken.user_id == current_user.id,
-        RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": _utcnow()})
+    revoked_count = (
+        session.query(RefreshToken)
+        .filter(
+            RefreshToken.user_id == current_user.id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .update({"revoked_at": _utcnow()})
+    )
 
     session.commit()
 
     await log_audit(
-        request, AuditAction.PASSWORD_CHANGED, current_user.username, current_user.id,
+        request,
+        AuditAction.PASSWORD_CHANGED,
+        current_user.username,
+        current_user.id,
         description=f"Password changed for {current_user.username}. Revoked {revoked_count} refresh tokens.",
         details={"revoked_tokens": revoked_count},
         session=session,
@@ -971,15 +1017,22 @@ async def revoke_all_sessions(
     Useful if the user suspects their account has been compromised.
     Forces re-authentication on all devices.
     """
-    revoked_count = session.query(RefreshToken).filter(
-        RefreshToken.user_id == current_user.id,
-        RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": _utcnow()})
+    revoked_count = (
+        session.query(RefreshToken)
+        .filter(
+            RefreshToken.user_id == current_user.id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .update({"revoked_at": _utcnow()})
+    )
 
     session.commit()
 
     await log_audit(
-        request, AuditAction.SECURITY_ALERT, current_user.username, current_user.id,
+        request,
+        AuditAction.SECURITY_ALERT,
+        current_user.username,
+        current_user.id,
         description=f"All sessions revoked for {current_user.username}. Revoked {revoked_count} tokens.",
         details={"revoked_tokens": revoked_count},
         severity="WARNING",
@@ -993,6 +1046,7 @@ async def revoke_all_sessions(
 
 
 # ── MFA Endpoints ─────────────────────────────────────────────────
+
 
 @app.post("/auth/mfa/enroll", response_model=MFAEnrollResponse)
 @limiter.limit("5/minute")
@@ -1047,6 +1101,7 @@ async def verify_mfa(
     token = credentials.credentials
     try:
         from jose import jwt
+
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         if not payload.get("mfa_pending"):
             raise HTTPException(
@@ -1073,7 +1128,10 @@ async def verify_mfa(
 
     if not success:
         await log_audit(
-            request, AuditAction.USER_LOGIN, current_user.username, current_user.id,
+            request,
+            AuditAction.USER_LOGIN,
+            current_user.username,
+            current_user.id,
             description=f"MFA verification failed for {current_user.username}",
             severity="WARNING",
             session=session,
@@ -1082,13 +1140,20 @@ async def verify_mfa(
 
     # Issue full access token (with refresh token)
     access_token = create_access_token(
-        data={"sub": current_user.id, "username": current_user.username,
-               "roles": [r.name for r in current_user.roles], "mfa": True}
+        data={
+            "sub": current_user.id,
+            "username": current_user.username,
+            "roles": [r.name for r in current_user.roles],
+            "mfa": True,
+        }
     )
     refresh_token_str = _create_refresh_token(session, current_user, request)
 
     await log_audit(
-        request, AuditAction.USER_LOGIN, current_user.username, current_user.id,
+        request,
+        AuditAction.USER_LOGIN,
+        current_user.username,
+        current_user.id,
         description=f"User {current_user.username} completed MFA verification",
         session=session,
     )
@@ -1129,7 +1194,10 @@ async def disable_mfa(
     MFAService.disable_mfa(current_user)
 
     await log_audit(
-        request, AuditAction.SYSTEM_CONFIG_CHANGED, current_user.username, current_user.id,
+        request,
+        AuditAction.SYSTEM_CONFIG_CHANGED,
+        current_user.username,
+        current_user.id,
         description=f"User {current_user.username} disabled MFA",
         session=session,
     )
@@ -1138,6 +1206,7 @@ async def disable_mfa(
 
 
 # ── OIDC Endpoints ─────────────────────────────────────────────────
+
 
 @app.get("/auth/oidc/login", response_model=OIDCLoginResponse)
 @limiter.limit("10/minute")
@@ -1159,6 +1228,7 @@ async def oidc_login(request: Request):
         )
 
     import secrets
+
     state = secrets.token_urlsafe(32)
     auth_url = await oidc.get_login_url(request, state=state)
 
@@ -1231,16 +1301,19 @@ async def oidc_callback(
             db_user = s.query(User).filter(User.id == user.id).first()
             if db_user:
                 from datetime import datetime, timezone
+
                 db_user.mfa_last_verified = datetime.now(timezone.utc)
                 s.commit()
 
     access_token = create_access_token(
-        data={"sub": user.id, "username": user.username,
-               "roles": [r.name for r in user.roles], "oidc": True}
+        data={"sub": user.id, "username": user.username, "roles": [r.name for r in user.roles], "oidc": True}
     )
 
     await log_audit(
-        request, AuditAction.USER_LOGIN, user.username, user.id,
+        request,
+        AuditAction.USER_LOGIN,
+        user.username,
+        user.id,
         description=f"User {user.username} logged in via SSO ({user_info.provider})",
         session=session,
     )
@@ -1254,8 +1327,10 @@ async def oidc_callback(
 
 # ── Password Change Schema ────────────────────────────────────────
 
+
 class PasswordChangeRequest(BaseModel):
     """Password change request."""
+
     current_password: str = Field(..., min_length=8, description="Current password for verification")
     new_password: str = Field(..., min_length=8, max_length=128, description="New password")
 
@@ -1288,12 +1363,15 @@ class PasswordChangeRequest(BaseModel):
 
 # ── Refresh Token Schemas ────────────────────────────────────────
 
+
 class RefreshTokenRequest(BaseModel):
     """Refresh token request body (not query param, to avoid logging)."""
+
     refresh_token: str = Field(..., min_length=16, description="Refresh token from login response")
 
 
 # ── Refresh Token Endpoint ─────────────────────────────────────────
+
 
 @app.post("/auth/refresh", response_model=TokenResponse)
 @limiter.limit("20/minute")
@@ -1317,9 +1395,7 @@ async def refresh_token(
     token_hash = hashlib.sha256(body.refresh_token.encode()).hexdigest()
 
     # Find the refresh token
-    rt = session.query(RefreshToken).filter(
-        RefreshToken.token_hash == token_hash
-    ).first()
+    rt = session.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
 
     if not rt:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
@@ -1365,6 +1441,7 @@ async def refresh_token(
 
 # ── Health & Monitoring ──────────────────────────────────────────────
 
+
 @app.get("/health", response_model=HealthResponse)
 @limiter.exempt
 async def health_check(request: Request):
@@ -1383,10 +1460,12 @@ async def health_check(request: Request):
 async def metrics(request: Request):
     """Prometheus metrics endpoint (not rate-limited)."""
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── Enrollment & Upload ────────────────────────────────────────────
+
 
 @app.post("/enroll/upload", response_model=EnrollmentImageResponse)
 @limiter.limit(os.getenv("ENROLL_RATE_LIMIT", "5/minute"))
@@ -1431,6 +1510,7 @@ async def upload_enrollment_image(
 
 # ── Student Management ───────────────────────────────────────────────
 
+
 @app.post("/students", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(os.getenv("API_RATE_LIMIT", "100/minute"))
 async def create_student(
@@ -1446,10 +1526,14 @@ async def create_student(
     session.refresh(db_student)
 
     await log_audit(
-        request, AuditAction.STUDENT_ENROLLED, current_user.username, current_user.id,
-        resource_type="Student", resource_id=db_student.id,
+        request,
+        AuditAction.STUDENT_ENROLLED,
+        current_user.username,
+        current_user.id,
+        resource_type="Student",
+        resource_id=db_student.id,
         description=f"Student {db_student.student_id} enrolled",
-        session=session
+        session=session,
     )
     return StudentResponse.model_validate(db_student)
 
@@ -1511,6 +1595,7 @@ async def get_student(
 
 # ── Employee Management ───────────────────────────────────────────────
 
+
 @app.post("/employees", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(os.getenv("API_RATE_LIMIT", "100/minute"))
 async def create_employee(
@@ -1534,8 +1619,12 @@ async def create_employee(
     session.refresh(db_employee)
 
     await log_audit(
-        request, AuditAction.EMPLOYEE_ENROLLED, current_user.username, current_user.id,
-        resource_type="Employee", resource_id=db_employee.id,
+        request,
+        AuditAction.EMPLOYEE_ENROLLED,
+        current_user.username,
+        current_user.id,
+        resource_type="Employee",
+        resource_id=db_employee.id,
         description=f"Employee {db_employee.employee_id} enrolled",
         session=session,
     )
@@ -1601,8 +1690,12 @@ async def update_employee(
     session.refresh(employee)
 
     await log_audit(
-        request, AuditAction.EMPLOYEE_UPDATED, current_user.username, current_user.id,
-        resource_type="Employee", resource_id=employee.id,
+        request,
+        AuditAction.EMPLOYEE_UPDATED,
+        current_user.username,
+        current_user.id,
+        resource_type="Employee",
+        resource_id=employee.id,
         description=f"Employee {employee.employee_id} updated",
         details={"fields": list(update_data.keys())},
         session=session,
@@ -1640,8 +1733,12 @@ async def delete_employee(
     EmployeeService.remove_faiss_embedding(emp_name, fallback=emp_id_str)
 
     await log_audit(
-        request, AuditAction.DATA_DELETED, current_user.username, current_user.id,
-        resource_type="Employee", resource_id=employee_id,
+        request,
+        AuditAction.DATA_DELETED,
+        current_user.username,
+        current_user.id,
+        resource_type="Employee",
+        resource_id=employee_id,
         description=f"Employee '{emp_name}' ({emp_id_str}) deleted",
         session=session,
     )
@@ -1649,6 +1746,7 @@ async def delete_employee(
 
 
 # ── Camera Management ────────────────────────────────────────────────
+
 
 @app.post("/cameras", response_model=CameraResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(os.getenv("API_RATE_LIMIT", "100/minute"))
@@ -1665,10 +1763,14 @@ async def create_camera(
     session.refresh(db_camera)
 
     await log_audit(
-        request, AuditAction.CAMERA_ADDED, current_user.username, current_user.id,
-        resource_type="Camera", resource_id=db_camera.id,
+        request,
+        AuditAction.CAMERA_ADDED,
+        current_user.username,
+        current_user.id,
+        resource_type="Camera",
+        resource_id=db_camera.id,
         description=f"Camera {db_camera.camera_id} added",
-        session=session
+        session=session,
     )
 
     return CameraResponse.model_validate(db_camera)
@@ -1760,17 +1862,22 @@ async def update_camera_status(
     session.commit()
 
     await log_audit(
-        request, AuditAction.CAMERA_STATUS_CHANGED, current_user.username, current_user.id,
-        resource_type="Camera", resource_id=camera.id,
+        request,
+        AuditAction.CAMERA_STATUS_CHANGED,
+        current_user.username,
+        current_user.id,
+        resource_type="Camera",
+        resource_id=camera.id,
         description=f"Camera {camera.camera_id} status changed from {old_status} to {camera.status}",
         details={"old_status": old_status, "new_status": camera.status},
-        session=session
+        session=session,
     )
 
     return CameraResponse.model_validate(camera)
 
 
 # ── Attendance Management ────────────────────────────────────────────
+
 
 @app.post("/attendance", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(os.getenv("API_RATE_LIMIT", "100/minute"))
@@ -1793,11 +1900,15 @@ async def mark_attendance(
             raise HTTPException(status_code=404, detail="Section not found")
 
         # Check if student is enrolled in this section
-        enrollment = session.query(Enrollment).filter(
-            Enrollment.student_id == attendance.student_id,
-            Enrollment.section_id == attendance.section_id,
-            Enrollment.status == "ACTIVE"
-        ).first()
+        enrollment = (
+            session.query(Enrollment)
+            .filter(
+                Enrollment.student_id == attendance.student_id,
+                Enrollment.section_id == attendance.section_id,
+                Enrollment.status == "ACTIVE",
+            )
+            .first()
+        )
         if not enrollment:
             raise HTTPException(status_code=400, detail="Student not enrolled in this section")
 
@@ -1807,11 +1918,15 @@ async def mark_attendance(
     session.refresh(db_attendance)
 
     await log_audit(
-        request, AuditAction.ATTENDANCE_MARKED, current_user.username, current_user.id,
-        resource_type="Attendance", resource_id=db_attendance.id,
+        request,
+        AuditAction.ATTENDANCE_MARKED,
+        current_user.username,
+        current_user.id,
+        resource_type="Attendance",
+        resource_id=db_attendance.id,
         description=f"Attendance marked for student {student.student_id}",
         details={"section_id": attendance.section_id, "confidence": attendance.confidence},
-        session=session
+        session=session,
     )
 
     return AttendanceResponse(
@@ -1837,8 +1952,12 @@ async def get_attendance(
     student_id: Optional[int] = None,
     section_id: Optional[int] = None,
     course_id: Optional[int] = None,
-    date_from: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15 or 2024-01-15T00:00:00)"),
-    date_to: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15 or 2024-01-15T00:00:00)"),
+    date_from: Optional[str] = Query(
+        None, description="ISO date string (e.g. 2024-01-15 or 2024-01-15T00:00:00)"
+    ),
+    date_to: Optional[str] = Query(
+        None, description="ISO date string (e.g. 2024-01-15 or 2024-01-15T00:00:00)"
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
@@ -1870,12 +1989,7 @@ async def get_attendance(
         query = query.filter(Attendance.timestamp <= dt)
 
     total = query.order_by(None).count()
-    attendances = (
-        query.order_by(Attendance.timestamp.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    attendances = query.order_by(Attendance.timestamp.desc()).offset(skip).limit(limit).all()
     results = []
     for a in attendances:
         student_name = a.student.name if a.student else "Unknown"
@@ -1904,8 +2018,10 @@ async def get_attendance(
 
 # ── Unknown Face Management ──────────────────────────────────────────
 
+
 class ReviewAction(str, Enum):
     """Valid actions for reviewing unknown faces."""
+
     APPROVE = "approve"
     DISMISS = "dismiss"
     DELETE = "delete"
@@ -1913,6 +2029,7 @@ class ReviewAction(str, Enum):
 
 class CameraStatusUpdate(BaseModel):
     """Request body for updating camera status."""
+
     is_active: bool = Field(..., description="Whether the camera should be active")
 
 
@@ -1930,7 +2047,9 @@ class UnknownFaceResponse(BaseModel):
 @limiter.limit("30/minute")
 async def list_unknown_faces(
     request: Request,
-    current_user: Annotated[User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
+    current_user: Annotated[
+        User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))
+    ],
     session: Session = Depends(get_session),
     reviewed: Optional[bool] = None,
     camera_id: Optional[int] = None,
@@ -1946,12 +2065,7 @@ async def list_unknown_faces(
         query = query.filter(UnknownFace.camera_id == camera_id)
 
     total = query.order_by(None).count()
-    faces = (
-        query.order_by(UnknownFace.timestamp.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    faces = query.order_by(UnknownFace.timestamp.desc()).offset(skip).limit(limit).all()
     items = [UnknownFaceResponse.model_validate(u).model_dump() for u in faces]
     return PaginatedResponse(
         items=items,
@@ -1967,7 +2081,9 @@ async def list_unknown_faces(
 async def review_unknown_face(
     face_id: int,
     request: Request,
-    current_user: Annotated[User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
+    current_user: Annotated[
+        User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))
+    ],
     action: ReviewAction = Query(...),
     employee_id: Optional[int] = None,
     session: Session = Depends(get_session),
@@ -1993,17 +2109,22 @@ async def review_unknown_face(
     session.commit()
 
     await log_audit(
-        request, AuditAction.UNKNOWN_FACE_REVIEWED, current_user.username, current_user.id,
-        resource_type="UnknownFace", resource_id=face_id,
+        request,
+        AuditAction.UNKNOWN_FACE_REVIEWED,
+        current_user.username,
+        current_user.id,
+        resource_type="UnknownFace",
+        resource_id=face_id,
         description=f"Unknown face {face_id} {action}ed",
         details={"action": action, "employee_id": employee_id},
-        session=session
+        session=session,
     )
 
     return {"message": f"Face {action}ed successfully"}
 
 
 # ── Analytics Endpoints ──────────────────────────────────────────────
+
 
 @app.get("/analytics/attendance-summary")
 @limiter.limit("20/minute")
@@ -2015,7 +2136,7 @@ async def attendance_summary(
     date_to: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15)"),
 ):
     """Get attendance summary statistics."""
-    from sqlalchemy import func, extract
+    from sqlalchemy import func
 
     query = session.query(
         func.date(Attendance.timestamp).label("date"),
@@ -2051,7 +2172,9 @@ async def attendance_summary(
 @limiter.limit("20/minute")
 async def camera_status(
     request: Request,
-    current_user: Annotated[User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
+    current_user: Annotated[
+        User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))
+    ],
     session: Session = Depends(get_session),
 ):
     """Get camera status overview."""
@@ -2074,13 +2197,14 @@ async def camera_status(
 #  College-Scale Backend — WebSocket / SSE / Jobs / Bulk Ops
 # ═══════════════════════════════════════════════════════════════════
 
-from fastapi import WebSocket, Query as WSQuery
-from api.websocket_manager import ws_manager
-from api.job_queue import job_queue, register_default_handlers, JobStatus
-from api.bulk_operations import bulk_operations, BulkResult
+from fastapi import WebSocket, Query as WSQuery  # noqa: E402
+from api.websocket_manager import ws_manager  # noqa: E402
+from api.job_queue import job_queue, JobStatus, register_default_handlers  # noqa: E402
+from api.bulk_operations import bulk_operations  # noqa: E402
 
 
 # ── WebSocket: Live Recognition Events ───────────────────────────
+
 
 @app.websocket("/ws/live")
 async def websocket_live_events(
@@ -2102,6 +2226,7 @@ async def websocket_live_events(
     # Authenticate
     try:
         from jose import jwt as jose_jwt
+
         payload = jose_jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         user_id = payload.get("sub")
         username = payload.get("username", "unknown")
@@ -2131,14 +2256,14 @@ async def websocket_live_events(
         await ws_manager.disconnect(client)
 
 
-import time
+import time  # noqa: E402
 
 
 # ── SSE: Server-Sent Events endpoint (alternative to WebSocket) ───
 
-from fastapi.responses import StreamingResponse
-import asyncio
-import json as json_mod
+from fastapi.responses import StreamingResponse  # noqa: E402
+import asyncio  # noqa: E402
+import json as json_mod  # noqa: E402
 
 
 @app.get("/events/stream")
@@ -2152,8 +2277,10 @@ async def sse_live_events(
     Alternative to WebSocket for clients that don't support WS.
     Includes JWT authentication via query param or header.
     """
+
     async def event_generator():
         queue: asyncio.Queue = asyncio.Queue()
+
         # Create a simple client wrapper for SSE
         class SSEClient:
             def __init__(self):
@@ -2201,6 +2328,7 @@ async def sse_live_events(
 
 
 # ── Job Queue Endpoints ──────────────────────────────────────────
+
 
 class JobCreateRequest(BaseModel):
     job_type: str = Field(..., description="Type of job: batch_enroll, rebuild_index, cleanup_unknown")
@@ -2267,9 +2395,12 @@ async def cancel_job(
 
 # ── Bulk Operations Endpoints ────────────────────────────────────
 
+
 class BulkStudentImport(BaseModel):
     csv_content: str = Field(..., description="CSV content with student records")
-    default_department_id: Optional[int] = Field(None, description="Default department for students without department")
+    default_department_id: Optional[int] = Field(
+        None, description="Default department for students without department"
+    )
     skip_duplicates: bool = Field(True, description="Skip existing student IDs")
 
 
@@ -2340,8 +2471,11 @@ async def export_attendance(
 ):
     """Export attendance records as CSV."""
     from fastapi.responses import PlainTextResponse
+
     csv_content = bulk_operations.export_attendance_csv(
-        date_from=date_from, date_to=date_to, section_id=section_id,
+        date_from=date_from,
+        date_to=date_to,
+        section_id=section_id,
     )
     return PlainTextResponse(
         content=csv_content,
@@ -2351,6 +2485,7 @@ async def export_attendance(
 
 
 # ── Enhanced Health / Readiness ──────────────────────────────────
+
 
 @app.get("/health/ready")
 @limiter.exempt
@@ -2371,6 +2506,7 @@ async def readiness_check(request: Request):
     # Redis check
     try:
         from api.redis_client import get_redis
+
         redis = get_redis()
         redis.client.ping()
         checks["redis"] = "ok"
@@ -2437,4 +2573,5 @@ async def system_status(
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

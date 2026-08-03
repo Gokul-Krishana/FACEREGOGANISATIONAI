@@ -14,7 +14,6 @@ Features:
 from __future__ import annotations
 
 import logging
-from datetime import date
 from pathlib import Path
 import sys
 
@@ -22,12 +21,12 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import pandas as pd
+import streamlit as st  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from services.employee_service import EmployeeService
-from database.database import get_session
-from database.repository import AttendanceRepo
+from services.employee_service import EmployeeService  # noqa: E402
+from database.database import get_session  # noqa: E402
+from database.repository import AttendanceRepo  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,9 @@ st.markdown("---")
 search_col, add_col = st.columns([3, 1])
 
 with search_col:
-    search_query = st.text_input("🔍 Search by name, ID, or department", placeholder="e.g. gokul, EMP003, Engineering")
+    search_query = st.text_input(
+        "🔍 Search by name, ID, or department", placeholder="e.g. gokul, EMP003, Engineering"
+    )
 
 with add_col:
     if st.button("➕ Add Employee", type="primary", use_container_width=True):
@@ -94,15 +95,17 @@ if filtered:
     table_data = []
     for emp in filtered:
         tc = today_counts.get(emp.id, 0)
-        table_data.append({
-            "ID": emp.employee_id,
-            "Name": emp.name,
-            "Department": emp.department or "—",
-            "FAISS ID": emp.faiss_id if emp.faiss_id is not None else "—",
-            "Today": f"{tc} ✅" if tc > 0 else "0",
-            "Enrolled": emp.created_at.strftime("%d %b %Y") if emp.created_at else "—",
-            "emp_obj": emp,  # hidden column for actions
-        })
+        table_data.append(
+            {
+                "ID": emp.employee_id,
+                "Name": emp.name,
+                "Department": emp.department or "—",
+                "FAISS ID": emp.faiss_id if emp.faiss_id is not None else "—",
+                "Today": f"{tc} ✅" if tc > 0 else "0",
+                "Enrolled": emp.created_at.strftime("%d %b %Y") if emp.created_at else "—",
+                "emp_obj": emp,  # hidden column for actions
+            }
+        )
 
     df = pd.DataFrame(table_data)
 
@@ -137,8 +140,12 @@ if filtered:
             else:
                 with st.form("edit_employee_form"):
                     new_name = st.text_input("Full Name", value=emp_obj.name or "", key="emp_edit_name")
-                    new_dept = st.text_input("Department", value=emp_obj.department or "", key="emp_edit_dept")
-                    save_clicked = st.form_submit_button("💾 Save Changes", type="primary", use_container_width=True)
+                    new_dept = st.text_input(
+                        "Department", value=emp_obj.department or "", key="emp_edit_dept"
+                    )
+                    save_clicked = st.form_submit_button(
+                        "💾 Save Changes", type="primary", use_container_width=True
+                    )
                     if save_clicked:
                         if not new_name.strip():
                             st.error("Name cannot be empty.")
@@ -164,7 +171,9 @@ if filtered:
             format_func=lambda x: f"{x[0]} — {x[1]}",
         )
         if emp_to_delete:
-            st.warning(f"This will remove {emp_to_delete[1]} ({emp_to_delete[0]}) from the database and remove their face embedding from the recognition index.")
+            st.warning(
+                f"This will remove {emp_to_delete[1]} ({emp_to_delete[0]}) from the database and remove their face embedding from the recognition index."
+            )
             confirm = st.text_input("Type the Employee ID to confirm:", placeholder=emp_to_delete[0])
             if confirm == emp_to_delete[0]:
                 if st.button("🗑️ Delete Permanently", type="primary", use_container_width=True):
@@ -186,8 +195,9 @@ if st.session_state.get("show_add_form"):
     st.markdown("### 📝 Register New Employee")
 
     with st.form("add_employee_form"):
-        emp_id = st.text_input("Employee ID *", placeholder="e.g. EMP004",
-                               help="Unique identifier for the employee")
+        emp_id = st.text_input(
+            "Employee ID *", placeholder="e.g. EMP004", help="Unique identifier for the employee"
+        )
         name = st.text_input("Full Name *", placeholder="e.g. John Doe")
         dept = st.text_input("Department", placeholder="e.g. Engineering")
         col_s1, col_s2 = st.columns(2)
@@ -227,13 +237,15 @@ try:
         for emp in filtered[:10]:  # limit to first 10 to avoid slow loads
             records = AttendanceRepo.get_by_employee(s, emp.id)
             for r in records:
-                all_attendance.append({
-                    "Employee": emp.name,
-                    "ID": emp.employee_id,
-                    "Date": r.timestamp.strftime("%d %b %Y"),
-                    "Time": r.timestamp.strftime("%I:%M %p"),
-                    "Confidence": f"{r.confidence:.1%}",
-                })
+                all_attendance.append(
+                    {
+                        "Employee": emp.name,
+                        "ID": emp.employee_id,
+                        "Date": r.timestamp.strftime("%d %b %Y"),
+                        "Time": r.timestamp.strftime("%I:%M %p"),
+                        "Confidence": f"{r.confidence:.1%}",
+                    }
+                )
 except Exception as _exc:
     logger.warning("Could not load attendance history: %s", _exc)
     all_attendance = []  # Degrade gracefully if attendance query fails

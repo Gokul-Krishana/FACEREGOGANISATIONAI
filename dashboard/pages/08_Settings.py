@@ -21,8 +21,8 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import config.config as cfg
+import streamlit as st  # noqa: E402
+import config.config as cfg  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ st.set_page_config(page_title="Settings", page_icon="⚙️", layout="wide")
 st.title("⚙️ Settings")
 st.markdown("Edit configuration values below and save — changes persist to `config/settings.yaml`.")
 st.caption("**Note:** Some settings (e.g. camera, logging) require a full app restart to take effect.")
+
 
 # ── Load current values from the live settings dict ─────────
 def _get_live(*keys: str, default):
@@ -48,7 +49,7 @@ def _get_live(*keys: str, default):
 # ── Form ─────────────────────────────────────────────────────
 with st.form("settings_form", clear_on_submit=False):
     st.markdown("### 🎥 Camera")
-    
+
     # Camera source type
     camera_source_options = {
         "💻 Laptop Webcam": "webcam",
@@ -66,7 +67,7 @@ with st.form("settings_form", clear_on_submit=False):
         if slug == current_source:
             current_source_label = label
             break
-    
+
     selected_source_label = st.selectbox(
         "Camera Source",
         options=list(camera_source_options.keys()),
@@ -74,7 +75,7 @@ with st.form("settings_form", clear_on_submit=False):
         help="Select the camera source type for face recognition",
     )
     camera_source_type = camera_source_options[selected_source_label]
-    
+
     # Define help text dictionaries BEFORE they are used in the form fields below
     cam_id_help = {
         "webcam": "Camera device index (0 = default webcam)",
@@ -98,22 +99,28 @@ with st.form("settings_form", clear_on_submit=False):
         camera_id = st.number_input(
             "Camera ID",
             value=_get_live("camera", "id", default=0),
-            min_value=-1, max_value=10, step=1,
+            min_value=-1,
+            max_value=10,
+            step=1,
             help=cam_id_help.get(camera_source_type, "Camera device index"),
         )
     with col2:
         cam_width = st.number_input(
             "Width",
             value=_get_live("camera", "width", default=640),
-            min_value=320, max_value=3840, step=10,
+            min_value=320,
+            max_value=3840,
+            step=10,
         )
     with col3:
         cam_height = st.number_input(
             "Height",
             value=_get_live("camera", "height", default=480),
-            min_value=240, max_value=2160, step=10,
+            min_value=240,
+            max_value=2160,
+            step=10,
         )
-    
+
     # Only show URL field for phone camera types
     if camera_source_type in ("android_wifi", "android_usb", "iphone_wifi"):
         camera_url = st.text_input(
@@ -124,7 +131,7 @@ with st.form("settings_form", clear_on_submit=False):
     else:
         camera_url = _get_live("camera", "url", default="http://192.168.1.100:8080/video")
         st.caption(f"🔗 Camera URL: {camera_url_help.get(camera_source_type, '')}")
-    
+
     # Auto-connect toggle
     auto_connect = st.toggle(
         "Auto-connect camera at startup",
@@ -139,26 +146,34 @@ with st.form("settings_form", clear_on_submit=False):
     with col1:
         yolo_conf = st.slider(
             "YOLO Confidence Threshold",
-            min_value=0.0, max_value=1.0, step=0.05,
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
             value=_get_live("recognition", "yolo_confidence", default=0.5),
             help="Minimum confidence for YOLO person detection. Lower = more detections but more false positives.",
         )
         threshold = st.slider(
             "Recognition Threshold (L2 distance)",
-            min_value=0.0, max_value=3.0, step=0.05,
+            min_value=0.0,
+            max_value=3.0,
+            step=0.05,
             value=_get_live("recognition", "recognition_threshold", default=1.0),
             help="FAISS L2 distance threshold. Lower = stricter match. 1.0–1.5 is typical for same person under different conditions.",
         )
     with col2:
         frame_skip = st.number_input(
             "Frame Skip",
-            min_value=0, max_value=10, step=1,
+            min_value=0,
+            max_value=10,
+            step=1,
             value=_get_live("recognition", "frame_skip", default=2),
             help="Process every Nth frame. Higher = faster but may miss faces.",
         )
         cooldown = st.number_input(
             "Cooldown (seconds)",
-            min_value=0, max_value=600, step=5,
+            min_value=0,
+            max_value=600,
+            step=5,
             value=_get_live("recognition", "cooldown_seconds", default=60),
             help="Don't re-mark attendance within this window for the same person.",
         )
@@ -167,7 +182,9 @@ with st.form("settings_form", clear_on_submit=False):
     st.markdown("### 👤 Unknown Faces")
     retention = st.number_input(
         "Auto-delete unknown faces after (days)",
-        min_value=0, max_value=365, step=1,
+        min_value=0,
+        max_value=365,
+        step=1,
         value=_get_live("unknown_faces", "retention_days", default=30),
         help="0 = never auto-delete.",
     )
@@ -178,13 +195,17 @@ with st.form("settings_form", clear_on_submit=False):
     with col1:
         min_face = st.number_input(
             "Min Face Size (pixels)",
-            min_value=50, max_value=500, step=10,
+            min_value=50,
+            max_value=500,
+            step=10,
             value=_get_live("enrollment", "min_face_size", default=100),
         )
     with col2:
         capture_count = st.number_input(
             "Capture Count",
-            min_value=1, max_value=10, step=1,
+            min_value=1,
+            max_value=10,
+            step=1,
             value=_get_live("enrollment", "capture_count", default=1),
         )
 
@@ -202,7 +223,9 @@ with st.form("settings_form", clear_on_submit=False):
     with col2:
         log_max_mb = st.number_input(
             "Max Log Size (MB)",
-            min_value=1, max_value=100, step=1,
+            min_value=1,
+            max_value=100,
+            step=1,
             value=_get_live("logging", "max_size_mb", default=10),
         )
 
@@ -319,10 +342,7 @@ if run_diag:
 
     with st.spinner("Scanning camera ports..."):
         for idx in range(max_idx):
-            progress_bar.progress(
-                (idx + 1) / max_idx,
-                text=f"Scanning device #{idx}..."
-            )
+            progress_bar.progress((idx + 1) / max_idx, text=f"Scanning device #{idx}...")
 
             cam_info = None
             # Try DirectShow first, then default
@@ -365,13 +385,15 @@ if run_diag:
         for cam in found_cameras:
             idx = cam["index"]
             label = "Built-in webcam" if idx == 0 else f"USB Camera #{idx}"
-            table_data.append({
-                "Device": f"#{idx}",
-                "Type": label,
-                "Resolution": cam["resolution"],
-                "Backend": cam["backend"],
-                "Frame OK": "Yes" if cam["has_frame"] else "No",
-            })
+            table_data.append(
+                {
+                    "Device": f"#{idx}",
+                    "Type": label,
+                    "Resolution": cam["resolution"],
+                    "Backend": cam["backend"],
+                    "Frame OK": "Yes" if cam["has_frame"] else "No",
+                }
+            )
 
         st.table(table_data)
 
@@ -379,9 +401,13 @@ if run_diag:
         for cam in found_cameras:
             idx = cam["index"]
             if idx == 0:
-                st.markdown(f"- Device **#{idx}** appears to be your built-in webcam. Select **Laptop Webcam** above.")
+                st.markdown(
+                    f"- Device **#{idx}** appears to be your built-in webcam. Select **Laptop Webcam** above."
+                )
             else:
-                st.markdown(f"- Device **#{idx}** is a USB camera. Select **USB Auto** or **Webcam** with device ID **{idx}**.")
+                st.markdown(
+                    f"- Device **#{idx}** is a USB camera. Select **USB Auto** or **Webcam** with device ID **{idx}**."
+                )
 
         # Check for phone cameras
         if len(found_cameras) > 1:

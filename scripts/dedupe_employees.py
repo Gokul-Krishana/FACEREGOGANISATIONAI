@@ -72,6 +72,7 @@ from database.repository import EmployeeRepo  # noqa: E402
 
 # ── FAISS helpers ──────────────────────────────────────────────────
 
+
 def load_faiss_names() -> Dict[str, int]:
     """Return ``{name: faiss_id}`` from the FAISS metadata file.
 
@@ -101,6 +102,7 @@ def valid_faiss_ids() -> set:
 
 # ── Duplicate detection ──────────────────────────────────────────
 
+
 def find_duplicate_groups(employees: List[Employee]) -> List[List[Employee]]:
     """Group employees by normalized name; return groups with >1 member."""
     by_name: Dict[str, List[Employee]] = defaultdict(list)
@@ -127,6 +129,7 @@ def pick_survivor(group: List[Employee], valid_ids: set) -> Employee:
 
 # ── Merge logic ──────────────────────────────────────────────────
 
+
 def merge_group(session, group: List[Employee], survivor: Employee) -> int:
     """Re-point dependent rows and delete duplicates in one group.
 
@@ -137,19 +140,17 @@ def merge_group(session, group: List[Employee], survivor: Employee) -> int:
         return 0
 
     # Re-point attendance records
-    session.query(Attendance).filter(
-        Attendance.employee_id.in_(removed_ids)
-    ).update({"employee_id": survivor.id}, synchronize_session=False)
+    session.query(Attendance).filter(Attendance.employee_id.in_(removed_ids)).update(
+        {"employee_id": survivor.id}, synchronize_session=False
+    )
 
     # Re-point recognition logs
-    session.query(RecognitionLog).filter(
-        RecognitionLog.employee_id.in_(removed_ids)
-    ).update({"employee_id": survivor.id}, synchronize_session=False)
+    session.query(RecognitionLog).filter(RecognitionLog.employee_id.in_(removed_ids)).update(
+        {"employee_id": survivor.id}, synchronize_session=False
+    )
 
     # Delete duplicates
-    session.query(Employee).filter(Employee.id.in_(removed_ids)).delete(
-        synchronize_session=False
-    )
+    session.query(Employee).filter(Employee.id.in_(removed_ids)).delete(synchronize_session=False)
     session.commit()
     return len(removed_ids)
 
@@ -163,16 +164,14 @@ def clean_stale_faiss_ids(session, employees: List[Employee], valid_ids: set) ->
     foreign-key constraints on PostgreSQL. Returns the number of rows
     deleted.
     """
-    stale = [
-        emp for emp in employees
-        if emp.faiss_id is not None and emp.faiss_id not in valid_ids
-    ]
+    stale = [emp for emp in employees if emp.faiss_id is not None and emp.faiss_id not in valid_ids]
     if not stale:
         return 0
 
     # Attempt FAISS label removal first (best-effort, never fatal)
     try:
         from app.enrollment import FaceEnrollment
+
         enrollment = FaceEnrollment()
         for emp in stale:
             try:
@@ -188,14 +187,10 @@ def clean_stale_faiss_ids(session, employees: List[Employee], valid_ids: set) ->
     safe = []
     for emp in stale:
         has_attendance = (
-            session.query(Attendance.id)
-            .filter(Attendance.employee_id == emp.id)
-            .first()
+            session.query(Attendance.id).filter(Attendance.employee_id == emp.id).first()
         ) is not None
         has_logs = (
-            session.query(RecognitionLog.id)
-            .filter(RecognitionLog.employee_id == emp.id)
-            .first()
+            session.query(RecognitionLog.id).filter(RecognitionLog.employee_id == emp.id).first()
         ) is not None
         if has_attendance or has_logs:
             print(
@@ -209,23 +204,24 @@ def clean_stale_faiss_ids(session, employees: List[Employee], valid_ids: set) ->
         return 0
 
     ids = [emp.id for emp in safe]
-    session.query(Employee).filter(Employee.id.in_(ids)).delete(
-        synchronize_session=False
-    )
+    session.query(Employee).filter(Employee.id.in_(ids)).delete(synchronize_session=False)
     session.commit()
     return len(ids)
 
 
 # ── Main ─────────────────────────────────────────────────────────
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--apply", action="store_true",
+        "--apply",
+        action="store_true",
         help="Apply the merge (default is a dry run that only reports).",
     )
     parser.add_argument(
-        "--clean-stale", action="store_true",
+        "--clean-stale",
+        action="store_true",
         help="Also delete employees whose faiss_id no longer exists in FAISS.",
     )
     args = parser.parse_args()
@@ -249,7 +245,7 @@ def main() -> int:
             print(f"\n  ⚠️  {len(groups)} duplicate name group(s) found:")
             for group in groups:
                 survivor = pick_survivor(group, valid_ids)
-                print(f"\n    Group \"{group[0].name}\":")
+                print(f'\n    Group "{group[0].name}":')
                 for emp in group:
                     marker = "  ← KEEP" if emp.id == survivor.id else "  (duplicate)"
                     stale = ""
@@ -261,10 +257,7 @@ def main() -> int:
                     )
 
         # Stale faiss_id report
-        stale_rows = [
-            emp for emp in employees
-            if emp.faiss_id is not None and emp.faiss_id not in valid_ids
-        ]
+        stale_rows = [emp for emp in employees if emp.faiss_id is not None and emp.faiss_id not in valid_ids]
         if stale_rows:
             print(f"\n  ⚠️  {len(stale_rows)} employee(s) with stale faiss_id (not in FAISS):")
             for emp in stale_rows:
@@ -282,7 +275,7 @@ def main() -> int:
                 deleted = merge_group(session, group, survivor)
                 total_deleted += deleted
                 print(
-                    f"  ✅ Merged \"{survivor.name}\" group: "
+                    f'  ✅ Merged "{survivor.name}" group: '
                     f"kept id={survivor.id}, deleted {deleted} duplicate(s)"
                 )
 

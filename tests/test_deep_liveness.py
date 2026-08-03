@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import cv2
 import numpy as np
 import pytest
 
@@ -52,13 +51,16 @@ def detector(monkeypatch) -> DeepLivenessDetector:
 @pytest.fixture()
 def frontal_landmarks() -> np.ndarray:
     """5-point landmarks for a frontal face."""
-    return np.array([
-        [60, 80],    # left eye
-        [140, 80],   # right eye
-        [100, 130],  # nose
-        [70, 170],   # left mouth
-        [130, 170],  # right mouth
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [60, 80],  # left eye
+            [140, 80],  # right eye
+            [100, 130],  # nose
+            [70, 170],  # left mouth
+            [130, 170],  # right mouth
+        ],
+        dtype=np.float32,
+    )
 
 
 @pytest.fixture()
@@ -90,9 +92,9 @@ def spoof_screen() -> np.ndarray:
     for i in range(0, 200, 4):
         for j in range(0, 200, 4):
             if j + 2 < 200:
-                face[i, j] = [255, 0, 0]       # Red subpixel
-                face[i, j + 1] = [0, 255, 0]    # Green subpixel
-                face[i, j + 2] = [0, 0, 255]    # Blue subpixel
+                face[i, j] = [255, 0, 0]  # Red subpixel
+                face[i, j + 1] = [0, 255, 0]  # Green subpixel
+                face[i, j + 2] = [0, 0, 255]  # Blue subpixel
     return face
 
 
@@ -102,8 +104,11 @@ class TestDeepLivenessResult:
     def test_creation(self):
         """DeepLivenessResult should store all fields."""
         result = DeepLivenessResult(
-            is_live=True, dl_score=0.92, raw_score=0.08,
-            inference_time_ms=5.2, model_available=True,
+            is_live=True,
+            dl_score=0.92,
+            raw_score=0.08,
+            inference_time_ms=5.2,
+            model_available=True,
         )
         assert result.is_live is True
         assert result.dl_score == 0.92
@@ -115,7 +120,9 @@ class TestDeepLivenessResult:
     def test_creation_with_error(self):
         """DeepLivenessResult with error should store it."""
         result = DeepLivenessResult(
-            is_live=False, dl_score=0.0, raw_score=0.0,
+            is_live=False,
+            dl_score=0.0,
+            raw_score=0.0,
             error="face_too_small",
         )
         assert result.is_live is False
@@ -125,8 +132,11 @@ class TestDeepLivenessResult:
     def test_repr(self):
         """String representation should include key info."""
         result = DeepLivenessResult(
-            is_live=True, dl_score=0.92, raw_score=0.08,
-            inference_time_ms=5.2, model_available=True,
+            is_live=True,
+            dl_score=0.92,
+            raw_score=0.08,
+            inference_time_ms=5.2,
+            model_available=True,
         )
         repr_str = repr(result)
         assert "DeepLivenessResult" in repr_str
@@ -136,7 +146,9 @@ class TestDeepLivenessResult:
     def test_zero_confidence(self):
         """Zero confidence should still produce valid result."""
         result = DeepLivenessResult(
-            is_live=False, dl_score=0.0, raw_score=1.0,
+            is_live=False,
+            dl_score=0.0,
+            raw_score=1.0,
         )
         assert result.dl_score == 0.0
         assert result.is_live is False
@@ -190,7 +202,7 @@ class TestDeepLivenessDetector:
         red_face = np.full((100, 100, 3), [0, 0, 255], dtype=np.uint8)
         tensor = detector._preprocess(red_face, landmarks=None)
         # Red channel should be higher than blue in RGB
-        red_channel = tensor[0, 0]   # R channel (RGB → index 0)
+        red_channel = tensor[0, 0]  # R channel (RGB → index 0)
         blue_channel = tensor[0, 2]  # B channel
         assert float(np.mean(red_channel)) > float(np.mean(blue_channel))
 
@@ -207,10 +219,16 @@ class TestDeepLivenessDetector:
         # Use a face with prominent features
         face = np.zeros((200, 200, 3), dtype=np.uint8)
         face[50:150, 50:150] = [200, 150, 100]  # Skin-colored square
-        landmarks = np.array([
-            [70, 80], [130, 80], [100, 110],
-            [75, 150], [125, 150],
-        ], dtype=np.float32)
+        landmarks = np.array(
+            [
+                [70, 80],
+                [130, 80],
+                [100, 110],
+                [75, 150],
+                [125, 150],
+            ],
+            dtype=np.float32,
+        )
         aligned = detector._align_face(face, landmarks)
         assert aligned.shape == face.shape
 
@@ -350,18 +368,21 @@ class TestIntegrationWithLivenessDetector:
     def test_liveness_detector_uses_deep_liveness(self):
         """LivenessDetector should initialise deep liveness by default."""
         from app.liveness_detector import LivenessDetector
+
         det = LivenessDetector()
         assert det.deep_liveness_available is True
 
     def test_liveness_detector_can_disable_deep_liveness(self):
         """LivenessDetector should allow disabling deep liveness."""
         from app.liveness_detector import LivenessDetector
+
         det = LivenessDetector(use_deep_liveness=False)
         assert det.deep_liveness_available is False
 
     def test_analyze_frame_includes_dl_score(self):
         """analyze_frame should include deep-learning score in result."""
         from app.liveness_detector import LivenessDetector
+
         det = LivenessDetector()
         face = np.random.randint(0, 255, (200, 200, 3), dtype=np.uint8)
         result = det.analyze_frame(face)
@@ -372,6 +393,7 @@ class TestIntegrationWithLivenessDetector:
     def test_analyze_frame_disabled_dl(self):
         """With deep liveness disabled, dl_score should be neutral."""
         from app.liveness_detector import LivenessDetector
+
         det = LivenessDetector(use_deep_liveness=False)
         face = np.random.randint(0, 255, (200, 200, 3), dtype=np.uint8)
         result = det.analyze_frame(face)
@@ -382,6 +404,7 @@ class TestIntegrationWithLivenessDetector:
         """Very low deep liveness score should add spoof reason."""
         from app.liveness_detector import LivenessDetector
         import config.config as cfg
+
         det = LivenessDetector()
         # A clearly non-face uniform image should trigger deep spoof
         uniform = np.full((200, 200, 3), 128, dtype=np.uint8)
@@ -395,8 +418,9 @@ class TestIntegrationWithLivenessDetector:
     def test_weighted_combination_with_dl(self):
         """With deep liveness, the weights should differ."""
         from app.liveness_detector import LivenessDetector, _DEFAULT_WEIGHTS_DL, _DEFAULT_WEIGHTS_NO_DL
+
         # When deep liveness is enabled, weights should be from DL set
-        det = LivenessDetector(use_deep_liveness=True)
+        _det = LivenessDetector(use_deep_liveness=True)
         # Verify weights exist for the DL factor
         assert "deep_liveness" in _DEFAULT_WEIGHTS_DL
         assert _DEFAULT_WEIGHTS_DL["deep_liveness"] == 0.40
@@ -410,6 +434,7 @@ class TestModelFallback:
     def test_fallback_initializes_quickly(self, monkeypatch):
         """Fallback CNN should initialise instantly."""
         import time
+
         # Force the fallback path regardless of local model presence
         monkeypatch.setattr(
             DeepLivenessDetector,
@@ -442,7 +467,7 @@ class TestModelFallback:
         # Test with various color distributions
         test_images = [
             np.full((64, 64, 3), [100, 150, 220], dtype=np.uint8),  # warm
-            np.full((64, 64, 3), [200, 100, 50], dtype=np.uint8),   # cool
+            np.full((64, 64, 3), [200, 100, 50], dtype=np.uint8),  # cool
             np.full((64, 64, 3), [128, 128, 128], dtype=np.uint8),  # gray
             np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8),  # noise
         ]

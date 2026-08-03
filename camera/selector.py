@@ -47,28 +47,33 @@ logger = get_logger(__name__)
 # ── Registry ───────────────────────────────────────────────────
 # Maps source type slugs to their class and a human label.
 CAMERA_REGISTRY: Dict[str, Tuple[str, type]] = {
-    "webcam":       ("💻 Laptop Webcam", WebcamSource),
-    "usb_auto":     ("🔌 USB Auto", USBAnySource),
-    "android_usb":  ("📱 Android (USB)", AndroidUSBSource),
+    "webcam": ("💻 Laptop Webcam", WebcamSource),
+    "usb_auto": ("🔌 USB Auto", USBAnySource),
+    "android_usb": ("📱 Android (USB)", AndroidUSBSource),
     "android_wifi": ("📱 Android (Wi-Fi)", AndroidWiFiSource),
-    "iphone_usb":   ("📱 iPhone (USB)", iPhoneUSBSource),
-    "iphone_wifi":  ("📱 iPhone (Wi-Fi)", iPhoneWiFiSource),
-    "ip_camera":    ("🌐 IP Camera", IPCameraSource),
+    "iphone_usb": ("📱 iPhone (USB)", iPhoneUSBSource),
+    "iphone_wifi": ("📱 iPhone (Wi-Fi)", iPhoneWiFiSource),
+    "ip_camera": ("🌐 IP Camera", IPCameraSource),
 }
 
 # Ordered list for CLI / UI display
 CAMERA_CHOICES: List[Tuple[str, str, str]] = [
-    ("webcam",       "💻 Laptop Webcam",       "Built-in or USB webcam (default)"),
-    ("usb_auto",     "🔌 USB Auto (Plug & Play)",  "Auto-detect any USB camera (Android UVC, webcam, DroidCam, EpocCam)"),
-    ("android_usb",  "📱 Android (USB)",        "DroidCam USB connection"),
-    ("android_wifi", "📱 Android (Wi-Fi)",      "IP Webcam app over Wi-Fi"),
-    ("iphone_usb",   "📱 iPhone (USB)",         "EpocCam/DroidCam OBS USB connection"),
-    ("iphone_wifi",  "📱 iPhone (Wi-Fi)",       "EpocCam Wi-Fi streaming"),
-    ("ip_camera",    "🌐 IP Camera",            "Generic RTSP/HTTP network camera (Hikvision, Dahua, etc.)"),
+    ("webcam", "💻 Laptop Webcam", "Built-in or USB webcam (default)"),
+    (
+        "usb_auto",
+        "🔌 USB Auto (Plug & Play)",
+        "Auto-detect any USB camera (Android UVC, webcam, DroidCam, EpocCam)",
+    ),
+    ("android_usb", "📱 Android (USB)", "DroidCam USB connection"),
+    ("android_wifi", "📱 Android (Wi-Fi)", "IP Webcam app over Wi-Fi"),
+    ("iphone_usb", "📱 iPhone (USB)", "EpocCam/DroidCam OBS USB connection"),
+    ("iphone_wifi", "📱 iPhone (Wi-Fi)", "EpocCam Wi-Fi streaming"),
+    ("ip_camera", "🌐 IP Camera", "Generic RTSP/HTTP network camera (Hikvision, Dahua, etc.)"),
 ]
 
 
 # ── Factory ────────────────────────────────────────────────────
+
 
 def create_camera(source_type: str, **kwargs) -> Optional[CameraSource]:
     """Create a camera source by type.
@@ -114,6 +119,7 @@ def create_camera(source_type: str, **kwargs) -> Optional[CameraSource]:
 
 
 # ── CLI Selector ───────────────────────────────────────────────
+
 
 def select_camera_cli() -> CameraSource:
     """Interactive CLI camera selector.
@@ -182,6 +188,7 @@ def select_camera_cli() -> CameraSource:
 
 
 # ── Streamlit UI ───────────────────────────────────────────────
+
 
 def select_camera_ui(st) -> Optional[CameraSource]:
     """Render a camera source selector in Streamlit.
@@ -283,6 +290,7 @@ def select_camera_ui(st) -> Optional[CameraSource]:
 
 # ── Probe ──────────────────────────────────────────────────────
 
+
 def get_available_cameras() -> List[Dict]:
     """Probe the system and return a list of detectable camera sources.
 
@@ -299,20 +307,26 @@ def get_available_cameras() -> List[Dict]:
             available_indices.append(idx)
             cap.release()
 
-    results.append({
-        "slug": "webcam",
-        "label": "Laptop Webcam",
-        "available": len(available_indices) > 0,
-        "detail": f"Found {len(available_indices)} device(s): {available_indices}" if available_indices else "No webcam detected",
-    })
+    results.append(
+        {
+            "slug": "webcam",
+            "label": "Laptop Webcam",
+            "available": len(available_indices) > 0,
+            "detail": f"Found {len(available_indices)} device(s): {available_indices}"
+            if available_indices
+            else "No webcam detected",
+        }
+    )
 
     # Other sources are assumed "maybe available" — they depend on external apps
     for slug, label, _ in CAMERA_CHOICES[1:]:
-        results.append({
-            "slug": slug,
-            "label": label.split(" ", 1)[1],  # Remove emoji
-            "available": "unknown",  # Can't probe DroidCam / EpocCam without the app running
-            "detail": "Connect and start the app on your phone to use this source",
-        })
+        results.append(
+            {
+                "slug": slug,
+                "label": label.split(" ", 1)[1],  # Remove emoji
+                "available": "unknown",  # Can't probe DroidCam / EpocCam without the app running
+                "detail": "Connect and start the app on your phone to use this source",
+            }
+        )
 
     return results

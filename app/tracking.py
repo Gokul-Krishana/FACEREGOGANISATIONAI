@@ -31,11 +31,11 @@ class TrackState:
     """Mutable state for a single tracked individual."""
 
     track_id: str
-    first_seen: float                   # Seconds since epoch
-    last_seen: float                    # Seconds since epoch
+    first_seen: float  # Seconds since epoch
+    last_seen: float  # Seconds since epoch
     total_frames: int = 0
-    consistent_frames: int = 0          # Frames with same identity match
-    unknown_frames: int = 0             # Frames where identity was unknown
+    consistent_frames: int = 0  # Frames with same identity match
+    unknown_frames: int = 0  # Frames where identity was unknown
 
     # Bounding box (smoothed)
     bbox: Optional[Tuple[int, int, int, int]] = None
@@ -354,7 +354,10 @@ class MultiFrameTracker:
             elif track.identity == name:
                 track.consistent_frames += 1
                 # Decaying EMA for confidence
-                track.identity_confidence = track.identity_confidence * 0.9 + (1.0 - arcface_dist / max(cfg.RECOGNITION_THRESHOLD * 2, 1)) * 0.1
+                track.identity_confidence = (
+                    track.identity_confidence * 0.9
+                    + (1.0 - arcface_dist / max(cfg.RECOGNITION_THRESHOLD * 2, 1)) * 0.1
+                )
             else:
                 # Identity changed — could be ID switch
                 track.identity = name
@@ -374,11 +377,7 @@ class MultiFrameTracker:
 
     def _prune_lost_tracks(self) -> None:
         """Remove tracks that have been lost for too long."""
-        lost = [
-            tid
-            for tid, count in self._disappeared.items()
-            if count > self.max_disappeared
-        ]
+        lost = [tid for tid, count in self._disappeared.items() if count > self.max_disappeared]
         for tid in lost:
             del self._tracks[tid]
             del self._disappeared[tid]

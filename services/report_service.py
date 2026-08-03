@@ -47,6 +47,7 @@ class ReportUnavailableError(RuntimeError):
 
 # ── Data helpers ─────────────────────────────────────────────────
 
+
 class ReportService:
     """Static report generation helpers."""
 
@@ -62,17 +63,22 @@ class ReportService:
         rows: List[Dict[str, Any]] = []
         with get_session() as session:
             records = AttendanceRepo.get_by_date(
-                session, target_date, limit=limit, skip=skip,
+                session,
+                target_date,
+                limit=limit,
+                skip=skip,
             )
             for r in records:
                 emp = r.employee
-                rows.append({
-                    "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
-                    "Name": emp.name if emp else "Unknown",
-                    "Department": emp.department if emp and emp.department else "—",
-                    "Time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if r.timestamp else "",
-                    "Confidence": f"{r.confidence:.1%}" if r.confidence is not None else "",
-                })
+                rows.append(
+                    {
+                        "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
+                        "Name": emp.name if emp else "Unknown",
+                        "Department": emp.department if emp and emp.department else "—",
+                        "Time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if r.timestamp else "",
+                        "Confidence": f"{r.confidence:.1%}" if r.confidence is not None else "",
+                    }
+                )
         return rows
 
     @staticmethod
@@ -96,14 +102,16 @@ class ReportService:
             )
             for r in records:
                 emp = r.employee
-                rows.append({
-                    "Date": r.timestamp.strftime("%Y-%m-%d") if r.timestamp else "",
-                    "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
-                    "Name": emp.name if emp else "Unknown",
-                    "Department": emp.department if emp and emp.department else "—",
-                    "Time": r.timestamp.strftime("%H:%M:%S") if r.timestamp else "",
-                    "Confidence": f"{r.confidence:.1%}" if r.confidence is not None else "",
-                })
+                rows.append(
+                    {
+                        "Date": r.timestamp.strftime("%Y-%m-%d") if r.timestamp else "",
+                        "ID": emp.employee_id if emp else f"ID:{r.employee_id}",
+                        "Name": emp.name if emp else "Unknown",
+                        "Department": emp.department if emp and emp.department else "—",
+                        "Time": r.timestamp.strftime("%H:%M:%S") if r.timestamp else "",
+                        "Confidence": f"{r.confidence:.1%}" if r.confidence is not None else "",
+                    }
+                )
         return rows
 
     @staticmethod
@@ -130,15 +138,17 @@ class ReportService:
                 skip=skip,
             )
             for log in page.items:
-                rows.append({
-                    "Timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "",
-                    "Action": log.action or "",
-                    "Actor": log.actor or "",
-                    "Severity": log.severity or "INFO",
-                    "Resource": log.resource_type or "",
-                    "Description": log.description or "",
-                    "IP": log.ip_address or "",
-                })
+                rows.append(
+                    {
+                        "Timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "",
+                        "Action": log.action or "",
+                        "Actor": log.actor or "",
+                        "Severity": log.severity or "INFO",
+                        "Resource": log.resource_type or "",
+                        "Description": log.description or "",
+                        "IP": log.ip_address or "",
+                    }
+                )
         return rows
 
     @staticmethod
@@ -146,18 +156,15 @@ class ReportService:
         """Fetch employees as plain dict rows."""
         rows: List[Dict[str, Any]] = []
         with get_session() as session:
-            employees = (
-                session.query(Employee)
-                .order_by(Employee.name, Employee.id)
-                .limit(limit)
-                .all()
-            )
+            employees = session.query(Employee).order_by(Employee.name, Employee.id).limit(limit).all()
             for e in employees:
-                rows.append({
-                    "ID": e.employee_id or "",
-                    "Name": e.name or "",
-                    "Department": e.department or "—",
-                })
+                rows.append(
+                    {
+                        "ID": e.employee_id or "",
+                        "Name": e.name or "",
+                        "Department": e.department or "—",
+                    }
+                )
         return rows
 
     # ── Generic table rendering (PDF / Excel) ─────────────────
@@ -176,7 +183,11 @@ class ReportService:
             from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
             from reportlab.lib.units import inch
             from reportlab.platypus import (
-                Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+                Paragraph,
+                SimpleDocTemplate,
+                Spacer,
+                Table,
+                TableStyle,
             )
         except ImportError as exc:  # pragma: no cover
             raise ReportUnavailableError(
@@ -195,18 +206,30 @@ class ReportService:
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
-            "ReportTitle", parent=styles["Title"], fontSize=16, spaceAfter=4,
+            "ReportTitle",
+            parent=styles["Title"],
+            fontSize=16,
+            spaceAfter=4,
         )
         subtitle_style = ParagraphStyle(
-            "ReportSubtitle", parent=styles["Normal"], fontSize=9,
-            textColor=colors.grey, spaceAfter=8,
+            "ReportSubtitle",
+            parent=styles["Normal"],
+            fontSize=9,
+            textColor=colors.grey,
+            spaceAfter=8,
         )
         header_style = ParagraphStyle(
-            "ReportHeader", parent=styles["Normal"], fontSize=8,
-            textColor=colors.white, fontName="Helvetica-Bold",
+            "ReportHeader",
+            parent=styles["Normal"],
+            fontSize=8,
+            textColor=colors.white,
+            fontName="Helvetica-Bold",
         )
         cell_style = ParagraphStyle(
-            "ReportCell", parent=styles["Normal"], fontSize=7.5, leading=9,
+            "ReportCell",
+            parent=styles["Normal"],
+            fontSize=7.5,
+            leading=9,
         )
 
         story = [Paragraph(_escape(title), title_style)]
@@ -224,21 +247,23 @@ class ReportService:
             [Paragraph(_escape(c), header_style) for c in columns],
         ]
         for row in rows[:500]:  # Hard cap: 500 rows per PDF page-set
-            table_data.append(
-                [Paragraph(_escape(_fmt(row.get(c, ""))), cell_style) for c in columns]
-            )
+            table_data.append([Paragraph(_escape(_fmt(row.get(c, ""))), cell_style) for c in columns])
 
         table = Table(table_data, repeatRows=1, hAlign="LEFT")
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563EB")),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1F5F9")]),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563EB")),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1F5F9")]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
         story.append(table)
 
         doc.build(story)
@@ -315,7 +340,10 @@ class ReportService:
         title = title or f"Attendance Register — {target_date.strftime('%d %b %Y')}"
         subtitle = f"{len(rows)} record(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         return ReportService._pdf_table(
-            title, ["ID", "Name", "Department", "Time", "Confidence"], rows, subtitle,
+            title,
+            ["ID", "Name", "Department", "Time", "Confidence"],
+            rows,
+            subtitle,
         )
 
     @staticmethod
@@ -328,8 +356,10 @@ class ReportService:
         rows = rows if rows is not None else ReportService.attendance_rows(target_date)
         title = title or f"Attendance Register — {target_date.strftime('%d %b %Y')}"
         return ReportService._excel_table(
-            title, ["ID", "Name", "Department", "Time", "Confidence"],
-            rows, sheet_name="Attendance",
+            title,
+            ["ID", "Name", "Department", "Time", "Confidence"],
+            rows,
+            sheet_name="Attendance",
         )
 
     @staticmethod
@@ -343,15 +373,19 @@ class ReportService:
     ) -> bytes:
         """PDF audit log export with optional filters."""
         rows = ReportService.audit_rows(
-            query=query, action=action, severity=severity,
-            date_from=date_from, date_to=date_to,
+            query=query,
+            action=action,
+            severity=severity,
+            date_from=date_from,
+            date_to=date_to,
         )
         title = title or "Audit Log Export"
         subtitle = f"{len(rows)} entrie(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         return ReportService._pdf_table(
             title,
             ["Timestamp", "Action", "Actor", "Severity", "Resource", "Description", "IP"],
-            rows, subtitle,
+            rows,
+            subtitle,
         )
 
     @staticmethod
@@ -365,14 +399,18 @@ class ReportService:
     ) -> bytes:
         """Excel audit log export with optional filters."""
         rows = ReportService.audit_rows(
-            query=query, action=action, severity=severity,
-            date_from=date_from, date_to=date_to,
+            query=query,
+            action=action,
+            severity=severity,
+            date_from=date_from,
+            date_to=date_to,
         )
         title = title or "Audit Log Export"
         return ReportService._excel_table(
             title,
             ["Timestamp", "Action", "Actor", "Severity", "Resource", "Description", "IP"],
-            rows, sheet_name="AuditLog",
+            rows,
+            sheet_name="AuditLog",
         )
 
     @staticmethod
@@ -381,7 +419,10 @@ class ReportService:
         rows = ReportService.employee_rows()
         title = title or "Employee Directory"
         return ReportService._excel_table(
-            title, ["ID", "Name", "Department"], rows, sheet_name="Employees",
+            title,
+            ["ID", "Name", "Department"],
+            rows,
+            sheet_name="Employees",
         )
 
     @staticmethod
@@ -391,7 +432,10 @@ class ReportService:
         title = title or "Employee Directory"
         subtitle = f"{len(rows)} employee(s) · Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         return ReportService._pdf_table(
-            title, ["ID", "Name", "Department"], rows, subtitle,
+            title,
+            ["ID", "Name", "Department"],
+            rows,
+            subtitle,
         )
 
 
@@ -399,9 +443,4 @@ def _escape(text: Any) -> str:
     """Escape text for reportlab Paragraph markup."""
     if text is None:
         return ""
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

@@ -41,7 +41,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 # ── Acceptance targets (for 500K @ 512-D) ──────────────────────────
 ACCEPTANCE_TARGETS: Dict[str, Dict[str, float]] = {
@@ -72,7 +72,9 @@ def _build_exact(vectors: np.ndarray) -> tuple[faiss.IndexFlatL2, float]:
 
 
 def _build_hnsw(
-    vectors: np.ndarray, m: int = 32, ef_construction: int = 200,
+    vectors: np.ndarray,
+    m: int = 32,
+    ef_construction: int = 200,
     ef_search: int = 128,
 ) -> tuple[faiss.IndexHNSWFlat, float]:
     start = time.perf_counter()
@@ -99,10 +101,7 @@ def _build_ivf(
 
 
 def _serialize_size(index) -> int:
-    tmp = (
-        Path(tempfile.gettempdir())
-        / f"faiss_{type(index).__name__}.index"
-    )
+    tmp = Path(tempfile.gettempdir()) / f"faiss_{type(index).__name__}.index"
     faiss.write_index(index, str(tmp))
     return tmp.stat().st_size
 
@@ -118,9 +117,7 @@ def _recall(reference: np.ndarray, actual: np.ndarray, k: int) -> float:
     return hits / len(reference)
 
 
-def _search_per_query(
-    index, queries: np.ndarray, k: int
-) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
+def _search_per_query(index, queries: np.ndarray, k: int) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
     """Search all queries and return results plus per-query latency stats.
 
     Returns:
@@ -136,21 +133,25 @@ def _search_per_query(
     for i in range(n):
         q = queries[i : i + 1]  # keep 2-D
         t0 = time.perf_counter()
-        D, I = index.search(q, k)
+        D, idx = index.search(q, k)
         t1 = time.perf_counter()
         per_times[i] = (t1 - t0) * 1000  # milliseconds
         all_distances[i] = D[0]
-        all_indices[i] = I[0]
+        all_indices[i] = idx[0]
 
     per_times.sort()
-    return all_distances, all_indices, {
-        "avg_ms": round(float(per_times.mean()), 4),
-        "p50_ms": round(float(np.median(per_times)), 4),
-        "p95_ms": round(float(per_times[int(n * 0.95)]), 4),
-        "p99_ms": round(float(per_times[int(n * 0.99)]), 4),
-        "min_ms": round(float(per_times[0]), 4),
-        "max_ms": round(float(per_times[-1]), 4),
-    }
+    return (
+        all_distances,
+        all_indices,
+        {
+            "avg_ms": round(float(per_times.mean()), 4),
+            "p50_ms": round(float(np.median(per_times)), 4),
+            "p95_ms": round(float(per_times[int(n * 0.95)]), 4),
+            "p99_ms": round(float(per_times[int(n * 0.99)]), 4),
+            "min_ms": round(float(per_times[0]), 4),
+            "max_ms": round(float(per_times[-1]), 4),
+        },
+    )
 
 
 def _assess_targets(
@@ -167,11 +168,13 @@ def _assess_targets(
             base_ms = r["baseline"]["search_ms"]
             target = ACCEPTANCE_TARGETS["baseline"]["search_ms_max_500k"]
             passed = base_ms <= target
-            size_assess["checks"].append({
-                "check": f"baseline_search_ms <= {target}",
-                "measured": round(base_ms, 2),
-                "passed": passed,
-            })
+            size_assess["checks"].append(
+                {
+                    "check": f"baseline_search_ms <= {target}",
+                    "measured": round(base_ms, 2),
+                    "passed": passed,
+                }
+            )
             if not passed:
                 size_assess["overall"] = "FAIL"
 
@@ -179,20 +182,24 @@ def _assess_targets(
         hnsw_r1 = r["hnsw"]["recall_at_1"]
         target_r1 = ACCEPTANCE_TARGETS["hnsw"]["recall_at_1_min"]
         passed_r1 = hnsw_r1 >= target_r1
-        size_assess["checks"].append({
-            "check": f"HNSW Recall@1 >= {target_r1}",
-            "measured": hnsw_r1,
-            "passed": passed_r1,
-        })
+        size_assess["checks"].append(
+            {
+                "check": f"HNSW Recall@1 >= {target_r1}",
+                "measured": hnsw_r1,
+                "passed": passed_r1,
+            }
+        )
 
         hnsw_ms = r["hnsw"]["avg_query_ms"]
         target_ms = ACCEPTANCE_TARGETS["hnsw"]["avg_query_ms_max"]
         passed_ms = hnsw_ms <= target_ms
-        size_assess["checks"].append({
-            "check": f"HNSW avg_query_ms <= {target_ms}",
-            "measured": hnsw_ms,
-            "passed": passed_ms,
-        })
+        size_assess["checks"].append(
+            {
+                "check": f"HNSW avg_query_ms <= {target_ms}",
+                "measured": hnsw_ms,
+                "passed": passed_ms,
+            }
+        )
         if not (passed_r1 and passed_ms):
             size_assess["overall"] = "FAIL"
 
@@ -200,20 +207,24 @@ def _assess_targets(
         ivf_r1 = r["ivf"]["recall_at_1"]
         target_ivf_r1 = ACCEPTANCE_TARGETS["ivf"]["recall_at_1_min"]
         passed_ivf_r1 = ivf_r1 >= target_ivf_r1
-        size_assess["checks"].append({
-            "check": f"IVF Recall@1 >= {target_ivf_r1}",
-            "measured": ivf_r1,
-            "passed": passed_ivf_r1,
-        })
+        size_assess["checks"].append(
+            {
+                "check": f"IVF Recall@1 >= {target_ivf_r1}",
+                "measured": ivf_r1,
+                "passed": passed_ivf_r1,
+            }
+        )
 
         ivf_ms = r["ivf"]["avg_query_ms"]
         target_ivf_ms = ACCEPTANCE_TARGETS["ivf"]["avg_query_ms_max"]
         passed_ivf_ms = ivf_ms <= target_ivf_ms
-        size_assess["checks"].append({
-            "check": f"IVF avg_query_ms <= {target_ivf_ms}",
-            "measured": ivf_ms,
-            "passed": passed_ivf_ms,
-        })
+        size_assess["checks"].append(
+            {
+                "check": f"IVF avg_query_ms <= {target_ivf_ms}",
+                "measured": ivf_ms,
+                "passed": passed_ivf_ms,
+            }
+        )
         if not (passed_ivf_r1 and passed_ivf_ms):
             size_assess["overall"] = "FAIL"
 
@@ -303,9 +314,7 @@ def benchmark_size(size: int, dim: int, queries: int, k: int) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="FAISS 512-D scalability benchmark with acceptance targets."
-    )
+    parser = argparse.ArgumentParser(description="FAISS 512-D scalability benchmark with acceptance targets.")
     parser.add_argument(
         "--sizes",
         nargs="+",
@@ -353,24 +362,28 @@ def main() -> int:
         print(f"  SIZE: {s:,}  |  Dim: {r['dimension']}  |  Acceptance: {r['acceptance']['overall']}")
         print(sep2)
 
-        for label, key in [("Baseline (IndexFlatL2)", "baseline"),
-                            ("HNSW", "hnsw"),
-                            ("IVF", "ivf")]:
+        for label, key in [("Baseline (IndexFlatL2)", "baseline"), ("HNSW", "hnsw"), ("IVF", "ivf")]:
             idx = r[key]
             print(f"  {label}:")
             print(f"    Build: {idx['build_ms']:>8.2f} ms  |  Search: {idx['search_ms']:>8.2f} ms")
-            print(f"    Avg: {idx['avg_query_ms']:>8.4f} ms  |  P50: {idx['p50_ms']:>8.4f} ms  |  "
-                  f"P95: {idx['p95_ms']:>8.4f} ms  |  P99: {idx['p99_ms']:>8.4f} ms")
-            print(f"    Min: {idx['min_ms']:>8.4f} ms  |  Max: {idx['max_ms']:>8.4f} ms  |  "
-                  f"QPS: {idx['queries_per_sec']:>8.2f}")
+            print(
+                f"    Avg: {idx['avg_query_ms']:>8.4f} ms  |  P50: {idx['p50_ms']:>8.4f} ms  |  "
+                f"P95: {idx['p95_ms']:>8.4f} ms  |  P99: {idx['p99_ms']:>8.4f} ms"
+            )
+            print(
+                f"    Min: {idx['min_ms']:>8.4f} ms  |  Max: {idx['max_ms']:>8.4f} ms  |  "
+                f"QPS: {idx['queries_per_sec']:>8.2f}"
+            )
             print(f"    Memory: {idx['memory_mb']:>8.2f} MB")
             if "recall_at_1" in idx:
-                print(f"    Recall@1: {idx['recall_at_1']:.4f}  |  "
-                      f"Recall@5: {idx['recall_at_5']:.4f}  |  "
-                      f"Recall@{r['k']}: {idx['recall_at_k']:.4f}")
+                print(
+                    f"    Recall@1: {idx['recall_at_1']:.4f}  |  "
+                    f"Recall@5: {idx['recall_at_5']:.4f}  |  "
+                    f"Recall@{r['k']}: {idx['recall_at_k']:.4f}"
+                )
 
         # Acceptance checks
-        print(f"\n  Acceptance checks:")
+        print("\n  Acceptance checks:")
         for check in r["acceptance"]["checks"]:
             status = "PASS" if check["passed"] else "FAIL"
             print(f"    {status} | {check['check']}: {check['measured']}")

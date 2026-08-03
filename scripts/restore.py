@@ -47,7 +47,7 @@ except Exception:
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 EMBEDDINGS_DIR = cfg.EMBEDDINGS_DIR
 
@@ -71,9 +71,7 @@ def find_pg_bin() -> Path:
     for cand in PG_BIN_CANDIDATES:
         if (Path(cand) / "psql.exe").exists() or (Path(cand) / "psql").exists():
             return Path(cand)
-    raise FileNotFoundError(
-        "psql not found. Install PostgreSQL or add its bin directory to PATH."
-    )
+    raise FileNotFoundError("psql not found. Install PostgreSQL or add its bin directory to PATH.")
 
 
 def extract_credentials(url: str) -> tuple[str, str, str, str, str]:
@@ -146,14 +144,16 @@ def resolve_target_url(manifest: dict, args) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Restore PostgreSQL + FAISS + metadata")
-    parser.add_argument("--backup-dir", required=True,
-                        help="Backup directory (name or path under backups/)")
-    parser.add_argument("--url", default=None,
-                        help="Target PostgreSQL URL (required if manifest URL is redacted)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would be restored without changing anything")
-    parser.add_argument("--no-db", action="store_true",
-                        help="Restore FAISS/metadata only, skip database restore")
+    parser.add_argument("--backup-dir", required=True, help="Backup directory (name or path under backups/)")
+    parser.add_argument(
+        "--url", default=None, help="Target PostgreSQL URL (required if manifest URL is redacted)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be restored without changing anything"
+    )
+    parser.add_argument(
+        "--no-db", action="store_true", help="Restore FAISS/metadata only, skip database restore"
+    )
     args = parser.parse_args()
 
     # Resolve backup dir
@@ -196,8 +196,7 @@ def main() -> int:
         except FileNotFoundError as exc:
             print(f"x {exc}")
             return 1
-        dump_path = backup_dir / manifest.get("database", {}).get(
-            "dump_file", f"{dbname}.sql")
+        dump_path = backup_dir / manifest.get("database", {}).get("dump_file", f"{dbname}.sql")
         if not dump_path.exists():
             print(f"x SQL dump not found: {dump_path}")
             return 1
@@ -219,16 +218,30 @@ def main() -> int:
                 f"WHERE datname = '{dbname}' AND pid <> pg_backend_pid();"
             )
             subprocess.run(
-                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user,
-                 "-d", "postgres", "-c", term_sql],
-                env=env, capture_output=True, text=True,
+                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", term_sql],
+                env=env,
+                capture_output=True,
+                text=True,
             )
 
             print("[2/4] Dropping existing database...")
             r = subprocess.run(
-                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user,
-                 "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS {dbname};"],
-                env=env, capture_output=True, text=True,
+                [
+                    str(pg_bin / "psql"),
+                    "-h",
+                    host,
+                    "-p",
+                    port,
+                    "-U",
+                    user,
+                    "-d",
+                    "postgres",
+                    "-c",
+                    f"DROP DATABASE IF EXISTS {dbname};",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
             )
             if r.returncode != 0:
                 print(f"  x DROP DATABASE failed:\n{r.stderr[-1500:]}")
@@ -236,9 +249,22 @@ def main() -> int:
 
             print("[3/4] Creating fresh database...")
             r = subprocess.run(
-                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user,
-                 "-d", "postgres", "-c", f"CREATE DATABASE {dbname};"],
-                env=env, capture_output=True, text=True,
+                [
+                    str(pg_bin / "psql"),
+                    "-h",
+                    host,
+                    "-p",
+                    port,
+                    "-U",
+                    user,
+                    "-d",
+                    "postgres",
+                    "-c",
+                    f"CREATE DATABASE {dbname};",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
             )
             if r.returncode != 0:
                 print(f"  x CREATE DATABASE failed:\n{r.stderr[-1500:]}")
@@ -246,9 +272,22 @@ def main() -> int:
 
             print("[4/4] Restoring dump...")
             r = subprocess.run(
-                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user,
-                 "-d", dbname, "-f", str(dump_path)],
-                env=env, capture_output=True, text=True,
+                [
+                    str(pg_bin / "psql"),
+                    "-h",
+                    host,
+                    "-p",
+                    port,
+                    "-U",
+                    user,
+                    "-d",
+                    dbname,
+                    "-f",
+                    str(dump_path),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
             )
             if r.returncode != 0:
                 print(f"  x psql restore failed:\n{r.stderr[-2000:]}")

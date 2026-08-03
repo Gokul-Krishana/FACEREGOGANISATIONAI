@@ -158,12 +158,26 @@ class FakeCameraSource(CameraSource):
             r = max(2, min(h, w) // 8)
             cv2.circle(frame, (cx, cy), r, (60, 200, 90), -1)
             cv2.circle(frame, (cx, cy), max(1, r // 3), (0, 0, 0), 2)
-        cv2.putText(frame, f"FAKE FRAME {index}", (8, 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1,
-                    cv2.LINE_AA)
-        cv2.putText(frame, f"{self._target_fps:.0f} fps target", (8, h - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1,
-                    cv2.LINE_AA)
+        cv2.putText(
+            frame,
+            f"FAKE FRAME {index}",
+            (8, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            frame,
+            f"{self._target_fps:.0f} fps target",
+            (8, h - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
         return frame
 
     # ── Convenience (parity with WebcamSource) ────────────────────

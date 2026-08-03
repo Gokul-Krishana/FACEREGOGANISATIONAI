@@ -7,12 +7,7 @@ Validates the Windows-safe magic-byte replacement for python-magic.
 from __future__ import annotations
 
 import io
-import struct
-import zlib
-from pathlib import Path
-from typing import Tuple
 
-import numpy as np
 import pytest
 from PIL import Image
 
@@ -73,13 +68,13 @@ def valid_webp_bytes() -> bytes:
 
 
 class TestValidateImageUpload:
-
     # ── Happy paths ────────────────────────────────────────────
 
     def test_valid_jpeg_passes(self, valid_jpeg_bytes):
         """Valid JPEG should pass validation and return a safe filename."""
         safe_name, data = validate_image_upload(
-            valid_jpeg_bytes, filename="photo.jpg",
+            valid_jpeg_bytes,
+            filename="photo.jpg",
         )
         assert safe_name.endswith(".jpg")
         assert data == valid_jpeg_bytes
@@ -87,7 +82,8 @@ class TestValidateImageUpload:
     def test_valid_png_passes(self, valid_png_bytes):
         """Valid PNG should pass validation."""
         safe_name, data = validate_image_upload(
-            valid_png_bytes, filename="photo.png",
+            valid_png_bytes,
+            filename="photo.png",
         )
         assert safe_name.endswith(".png")
 
@@ -179,7 +175,7 @@ class TestValidateImageUpload:
     def test_truncated_jpeg_is_rejected(self):
         """A JPEG file that's been truncated should be caught."""
         full = _make_jpeg_bytes(64, 64)
-        truncated = full[:len(full) // 4]  # Only first 25%
+        truncated = full[: len(full) // 4]  # Only first 25%
         with pytest.raises((UploadSecurityError, OSError)):
             validate_image_upload(truncated, filename="truncated.jpg")
 
@@ -196,9 +192,7 @@ class TestValidateImageUpload:
 
     def test_no_extension_provided(self, valid_jpeg_bytes):
         """Even without a filename, detection should work via magic bytes."""
-        safe_name, data = validate_image_upload(
-            valid_jpeg_bytes, filename=""
-        )
+        safe_name, data = validate_image_upload(valid_jpeg_bytes, filename="")
         assert safe_name.endswith(".jpg")
 
     def test_unsupported_format_in_allowed_list(self, valid_png_bytes):

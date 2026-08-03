@@ -64,6 +64,7 @@ def _paginate(query, skip: int, limit: int) -> PageResult:
 
 # ── Employee Repository ───────────────────────────────────────
 
+
 class StudentRepo:
     """CRUD and search operations for the ``students`` table."""
 
@@ -94,21 +95,11 @@ class StudentRepo:
 
     @staticmethod
     def get_by_student_id(session: Session, student_id: str) -> Optional[Student]:
-        return (
-            session.query(Student)
-            .filter(Student.student_id == student_id)
-            .first()
-        )
+        return session.query(Student).filter(Student.student_id == student_id).first()
 
     @staticmethod
     def get_all(session: Session, limit: int = 100, skip: int = 0) -> List[Student]:
-        return (
-            session.query(Student)
-            .order_by(Student.student_id, Student.id)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        return session.query(Student).order_by(Student.student_id, Student.id).offset(skip).limit(limit).all()
 
     @staticmethod
     def search(
@@ -173,28 +164,17 @@ class EmployeeRepo:
 
     @staticmethod
     def get_by_employee_id(session: Session, employee_id: str) -> Optional[Employee]:
-        return session.query(Employee).filter(
-            Employee.employee_id == employee_id
-        ).first()
+        return session.query(Employee).filter(Employee.employee_id == employee_id).first()
 
     @staticmethod
     def get_all(session: Session) -> List[Employee]:
-        return (
-            session.query(Employee)
-            .order_by(Employee.name, Employee.id)
-            .limit(500)
-            .all()
-        )
+        return session.query(Employee).order_by(Employee.name, Employee.id).limit(500).all()
 
     @staticmethod
     def get_by_name(session: Session, name: str) -> Optional[Employee]:
         """Look up an employee by their display name."""
         normalized = name.strip().lower()
-        return (
-            session.query(Employee)
-            .filter(Employee.name.ilike(normalized))
-            .first()
-        )
+        return session.query(Employee).filter(Employee.name.ilike(normalized)).first()
 
     @staticmethod
     def search(session: Session, query: str) -> List[Employee]:
@@ -266,6 +246,7 @@ class EmployeeRepo:
 
 
 # ── Attendance Repository ─────────────────────────────────────
+
 
 class AttendanceRepo:
     """CRUD operations for the ``attendance`` table."""
@@ -350,9 +331,7 @@ class AttendanceRepo:
         start = datetime.combine(date.today(), datetime.min.time())
         end = datetime.combine(date.today(), datetime.max.time())
         today_count = (
-            session.query(func.count(Attendance.id))
-            .filter(Attendance.timestamp.between(start, end))
-            .scalar()
+            session.query(func.count(Attendance.id)).filter(Attendance.timestamp.between(start, end)).scalar()
             or 0
         )
         unique_today = (
@@ -372,6 +351,7 @@ class AttendanceRepo:
 
 
 # ── Recognition Log Repository ────────────────────────────────
+
 
 class RecognitionLogRepo:
     """CRUD operations for the ``recognition_log`` table."""
@@ -434,6 +414,7 @@ class RecognitionLogRepo:
 
 # ── Unknown Face Repository ───────────────────────────────────
 
+
 class UnknownFaceRepo:
     """CRUD operations for the ``unknown_faces`` table."""
 
@@ -466,7 +447,7 @@ class UnknownFaceRepo:
     ) -> List[UnknownFace]:
         query = (
             session.query(UnknownFace)
-            .filter(UnknownFace.reviewed == False)
+            .filter(UnknownFace.reviewed.is_(False))
             .options(selectinload(UnknownFace.camera))
             .order_by(desc(UnknownFace.timestamp))
         )
@@ -531,18 +512,10 @@ class UnknownFaceRepo:
             datetime.min.time(),
         )
         total = session.query(UnknownFace).count()
-        today = session.query(UnknownFace).filter(
-            UnknownFace.timestamp >= today_start
-        ).count()
-        this_week = session.query(UnknownFace).filter(
-            UnknownFace.timestamp >= week_ago
-        ).count()
-        pending = session.query(UnknownFace).filter(
-            UnknownFace.reviewed == False
-        ).count()
-        converted = session.query(UnknownFace).filter(
-            UnknownFace.converted_to_employee == True
-        ).count()
+        today = session.query(UnknownFace).filter(UnknownFace.timestamp >= today_start).count()
+        this_week = session.query(UnknownFace).filter(UnknownFace.timestamp >= week_ago).count()
+        pending = session.query(UnknownFace).filter(UnknownFace.reviewed.is_(False)).count()
+        converted = session.query(UnknownFace).filter(UnknownFace.converted_to_employee.is_(True)).count()
         return {
             "total": total,
             "today": today,
@@ -556,7 +529,7 @@ class UnknownFaceRepo:
         uf = session.query(UnknownFace).filter(UnknownFace.id == face_id).first()
         if not uf:
             return False
-        uf.reviewed = True
+        uf.reviewed = True  # type: ignore[assignment]
         session.commit()
         return True
 
@@ -566,8 +539,8 @@ class UnknownFaceRepo:
         uf = session.query(UnknownFace).filter(UnknownFace.id == face_id).first()
         if not uf:
             return False
-        uf.converted_to_employee = True
-        uf.reviewed = True
+        uf.converted_to_employee = True  # type: ignore[assignment]
+        uf.reviewed = True  # type: ignore[assignment]
         session.commit()
         return True
 
@@ -577,7 +550,7 @@ class UnknownFaceRepo:
         uf = session.query(UnknownFace).filter(UnknownFace.id == face_id).first()
         if not uf:
             return False
-        uf.notes = notes
+        uf.notes = notes  # type: ignore[assignment]
         session.commit()
         return True
 
@@ -624,10 +597,7 @@ class UnknownFaceRepo:
         # after the DB operation, even if the session is closed)
         image_paths: List[str] = []
         if delete_images:
-            image_paths = [
-                row[0] for row in session.query(UnknownFace.image_path).all()
-                if row[0]
-            ]
+            image_paths = [row[0] for row in session.query(UnknownFace.image_path).all() if row[0]]
 
         # Bulk delete all records in one shot
         count = session.query(UnknownFace).delete()
@@ -636,6 +606,7 @@ class UnknownFaceRepo:
         # Clean up image files from disk
         if delete_images:
             from pathlib import Path as _Path
+
             for path in image_paths:
                 try:
                     _Path(path).unlink(missing_ok=True)
@@ -655,11 +626,7 @@ class UnknownFaceRepo:
             date.today() - timedelta(days=days),
             datetime.min.time(),
         )
-        old_faces = (
-            session.query(UnknownFace)
-            .filter(UnknownFace.timestamp < cutoff)
-            .all()
-        )
+        old_faces = session.query(UnknownFace).filter(UnknownFace.timestamp < cutoff).all()
         count = len(old_faces)
         for uf in old_faces:
             # Delete image file
@@ -674,23 +641,24 @@ class UnknownFaceRepo:
 
     @staticmethod
     def count_unreviewed(session: Session) -> int:
-        return (
-            session.query(UnknownFace)
-            .filter(UnknownFace.reviewed == False)
-            .count()
-        )
+        return session.query(UnknownFace).filter(UnknownFace.reviewed.is_(False)).count()
 
     @staticmethod
     def count_by_date_range(session: Session, start: date, end: date) -> int:
-        return session.query(UnknownFace).filter(
-            UnknownFace.timestamp.between(
-                datetime.combine(start, datetime.min.time()),
-                datetime.combine(end, datetime.max.time()),
+        return (
+            session.query(UnknownFace)
+            .filter(
+                UnknownFace.timestamp.between(
+                    datetime.combine(start, datetime.min.time()),
+                    datetime.combine(end, datetime.max.time()),
+                )
             )
-        ).count()
+            .count()
+        )
 
 
 # ── Camera Repository ─────────────────────────────────────────
+
 
 class CameraRepo:
     """CRUD operations for the ``cameras`` table."""
@@ -719,12 +687,7 @@ class CameraRepo:
 
     @staticmethod
     def get_active(session: Session) -> List[Camera]:
-        return (
-            session.query(Camera)
-            .filter(Camera.is_active == True)
-            .order_by(Camera.camera_index)
-            .all()
-        )
+        return session.query(Camera).filter(Camera.is_active.is_(True)).order_by(Camera.camera_index).all()
 
     @staticmethod
     def get_by_id(session: Session, cam_id: int) -> Optional[Camera]:
@@ -732,12 +695,11 @@ class CameraRepo:
 
     @staticmethod
     def get_by_index(session: Session, camera_index: int) -> Optional[Camera]:
-        return session.query(Camera).filter(
-            Camera.camera_index == camera_index
-        ).first()
+        return session.query(Camera).filter(Camera.camera_index == camera_index).first()
 
 
 # ── Audit Log Repository ──────────────────────────────────────
+
 
 class AuditLogRepo:
     """CRUD operations for the ``audit_log`` table."""
@@ -763,20 +725,12 @@ class AuditLogRepo:
 
     @staticmethod
     def get_recent(session: Session, limit: int = 100) -> List[AuditLog]:
-        return (
-            session.query(AuditLog)
-            .order_by(desc(AuditLog.timestamp))
-            .limit(limit)
-            .all()
-        )
+        return session.query(AuditLog).order_by(desc(AuditLog.timestamp)).limit(limit).all()
 
     @staticmethod
     def get_by_action(session: Session, action: str) -> List[AuditLog]:
         return (
-            session.query(AuditLog)
-            .filter(AuditLog.action == action)
-            .order_by(desc(AuditLog.timestamp))
-            .all()
+            session.query(AuditLog).filter(AuditLog.action == action).order_by(desc(AuditLog.timestamp)).all()
         )
 
     @staticmethod

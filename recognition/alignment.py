@@ -26,13 +26,16 @@ import numpy as np
 
 # Canonical face landmarks (in normalized coordinates [0, 1]):
 #   [left_eye, right_eye, nose, left_mouth, right_mouth]
-CANONICAL_LANDMARKS = np.array([
-    [0.315, 0.350],  # Left eye
-    [0.685, 0.350],  # Right eye
-    [0.500, 0.500],  # Nose tip
-    [0.370, 0.650],  # Left mouth corner
-    [0.630, 0.650],  # Right mouth corner
-], dtype=np.float64)
+CANONICAL_LANDMARKS = np.array(
+    [
+        [0.315, 0.350],  # Left eye
+        [0.685, 0.350],  # Right eye
+        [0.500, 0.500],  # Nose tip
+        [0.370, 0.650],  # Left mouth corner
+        [0.630, 0.650],  # Right mouth corner
+    ],
+    dtype=np.float64,
+)
 
 # Output face size (pixels)
 ALIGN_SIZE = 224
@@ -150,11 +153,11 @@ def normalize_intensity(img: np.ndarray) -> np.ndarray:
     """
     # Convert to LAB color space
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    l_ch, a, b = cv2.split(lab)
 
     # Apply CLAHE to L-channel
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    l_eq = clahe.apply(l)
+    l_eq = clahe.apply(l_ch)
 
     # Merge back
     lab_eq = cv2.merge([l_eq, a, b])

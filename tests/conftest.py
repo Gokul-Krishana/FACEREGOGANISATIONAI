@@ -35,7 +35,7 @@ TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 # ── Monkey-patch the database module to use test DB ───────────
 # This MUST happen before any service code is imported, so it's at
 # module level (not inside a fixture).
-import database.database as _db_mod
+import database.database as _db_mod  # noqa: E402
 
 _db_mod.DATABASE_URL = TEST_DATABASE_URL
 _db_mod.engine = create_engine(
@@ -45,11 +45,14 @@ _db_mod.engine = create_engine(
     pool_pre_ping=True,  # Verify connections are alive before using them
 )
 _db_mod.SessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=_db_mod.engine,
+    autocommit=False,
+    autoflush=False,
+    bind=_db_mod.engine,
 )
 
 # Create tables
-from database.models import Base
+from database.models import Base  # noqa: E402
+
 Base.metadata.create_all(bind=_db_mod.engine)
 
 

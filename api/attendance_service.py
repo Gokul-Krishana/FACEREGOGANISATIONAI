@@ -7,12 +7,13 @@ from __future__ import annotations
 from datetime import datetime, time as dt_time
 from typing import Optional
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database.models import (
-    Attendance, Enrollment, Section, Student,
-    Timetable, Classroom, Course,
+    Attendance,
+    Enrollment,
+    Section,
+    Timetable,
 )
 
 
@@ -34,10 +35,14 @@ class AttendanceService:
         day_of_week = timestamp.weekday()  # 0=Monday, 6=Sunday
         current_time = timestamp.time()
 
-        timetable = session.query(Timetable).filter(
-            Timetable.section_id == section_id,
-            Timetable.day_of_week == day_of_week,
-        ).first()
+        timetable = (
+            session.query(Timetable)
+            .filter(
+                Timetable.section_id == section_id,
+                Timetable.day_of_week == day_of_week,
+            )
+            .first()
+        )
 
         if not timetable:
             return None
@@ -61,6 +66,7 @@ class AttendanceService:
         grace_minutes: int = 10,
     ) -> bool:
         """Check if timestamp falls within a time window with grace period."""
+
         def parse_t(s: str) -> dt_time:
             h, m, sec = map(int, s.split(":"))
             return dt_time(h, m, sec)
@@ -79,11 +85,15 @@ class AttendanceService:
         session: Session,
     ) -> bool:
         """Check if a student is enrolled in a section."""
-        enrollment = session.query(Enrollment).filter(
-            Enrollment.student_id == student_id,
-            Enrollment.section_id == section_id,
-            Enrollment.status == "ACTIVE",
-        ).first()
+        enrollment = (
+            session.query(Enrollment)
+            .filter(
+                Enrollment.student_id == student_id,
+                Enrollment.section_id == section_id,
+                Enrollment.status == "ACTIVE",
+            )
+            .first()
+        )
         return enrollment is not None
 
     @staticmethod
@@ -120,8 +130,6 @@ class AttendanceService:
         marked_by_user_id: Optional[int] = None,
     ) -> Attendance:
         """Create a new attendance record with timetable validation."""
-        now = datetime.utcnow()
-
         # If no explicit section_id, try to derive from timetable
         if section_id and course_id is None:
             section = session.get(Section, section_id)
@@ -130,19 +138,21 @@ class AttendanceService:
 
         # If no section_id, try to find it from timetable/camera/classroom
         if section_id is None and classroom_id:
-            class_section = session.query(Section).join(
-                Timetable
-            ).filter(
-                Timetable.classroom_id == classroom_id,
-            ).order_by(Timetable.start_time.desc()).first()
+            class_section = (
+                session.query(Section)
+                .join(Timetable)
+                .filter(
+                    Timetable.classroom_id == classroom_id,
+                )
+                .order_by(Timetable.start_time.desc())
+                .first()
+            )
             if class_section:
                 section_id = class_section.id
 
         # Validate that the student is enrolled in this section
         if section_id and not AttendanceService.is_student_enrolled(student_id, section_id, session):
-            raise ValueError(
-                f"Student {student_id} is not enrolled in section {section_id}"
-            )
+            raise ValueError(f"Student {student_id} is not enrolled in section {section_id}")
 
         # Mark attendance
         attendance = Attendance(
@@ -170,7 +180,6 @@ class AttendanceService:
         date_to: Optional[datetime] = None,
     ) -> dict:
         """Get attendance summary statistics."""
-        from sqlalchemy import func
 
         query = session.query(Attendance)
 

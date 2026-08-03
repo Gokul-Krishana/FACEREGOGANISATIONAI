@@ -37,13 +37,16 @@ def uniform_face() -> np.ndarray:
 @pytest.fixture()
 def frontal_landmarks() -> np.ndarray:
     """5-point landmarks simulating open eyes on a frontal face."""
-    return np.array([
-        [60, 80],   # left eye
-        [140, 80],  # right eye
-        [100, 120],  # nose
-        [70, 170],  # left mouth
-        [130, 170],  # right mouth
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [60, 80],  # left eye
+            [140, 80],  # right eye
+            [100, 120],  # nose
+            [70, 170],  # left mouth
+            [130, 170],  # right mouth
+        ],
+        dtype=np.float32,
+    )
 
 
 @pytest.fixture()
@@ -61,9 +64,14 @@ class TestLivenessResult:
     def test_creation(self):
         """LivenessResult should store all fields."""
         result = LivenessResult(
-            is_live=True, liveness_score=0.85,
-            texture_score=0.9, blink_score=0.8, motion_score=0.7,
-            screen_score=0.1, blink_detected=True, reasons=[],
+            is_live=True,
+            liveness_score=0.85,
+            texture_score=0.9,
+            blink_score=0.8,
+            motion_score=0.7,
+            screen_score=0.1,
+            blink_detected=True,
+            reasons=[],
         )
         assert result.is_live is True
         assert result.liveness_score == 0.85
@@ -73,9 +81,14 @@ class TestLivenessResult:
     def test_repr(self):
         """String representation should include key info."""
         result = LivenessResult(
-            is_live=True, liveness_score=0.85,
-            texture_score=0.9, blink_score=0.8, motion_score=0.7,
-            screen_score=0.1, blink_detected=True, reasons=[],
+            is_live=True,
+            liveness_score=0.85,
+            texture_score=0.9,
+            blink_score=0.8,
+            motion_score=0.7,
+            screen_score=0.1,
+            blink_detected=True,
+            reasons=[],
         )
         repr_str = repr(result)
         assert "LivenessResult" in repr_str
@@ -137,7 +150,7 @@ class TestLivenessDetector:
         ear_closed = detector._compute_approximate_ear(closed_landmarks, (200, 200))
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(detector, '_EAR_CLOSED_THRESHOLD', 0.5)
+            mp.setattr(detector, "_EAR_CLOSED_THRESHOLD", 0.5)
             for _ in range(3):
                 detector._update_blink_state(ear_closed)
 
@@ -156,10 +169,16 @@ class TestLivenessDetector:
 
     def test_ear_zero_eye_distance(self, detector):
         """EAR should not crash when eyes are at the same point."""
-        landmarks = np.array([
-            [100, 100], [100, 100],  # same point for both eyes
-            [100, 120], [80, 170], [120, 170],
-        ], dtype=np.float32)
+        landmarks = np.array(
+            [
+                [100, 100],
+                [100, 100],  # same point for both eyes
+                [100, 120],
+                [80, 170],
+                [120, 170],
+            ],
+            dtype=np.float32,
+        )
         ear = detector._compute_approximate_ear(landmarks, (200, 200))
         assert 0.0 <= ear <= 1.0
 
