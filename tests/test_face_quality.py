@@ -56,25 +56,31 @@ def high_contrast_face() -> np.ndarray:
 @pytest.fixture()
 def landmarks_frontal() -> np.ndarray:
     """5-point landmarks for a frontal face."""
-    return np.array([
-        [60, 80],   # left eye
-        [140, 80],  # right eye
-        [100, 130],  # nose
-        [70, 170],  # left mouth
-        [130, 170],  # right mouth
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [60, 80],  # left eye
+            [140, 80],  # right eye
+            [100, 130],  # nose
+            [70, 170],  # left mouth
+            [130, 170],  # right mouth
+        ],
+        dtype=np.float32,
+    )
 
 
 @pytest.fixture()
 def landmarks_profile() -> np.ndarray:
     """5-point landmarks for a profile face (extreme angle)."""
-    return np.array([
-        [140, 80],   # left eye (camera-right side)
-        [160, 85],   # right eye
-        [150, 130],  # nose
-        [130, 170],  # left mouth
-        [155, 175],  # right mouth
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [140, 80],  # left eye (camera-right side)
+            [160, 85],  # right eye
+            [150, 130],  # nose
+            [130, 170],  # left mouth
+            [155, 175],  # right mouth
+        ],
+        dtype=np.float32,
+    )
 
 
 class TestFaceQualityAssessment:
@@ -105,8 +111,7 @@ class TestFaceQualityAssessment:
 
     def test_assess_blur_identical_face(self, fqa):
         """Two calls on the same image should produce the same score."""
-        gray = cv2.cvtColor(np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8),
-                            cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8), cv2.COLOR_BGR2GRAY)
         s1 = fqa._assess_blur(gray)
         s2 = fqa._assess_blur(gray)
         assert s1 == pytest.approx(s2)
@@ -283,4 +288,3 @@ class TestFaceQualityAssessment:
             det_score=0.95,
         )
         assert 0.0 <= result["overall"] <= 1.0
-

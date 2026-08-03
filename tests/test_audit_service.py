@@ -74,8 +74,8 @@ class TestAuditService:
 
         enroll_logs = AuditService.get_by_action("ENROLL")
         assert len(enroll_logs) >= 1
-        assert any("Alice" in (l.description or "") for l in enroll_logs)
+        assert any("Alice" in (log.description or "") for log in enroll_logs)
 
         delete_logs = AuditService.get_by_action("DELETE")
         assert len(delete_logs) >= 1
-        assert any("Bob" in (l.description or "") for l in delete_logs)
+        assert any("Bob" in (log.description or "") for log in delete_logs)

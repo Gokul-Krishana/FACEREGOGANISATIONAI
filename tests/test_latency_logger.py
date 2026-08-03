@@ -25,16 +25,16 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dashboard.frame_buffer import FrameBuffer
-from dashboard.latency_logger import LatencyLogger
+from dashboard.frame_buffer import FrameBuffer  # noqa: E402
+from dashboard.latency_logger import LatencyLogger  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════
 #  LatencyLogger — percentile & window semantics
 # ═══════════════════════════════════════════════════════════════
 
-class TestLatencyLogger:
 
+class TestLatencyLogger:
     def test_empty_state(self):
         lg = LatencyLogger()
         assert lg.count == 0
@@ -154,8 +154,8 @@ class TestLatencyLogger:
 #  Integration — latency math used by _latency_loop
 # ═══════════════════════════════════════════════════════════════
 
-class TestFrameBufferLatencyIntegration:
 
+class TestFrameBufferLatencyIntegration:
     def test_get_with_meta_timestamp_after_put(self):
         """A frame put into the buffer carries a wall-clock timestamp."""
         buf = FrameBuffer()

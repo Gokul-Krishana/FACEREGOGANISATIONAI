@@ -8,10 +8,9 @@ fully replaces the terminal app.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, List, Optional
 
-import config.config as cfg
 from app.attendance import AttendanceTracker
 from database.database import get_session
 from database.models import Attendance
@@ -94,7 +93,9 @@ class AttendanceService:
             return records
 
     @classmethod
-    def get_by_employee(cls, employee_id: int, limit: Optional[int] = None, skip: int = 0) -> List[Attendance]:
+    def get_by_employee(
+        cls, employee_id: int, limit: Optional[int] = None, skip: int = 0
+    ) -> List[Attendance]:
         """Return attendance history for a specific employee."""
         with get_session() as session:
             records = AttendanceRepo.get_by_employee(session, employee_id, limit=limit, skip=skip)

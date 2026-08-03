@@ -43,11 +43,10 @@ References
 from __future__ import annotations
 
 import logging
-import os
 import time
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import cv2
 import numpy as np
@@ -64,8 +63,7 @@ logger = logging.getLogger(__name__)
 # maintained MiniFASNetV2 ONNX export from the yakhyo/face-anti-spoofing
 # release assets (same architecture, verified input 80x80 / 3-class output).
 _DEFAULT_MODEL_URL = (
-    "https://github.com/yakhyo/face-anti-spoofing/"
-    "releases/download/weights/MiniFASNetV2.onnx"
+    "https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/MiniFASNetV2.onnx"
 )
 _DEFAULT_MODEL_FILENAME = "MiniFASNetV2.onnx"
 _MODEL_INPUT_SIZE = (80, 80)  # Width, Height (as used by MiniFASNetV2)
@@ -74,7 +72,7 @@ _MODEL_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _MODEL_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 # Score thresholds
-_DL_SCORE_SPOOF = 0.10       # Below this → almost certainly a spoof
+_DL_SCORE_SPOOF = 0.10  # Below this → almost certainly a spoof
 _DL_SCORE_LOW_CONFIDENCE = 0.30  # Below this → likely spoof
 _DL_SCORE_HIGH_CONFIDENCE = 0.70  # Above this → very likely live
 
@@ -87,8 +85,12 @@ class DeepLivenessResult:
     """Result from the deep-learning liveness detector."""
 
     __slots__ = (
-        "is_live", "dl_score", "raw_score",
-        "inference_time_ms", "model_available", "error",
+        "is_live",
+        "dl_score",
+        "raw_score",
+        "inference_time_ms",
+        "model_available",
+        "error",
     )
 
     def __init__(
@@ -162,7 +164,9 @@ class DeepLivenessDetector:
         """
         if face_img.size == 0 or face_img.shape[0] < 16 or face_img.shape[1] < 16:
             return DeepLivenessResult(
-                is_live=False, dl_score=0.0, raw_score=0.0,
+                is_live=False,
+                dl_score=0.0,
+                raw_score=0.0,
                 error="face_too_small",
             )
 
@@ -174,7 +178,9 @@ class DeepLivenessDetector:
         except Exception as exc:
             logger.warning("Deep liveness inference failed: %s", exc)
             return DeepLivenessResult(
-                is_live=False, dl_score=0.5, raw_score=0.5,
+                is_live=False,
+                dl_score=0.5,
+                raw_score=0.5,
                 error=str(exc)[:100],
             )
 
@@ -217,10 +223,7 @@ class DeepLivenessDetector:
         if not model_path.exists():
             logger.info("ONNX model not found at %s. Attempting download...", model_path)
             if not self._download_model(model_path):
-                logger.warning(
-                    "Could not download ONNX model. "
-                    "Falling back to lightweight CNN."
-                )
+                logger.warning("Could not download ONNX model. Falling back to lightweight CNN.")
                 self._fallback_active = True
                 return
 
@@ -229,13 +232,14 @@ class DeepLivenessDetector:
                 str(model_path),
                 providers=["CPUExecutionProvider"],
             )
-            self._input_name = self._session.get_inputs()[0].name
+            self._input_name = self._session.get_inputs()[0].name  # type: ignore[attr-defined]
             self._model_path = model_path
             self._model_available = True
             self._fallback_active = False
             logger.info(
                 "Deep liveness model loaded: %s (%.1f MB)",
-                model_path.name, model_path.stat().st_size / (1024 * 1024),
+                model_path.name,
+                model_path.stat().st_size / (1024 * 1024),
             )
         except Exception as exc:
             logger.warning("Failed to load ONNX model: %s. Using fallback.", exc)
@@ -260,8 +264,9 @@ class DeepLivenessDetector:
             logger.info("Downloading deep liveness model from %s ...", _DEFAULT_MODEL_URL)
             urllib.request.urlretrieve(_DEFAULT_MODEL_URL, dest_path)
             if dest_path.exists() and dest_path.stat().st_size > 100_000:
-                logger.info("Model downloaded successfully (%.1f MB)",
-                            dest_path.stat().st_size / (1024 * 1024))
+                logger.info(
+                    "Model downloaded successfully (%.1f MB)", dest_path.stat().st_size / (1024 * 1024)
+                )
                 return True
             logger.error("Downloaded model is too small — corrupt?")
             if dest_path.exists():
@@ -287,9 +292,7 @@ class DeepLivenessDetector:
         input_tensor = self._preprocess(face_img, landmarks)
 
         # Inference
-        outputs = self._session.run(
-            None, {self._input_name: input_tensor}
-        )
+        outputs = self._session.run(None, {self._input_name: input_tensor})  # type: ignore[attr-defined]
 
         # Postprocess: MiniFASNet returns shape (1, 3) → [spoof, fake, live]
         # or (1, 2) → [spoof, live], or (1, 1) → single logit.
@@ -370,7 +373,7 @@ class DeepLivenessDetector:
 
         # NCHW
         tensor = np.transpose(normalized, (2, 0, 1))  # HWC → CHW
-        tensor = np.expand_dims(tensor, axis=0)       # CHW → NCHW
+        tensor = np.expand_dims(tensor, axis=0)  # CHW → NCHW
 
         return tensor.astype(np.float32)
 
@@ -397,20 +400,25 @@ class DeepLivenessDetector:
             return face_img
 
         # Canonical landmark positions (normalised to image size)
-        canonical = np.array([
-            [w * 0.315, h * 0.325],  # left eye
-            [w * 0.685, h * 0.325],  # right eye
-            [w * 0.500, h * 0.450],  # nose
-            [w * 0.370, h * 0.625],  # left mouth
-            [w * 0.630, h * 0.625],  # right mouth
-        ], dtype=np.float32)
+        canonical = np.array(
+            [
+                [w * 0.315, h * 0.325],  # left eye
+                [w * 0.685, h * 0.325],  # right eye
+                [w * 0.500, h * 0.450],  # nose
+                [w * 0.370, h * 0.625],  # left mouth
+                [w * 0.630, h * 0.625],  # right mouth
+            ],
+            dtype=np.float32,
+        )
 
         # Estimate similarity transform
         try:
             tform = cv2.estimateAffinePartial2D(landmarks, canonical)
             if tform is not None:
-                aligned = cv2.warpAffine(
-                    face_img, tform, (w, h),
+                aligned = cv2.warpAffine(  # type: ignore[call-overload]
+                    face_img,
+                    tform,
+                    (w, h),
                     flags=cv2.INTER_LINEAR,
                     borderMode=cv2.BORDER_REFLECT,
                 )
@@ -491,7 +499,7 @@ class DeepLivenessDetector:
             hist = cv2.calcHist([small], [c], None, [32], [0, 256])
             hist_sum = max(float(hist.sum()), eps)
             hist_norm = (hist / hist_sum).flatten()
-            hist_features.extend(hist_norm.tolist())
+            hist_features.extend(float(x) for x in hist_norm.tolist())  # type: ignore[arg-type]
 
         # 2. Spectral features (FFT magnitude distribution)
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
@@ -501,7 +509,7 @@ class DeepLivenessDetector:
 
         # Radial distribution of frequencies
         cy, cx = magnitude.shape[0] // 2, magnitude.shape[1] // 2
-        low_region = magnitude[max(0, cy - 4):cy + 4, max(0, cx - 4):cx + 4]
+        low_region = magnitude[max(0, cy - 4) : cy + 4, max(0, cx - 4) : cx + 4]
         low_freq = float(np.mean(low_region)) if low_region.size > 0 else 0.0
         high_freq = max(float(np.mean(magnitude)) - low_freq, eps)
         freq_ratio = high_freq / max(low_freq, eps)
@@ -509,7 +517,7 @@ class DeepLivenessDetector:
         # 3. Gradient features (edge density)
         sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
         sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        grad_mag = np.sqrt(sobel_x ** 2 + sobel_y ** 2)
+        grad_mag = np.sqrt(sobel_x**2 + sobel_y**2)
         edge_density = float(np.mean(grad_mag > 30))
         gradient_mean = float(np.mean(grad_mag))
 
@@ -550,15 +558,18 @@ class DeepLivenessDetector:
         uniformity = self._estimate_uniformity(hist_features)
 
         # Weighted combination
-        dl_score = float(np.clip(
-            edge_score * 0.15
-            + freq_score * 0.25
-            + corr_score * 0.25
-            + sharp_score * 0.15
-            + grad_score * 0.10
-            + (1.0 - uniformity) * 0.10,
-            0.0, 1.0,
-        ))
+        dl_score = float(
+            np.clip(
+                edge_score * 0.15
+                + freq_score * 0.25
+                + corr_score * 0.25
+                + sharp_score * 0.15
+                + grad_score * 0.10
+                + (1.0 - uniformity) * 0.10,
+                0.0,
+                1.0,
+            )
+        )
 
         # Handle NaN (shouldn't happen with safe functions above, but be defensive)
         if np.isnan(dl_score) or np.isinf(dl_score):
@@ -575,7 +586,6 @@ class DeepLivenessDetector:
             inference_time_ms=round(elapsed, 2),
             model_available=True,
         )
-
 
     @staticmethod
     def _estimate_uniformity(hist_features: List[float]) -> float:
@@ -610,9 +620,7 @@ class DeepLivenessDetector:
             # Shannon entropy: H = -sum(p * log(p))
             nonzero = channel_hist > 0
             if nonzero.any():
-                entropy = -np.sum(
-                    channel_hist[nonzero] * np.log(channel_hist[nonzero])
-                )
+                entropy = -np.sum(channel_hist[nonzero] * np.log(channel_hist[nonzero]))
                 normalised = entropy / np.log(n_bins)
                 entropy_sum += float(np.clip(normalised, 0.0, 1.0))
 

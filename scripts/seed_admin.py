@@ -42,10 +42,10 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import bcrypt
+import bcrypt  # noqa: E402
 
-from database.database import get_session, init_db
-from database.models import (
+from database.database import get_session, init_db  # noqa: E402
+from database.models import (  # noqa: E402
     ActionType,
     Permission,
     Role,
@@ -53,7 +53,6 @@ from database.models import (
     User,
     user_roles,
     role_permissions,
-    _utcnow,
 )
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -65,9 +64,8 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "AutoR!0t!ze*9!")
 
 def _hash_password(password: str) -> str:
     """Hash a password using bcrypt, returning a salt+hash string."""
-    return bcrypt.hashpw(
-        password.encode("utf-8"), bcrypt.gensalt()
-    ).decode("utf-8")
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
 
 # ── All resources used by the API ──────────────────────────────────
 
@@ -97,6 +95,7 @@ ACTIONS = [
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
+
 def _get_or_create_role(session, name: str, description: str) -> Role:
     """Fetch an existing role by name or create a new one."""
     role = session.query(Role).filter(Role.name == name).first()
@@ -110,9 +109,7 @@ def _get_or_create_role(session, name: str, description: str) -> Role:
     return role
 
 
-def _get_or_create_permission(
-    session, resource: str, action: ActionType
-) -> Permission:
+def _get_or_create_permission(session, resource: str, action: ActionType) -> Permission:
     """Fetch an existing permission by (resource, action) or create one."""
     perm = (
         session.query(Permission)
@@ -131,9 +128,7 @@ def _get_or_create_permission(
     return perm
 
 
-def _get_or_create_user(
-    session, username: str, email: str, password: str
-) -> User:
+def _get_or_create_user(session, username: str, email: str, password: str) -> User:
     """Fetch an existing user by username or create a new one."""
     user = session.query(User).filter(User.username == username).first()
     if user:
@@ -165,9 +160,7 @@ def _assign_role(session, user: User, role: Role) -> None:
     if existing:
         print(f"  [SKIP] User '{user.username}' already has role '{role.name}' ")
         return
-    session.execute(
-        user_roles.insert().values(user_id=user.id, role_id=role.id)
-    )
+    session.execute(user_roles.insert().values(user_id=user.id, role_id=role.id))
     print(f"  [ OK ] Assigned role '{role.name}' to user '{user.username}'")
 
 
@@ -181,14 +174,11 @@ def _assign_permission(session, role: Role, permission: Permission) -> None:
     ).first()
     if existing:
         return
-    session.execute(
-        role_permissions.insert().values(
-            role_id=role.id, permission_id=permission.id
-        )
-    )
+    session.execute(role_permissions.insert().values(role_id=role.id, permission_id=permission.id))
 
 
 # ── Main ────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     """Bootstrap the database with roles, permissions, and the admin user."""
@@ -259,8 +249,13 @@ def main() -> None:
             ActionType.EXECUTE,
         ]
         college_admin_resources = [
-            "students", "employees", "cameras", "attendance",
-            "enrollment", "analytics", "users",
+            "students",
+            "employees",
+            "cameras",
+            "attendance",
+            "enrollment",
+            "analytics",
+            "users",
         ]
         ca_count = 0
         for resource in college_admin_resources:
@@ -274,9 +269,7 @@ def main() -> None:
 
         # Step 5 — Create the admin user
         print(f"\n[ USER ] Creating admin user '{ADMIN_USERNAME}'...")
-        admin_user = _get_or_create_user(
-            session, ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD
-        )
+        admin_user = _get_or_create_user(session, ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD)
 
         # Step 6 — Assign SUPER_ADMIN role
         print("\n[ ASSIGN ] Assigning SUPER_ADMIN role...")
@@ -292,11 +285,11 @@ def main() -> None:
     print("\n" + "=" * 60)
     print("  [ DONE ] Seed complete!")
     print("=" * 60)
-    print(f"\n  Admin credentials:")
+    print("\n  Admin credentials:")
     print(f"    Username: {ADMIN_USERNAME}")
     print(f"    Email:    {ADMIN_EMAIL}")
     print(f"    Password: {'<hidden>' if ADMIN_PASSWORD else '<not set>'}")
-    print(f"    (set ADMIN_PASSWORD env var to override)")
+    print("    (set ADMIN_PASSWORD env var to override)")
     print()
     print(f"  Roles seeded:     {len(role_defs)}")
     print(f"  Permissions seeded: {len(permissions)}")

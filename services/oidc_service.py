@@ -29,7 +29,7 @@ from fastapi import HTTPException, Request, status
 from httpx import AsyncClient
 
 from database.database import get_session
-from database.models import Role, RoleName, User, user_roles
+from database.models import Role, RoleName, User
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +38,13 @@ logger = logging.getLogger(__name__)
 class OIDCUserInfo:
     """Normalised user info returned by any OIDC provider."""
 
-    sub: str                           # Provider-specific user ID
+    sub: str  # Provider-specific user ID
     email: str
-    username: str                      # Preferred username or email local part
-    name: str                          # Display name
-    provider: str                      # e.g. "azure", "keycloak", "google"
-    groups: List[str]                  # Group memberships (for role mapping)
-    mfa_performed: bool = False        # Whether MFA was performed at the IdP
+    username: str  # Preferred username or email local part
+    name: str  # Display name
+    provider: str  # e.g. "azure", "keycloak", "google"
+    groups: List[str]  # Group memberships (for role mapping)
+    mfa_performed: bool = False  # Whether MFA was performed at the IdP
     raw_claims: Optional[Dict] = None  # Full ID token claims for debugging
 
 
@@ -127,12 +127,13 @@ class OIDCService:
             raise HTTPException(status_code=500, detail="OIDC provider missing authorization_endpoint")
 
         import secrets
+
         state_value = state or secrets.token_urlsafe(32)
 
         # Store state securely by passing it through — the callback
         # returns it, so we validate by comparing the returned state
         # to what we sent. Store it as a signed cookie.
-        response_redirect = None  # We'll set this in the calling endpoint
+        _response_redirect = None  # We'll set this in the calling endpoint
 
         params = {
             "response_type": "code",
@@ -144,7 +145,9 @@ class OIDCService:
 
         return f"{auth_endpoint}?{urlencode(params)}"
 
-    async def handle_callback(self, code: str, returned_state: str, expected_state: Optional[str] = None) -> OIDCUserInfo:
+    async def handle_callback(
+        self, code: str, returned_state: str, expected_state: Optional[str] = None
+    ) -> OIDCUserInfo:
         """Handle the OIDC callback (exchange code for tokens).
 
         This version takes explicit parameters instead of reading from
@@ -183,7 +186,7 @@ class OIDCService:
         # Exchange code for tokens
         async with AsyncClient() as client:
             token_response = await client.post(
-                token_endpoint,
+                token_endpoint,  # type: ignore[arg-type]
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
@@ -223,7 +226,6 @@ class OIDCService:
         the provider's JWKS keys). In production, add JWKS verification.
         """
         import base64
-        import json
 
         # Decode JWT payload (second segment)
         parts = id_token.split(".")
@@ -254,7 +256,9 @@ class OIDCService:
         # Check if MFA was performed (via acr/amr claims)
         acr = payload.get("acr", "")
         amr = payload.get("amr", [])
-        mfa_performed = "mfa" in amr or "otp" in amr or "phr" in amr or "phrh" in amr or "multifactor" in str(acr).lower()
+        mfa_performed = (
+            "mfa" in amr or "otp" in amr or "phr" in amr or "phrh" in amr or "multifactor" in str(acr).lower()
+        )
 
         return OIDCUserInfo(
             sub=sub,
@@ -285,29 +289,29 @@ class OIDCService:
 
         with get_session() as session:
             # Find by OIDC subject first, then by email
-            user = session.query(User).options(
-                joinedload(User.roles)
-            ).filter(
-                User.oidc_sub == user_info.sub
-            ).first()
+            user = (
+                session.query(User)
+                .options(joinedload(User.roles))
+                .filter(User.oidc_sub == user_info.sub)
+                .first()
+            )
 
             if not user:
                 # Try matching by email
-                user = session.query(User).options(
-                    joinedload(User.roles)
-                ).filter(
-                    User.email == user_info.email
-                ).first()
+                user = (
+                    session.query(User)
+                    .options(joinedload(User.roles))
+                    .filter(User.email == user_info.email)
+                    .first()
+                )
                 if user:
-                    user.oidc_sub = user_info.sub
-                    user.oidc_provider = user_info.provider
-                    user.auth_method = "both"
+                    user.oidc_sub = user_info.sub  # type: ignore[assignment]
+                    user.oidc_provider = user_info.provider  # type: ignore[assignment]
+                    user.auth_method = "both"  # type: ignore[assignment]
 
             if not user:
                 # Create new user from OIDC
-                default_role = self._map_groups_to_role(
-                    user_info.groups, session
-                )
+                default_role = self._map_groups_to_role(user_info.groups, session)
 
                 user = User(
                     username=user_info.username,
@@ -324,13 +328,11 @@ class OIDCService:
                 if default_role:
                     user.roles.append(default_role)
                 else:
-                    staff_role = session.query(Role).filter(
-                        Role.name == RoleName.STAFF.value
-                    ).first()
+                    staff_role = session.query(Role).filter(Role.name == RoleName.STAFF.value).first()
                     if staff_role:
                         user.roles.append(staff_role)
 
-            user.last_login_at = User._utcnow()
+            user.last_login_at = User._utcnow()  # type: ignore[attr-defined]
             session.commit()
             session.refresh(user)
 
@@ -356,6 +358,7 @@ class OIDCService:
 
         if session is None:
             from database.database import get_session
+
             with get_session() as s:
                 return OIDCService._map_groups_to_role(groups, s)
 
@@ -373,10 +376,8 @@ class OIDCService:
         ]
 
         for keywords, role_name in role_mapping:
-            if any(kw in group for kw in keywords):
-                role = session.query(Role).filter(
-                    Role.name == role_name.value
-                ).first()
+            if any(kw in g for g in group_lower for kw in keywords):
+                role = session.query(Role).filter(Role.name == role_name.value).first()
                 if role:
                     return role
 

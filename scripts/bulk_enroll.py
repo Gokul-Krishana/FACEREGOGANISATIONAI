@@ -34,12 +34,11 @@ Image requirements:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import cv2
 import faiss
@@ -50,9 +49,9 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import config.config as cfg
-from app.enrollment import FaceEnrollment
-from app.recognizer import FaceRecognizer
+import config.config as cfg  # noqa: E402
+from app.enrollment import FaceEnrollment  # noqa: E402
+from app.recognizer import FaceRecognizer  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +62,7 @@ logger = logging.getLogger("bulk_enroll")
 
 
 # ── Helper: parse student name from filename ───────────────────────
+
 
 def parse_name_from_filename(filename: str) -> str:
     """Extract a clean student name from an image filename.
@@ -85,6 +85,7 @@ def parse_name_from_filename(filename: str) -> str:
 
 
 # ── Real face enrollment ───────────────────────────────────────────
+
 
 def process_real_faces(
     image_dir: Path,
@@ -118,26 +119,26 @@ def process_real_faces(
 
     for i, img_path in enumerate(image_files):
         name = parse_name_from_filename(img_path.name)
-        logger.info(f"[{i+1}/{len(image_files)}] Processing {name} ({img_path.name})")
+        logger.info(f"[{i + 1}/{len(image_files)}] Processing {name} ({img_path.name})")
 
         # Read image
         image = cv2.imread(str(img_path))
         if image is None:
-            logger.warning(f"  Cannot read image, skipping")
+            logger.warning("  Cannot read image, skipping")
             skipped.append(name)
             continue
 
         # Detect face
         face = recognizer.detect_face(image)
         if face is None:
-            logger.warning(f"  No face detected, skipping")
+            logger.warning("  No face detected, skipping")
             skipped.append(name)
             continue
 
         # Extract embedding
         embedding = recognizer.extract_embedding(image)
         if embedding is None:
-            logger.warning(f"  Embedding extraction failed, skipping")
+            logger.warning("  Embedding extraction failed, skipping")
             skipped.append(name)
             continue
 
@@ -156,6 +157,7 @@ def process_real_faces(
 
 
 # ── Synthetic enrollment ───────────────────────────────────────────
+
 
 def generate_synthetic(
     count: int,
@@ -198,11 +200,14 @@ def generate_synthetic(
 
     # Warn if index already has embeddings
     if enrollment.count() > 0 and not clear_first:
-        logger.warning(f"Index already has {enrollment.count()} embeddings. "
-                       f"New embeddings will be appended. Use --clear-first to reset.")
+        logger.warning(
+            f"Index already has {enrollment.count()} embeddings. "
+            f"New embeddings will be appended. Use --clear-first to reset."
+        )
 
-    logger.info(f"Generating {count} synthetic {dim}-D embeddings "
-                f"(batch={batch_size}, {total_batches} batches)")
+    logger.info(
+        f"Generating {count} synthetic {dim}-D embeddings (batch={batch_size}, {total_batches} batches)"
+    )
 
     for batch_num in range(total_batches):
         this_batch = min(batch_size, count - total_added)
@@ -213,8 +218,7 @@ def generate_synthetic(
 
         # Build metadata for this batch
         batch_meta = [
-            {"name": f"student_{total_added + j:06d}", "id": total_added + j}
-            for j in range(this_batch)
+            {"name": f"student_{total_added + j:06d}", "id": total_added + j} for j in range(this_batch)
         ]
 
         if not dry_run:
@@ -226,9 +230,11 @@ def generate_synthetic(
         elapsed = time.perf_counter() - start_time
         rate = total_added / elapsed if elapsed > 0 else 0
         pct = total_added / count * 100
-        logger.info(f"  Batch {batch_num + 1}/{total_batches}: "
-                    f"{total_added}/{count} added ({pct:.0f}%) "
-                    f"[{rate:.0f} emb/s]")
+        logger.info(
+            f"  Batch {batch_num + 1}/{total_batches}: "
+            f"{total_added}/{count} added ({pct:.0f}%) "
+            f"[{rate:.0f} emb/s]"
+        )
 
     # Save metadata and index once (batched)
     if not dry_run and all_metadata:
@@ -246,13 +252,13 @@ def generate_synthetic(
             _create_bulk_db_records(all_metadata[:n_db])
 
     elapsed = time.perf_counter() - start_time
-    logger.info(f"Generated {total_added} embeddings in {elapsed:.1f}s "
-                f"({total_added/elapsed:.0f} emb/s)")
+    logger.info(f"Generated {total_added} embeddings in {elapsed:.1f}s ({total_added / elapsed:.0f} emb/s)")
 
     return total_added
 
 
 # ── Database helpers ───────────────────────────────────────────────
+
 
 def _create_employee_db_record(name: str) -> None:
     """Create an Employee record in SQLite."""
@@ -261,9 +267,7 @@ def _create_employee_db_record(name: str) -> None:
         from database.models import Employee
 
         with get_session() as session:
-            exists = session.query(Employee).filter(
-                Employee.employee_id == name
-            ).first()
+            exists = session.query(Employee).filter(Employee.employee_id == name).first()
             if not exists:
                 emp = Employee(
                     employee_id=name,
@@ -286,9 +290,7 @@ def _create_bulk_db_records(metadata: List[Dict]) -> None:
             count = 0
             for entry in metadata:
                 name = entry["name"]
-                exists = session.query(Employee).filter(
-                    Employee.employee_id == name
-                ).first()
+                exists = session.query(Employee).filter(Employee.employee_id == name).first()
                 if not exists:
                     emp = Employee(
                         employee_id=name,
@@ -306,6 +308,7 @@ def _create_bulk_db_records(metadata: List[Dict]) -> None:
 
 # ── CLI ────────────────────────────────────────────────────────────
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Bulk-enroll students into the face recognition system",
@@ -313,45 +316,40 @@ def main() -> int:
         epilog=__doc__,
     )
     parser.add_argument(
-        "--mode", choices=["real", "synthetic"], default="synthetic",
-        help="Enrollment mode (default: synthetic)"
+        "--mode",
+        choices=["real", "synthetic"],
+        default="synthetic",
+        help="Enrollment mode (default: synthetic)",
     )
     parser.add_argument(
-        "--count", type=int, default=1000,
-        help="Number of students to enroll (synthetic mode, default: 1000)"
+        "--count", type=int, default=1000, help="Number of students to enroll (synthetic mode, default: 1000)"
     )
     parser.add_argument(
-        "--batch-size", type=int, default=10000,
-        help="Batch size for synthetic embedding generation (default: 10000)"
+        "--batch-size",
+        type=int,
+        default=10000,
+        help="Batch size for synthetic embedding generation (default: 10000)",
     )
     parser.add_argument(
-        "--db-records", type=int, default=0,
-        help="Number of DB records to create in synthetic mode (0 = all records)"
+        "--db-records",
+        type=int,
+        default=0,
+        help="Number of DB records to create in synthetic mode (0 = all records)",
     )
     parser.add_argument(
-        "--image-dir", type=Path, default=None,
-        help="Directory containing student photos (real mode)"
+        "--image-dir", type=Path, default=None, help="Directory containing student photos (real mode)"
     )
     parser.add_argument(
-        "--pattern", default="*.jpg",
-        help="Glob pattern for image files (real mode, default: *.jpg)"
+        "--pattern", default="*.jpg", help="Glob pattern for image files (real mode, default: *.jpg)"
     )
     parser.add_argument(
-        "--db", action="store_true",
-        help="Also create database records for enrolled students"
+        "--db", action="store_true", help="Also create database records for enrolled students"
     )
+    parser.add_argument("--dry-run", action="store_true", help="Run without saving anything (validate only)")
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Run without saving anything (validate only)"
+        "--clear-first", action="store_true", help="Clear the existing FAISS index before enrolling"
     )
-    parser.add_argument(
-        "--clear-first", action="store_true",
-        help="Clear the existing FAISS index before enrolling"
-    )
-    parser.add_argument(
-        "--stats", action="store_true",
-        help="Show enrollment statistics after completion"
-    )
+    parser.add_argument("--stats", action="store_true", help="Show enrollment statistics after completion")
 
     args = parser.parse_args()
 
@@ -419,15 +417,17 @@ def _show_stats() -> None:
     try:
         enrollment = FaceEnrollment()
         status = enrollment.status()
-        print(f"\n  FAISS Status:")
+        print("\n  FAISS Status:")
         print(f"    Index type:     {status['index'].get('type', '?')}")
-        if 'M' in status['index']:
+        if "M" in status["index"]:
             print(f"    HNSW M:         {status['index']['M']}")
         print(f"    Total vectors:  {status['total_embeddings']}")
         print(f"    Unique persons: {status['unique_persons']}")
-        print(f"    Persons:        {status['persons'][:10]}..."
-              if len(status['persons']) > 10
-              else f"    Persons:        {status['persons']}")
+        print(
+            f"    Persons:        {status['persons'][:10]}..."
+            if len(status["persons"]) > 10
+            else f"    Persons:        {status['persons']}"
+        )
     except Exception as e:
         logger.warning(f"Cannot show stats: {e}")
 

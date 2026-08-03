@@ -27,6 +27,7 @@ from camera.phone import AndroidWiFiSource, iPhoneWiFiSource
 #  Shared fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture()
 def sample_frame() -> np.ndarray:
     """Return a fake 480x640 BGR frame."""
@@ -36,6 +37,7 @@ def sample_frame() -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════
 #  Shared mock helpers
 # ═══════════════════════════════════════════════════════════════
+
 
 def _mock_cap_opened(ret_read: bool = True, frame=None):
     """Create a mock ``cv2.VideoCapture`` that reports as opened."""
@@ -50,11 +52,12 @@ def _mock_cap_opened(ret_read: bool = True, frame=None):
         mock_cap.read.return_value = (False, None)
 
     def mock_get(prop):
-        if prop == 3:   # CAP_PROP_FRAME_WIDTH
+        if prop == 3:  # CAP_PROP_FRAME_WIDTH
             return 640.0
-        if prop == 4:   # CAP_PROP_FRAME_HEIGHT
+        if prop == 4:  # CAP_PROP_FRAME_HEIGHT
             return 480.0
         return 0.0
+
     mock_cap.get.side_effect = mock_get
     mock_cap.set.return_value = True
     return mock_cap
@@ -84,6 +87,7 @@ def _mock_requests_fail(status_code: int = 404):
 # ═══════════════════════════════════════════════════════════════
 #  Tests: AndroidWiFiSource
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestAndroidWiFiSource:
     """Tests for AndroidWiFiSource — Android IP Webcam over Wi-Fi."""
@@ -367,6 +371,7 @@ class TestAndroidWiFiSource:
 # ═══════════════════════════════════════════════════════════════
 #  Tests: iPhoneWiFiSource
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestiPhoneWiFiSource:
     """Tests for iPhoneWiFiSource — iPhone via EpocCam Wi-Fi."""

@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import time
 from pathlib import Path
 
 # Workaround for PyTorch JIT on Windows (virtual memory fragmentation)
@@ -27,11 +26,11 @@ _project_root = str(Path(__file__).resolve().parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import cv2
-import numpy as np
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
 
-import config.config as cfg
-from app.live_detection import LiveDetection
+import config.config as cfg  # noqa: E402
+from app.live_detection import LiveDetection  # noqa: E402
 
 
 def cmd_webcam(args: argparse.Namespace) -> None:
@@ -91,10 +90,10 @@ def cmd_enroll(args: argparse.Namespace) -> None:
             continue
 
         # Show preview with instructions
-        cv2.putText(frame, f"Enrolling: {name}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(frame, "SPACE = Capture   Q = Quit", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, f"Enrolling: {name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(
+            frame, "SPACE = Capture   Q = Quit", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2
+        )
 
         # Draw YOLO detections
         detections = pipeline.detector.detect(frame)
@@ -114,8 +113,9 @@ def cmd_enroll(args: argparse.Namespace) -> None:
                 print("[WARN] No person detected. Try again.")
                 continue
 
-            largest = max(detections, key=lambda d:
-                          (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1]))
+            largest = max(
+                detections, key=lambda d: (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1])
+            )
             person_crop = pipeline.detector.crop_person(frame, largest["bbox"])
 
             embedding = pipeline.recognizer.extract_embedding(person_crop)
@@ -160,7 +160,7 @@ def cmd_test(args: argparse.Namespace) -> None:
         print(f"--- Processing: {img_path.name} ---")
         img = cv2.imread(str(img_path))
         if img is None:
-            print(f"  [FAIL] Could not read image")
+            print("  [FAIL] Could not read image")
             continue
 
         print(f"  Shape: {img.shape}")
@@ -177,8 +177,7 @@ def cmd_test(args: argparse.Namespace) -> None:
             continue
 
         # Step 2: Face embedding
-        largest = max(detections, key=lambda d:
-                      (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1]))
+        largest = max(detections, key=lambda d: (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1]))
         person_crop = pipeline.detector.crop_person(img, largest["bbox"])
         print(f"  Person crop: {person_crop.shape}")
 
@@ -211,8 +210,10 @@ def cmd_test(args: argparse.Namespace) -> None:
         print(f"[OK] Saved annotated result: {out_path}")
 
     print(f"[INFO] Attendance today: {len(pipeline.attendance.today())} records")
-    print(f"[INFO] Enrolled: {pipeline.enrollment.count()} embeddings / "
-          f"{pipeline.enrollment.unique_count()} persons")
+    print(
+        f"[INFO] Enrolled: {pipeline.enrollment.count()} embeddings / "
+        f"{pipeline.enrollment.unique_count()} persons"
+    )
     print("=" * 60)
     print("[OK] Pipeline test complete")
 
@@ -230,7 +231,7 @@ def cmd_debug(args: argparse.Namespace) -> None:
     print(f"[2/6] OpenCV: {cv2.__version__}")
 
     # Camera test — use the configured/CLI-provided source type
-    print(f"\n[3/6] Camera test:")
+    print("\n[3/6] Camera test:")
     source_type = args.source_type
     camera_url = args.camera_url
     camera_id = args.camera_id
@@ -245,20 +246,20 @@ def cmd_debug(args: argparse.Namespace) -> None:
     cap = LiveDetection.open_camera(camera_id=camera_id, source_type=source_type, camera_url=camera_url)
     if cap is not None:
         ret, frame = cap.read()
-        print(f"  ✅ Camera opened successfully!")
+        print("  ✅ Camera opened successfully!")
         if ret and frame is not None:
             print(f"     Frame shape: {frame.shape}")
             snap_path = cfg.OUTPUTS_DIR / f"camera_test_{source_type}.jpg"
             cv2.imwrite(str(snap_path), frame)
             print(f"     Snapshot saved: {snap_path}")
         else:
-            print(f"  ⚠️  Camera opened but could not read frame")
+            print("  ⚠️  Camera opened but could not read frame")
         cap.release()
     else:
         print(f"  ❌ Could not open {source_type} camera")
 
     # Also do a quick index scan (for diagnostic reference)
-    print(f"\n  --- Quick index scan (DirectShow) ---")
+    print("\n  --- Quick index scan (DirectShow) ---")
     found_indices = []
     for idx in range(5):
         test_cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
@@ -268,16 +269,17 @@ def cmd_debug(args: argparse.Namespace) -> None:
     if found_indices:
         print(f"  Available DirectShow device(s): {found_indices}")
     else:
-        print(f"  No DirectShow cameras found on indices 0-4")
+        print("  No DirectShow cameras found on indices 0-4")
 
     # YOLO model
-    print(f"\n[4/6] YOLO model:")
+    print("\n[4/6] YOLO model:")
     if Path(cfg.YOLO_MODEL_PATH).exists():
         size = Path(cfg.YOLO_MODEL_PATH).stat().st_size
         print(f"  Model: {cfg.YOLO_MODEL_PATH} ({size / 1024 / 1024:.1f} MB)")
         from app.face_detector import FaceDetector
+
         det = FaceDetector()
-        print(f"  YOLO: LOADED")
+        print("  YOLO: LOADED")
         # Quick test with Lena
         if Path("dataset/lena.jpg").exists():
             img = cv2.imread("dataset/lena.jpg")
@@ -287,13 +289,14 @@ def cmd_debug(args: argparse.Namespace) -> None:
         print(f"  [FAIL] Model not found: {cfg.YOLO_MODEL_PATH}")
 
     # InsightFace
-    print(f"\n[5/6] InsightFace:")
+    print("\n[5/6] InsightFace:")
     try:
         from app.recognizer import FaceRecognizer
+
         recognizer = FaceRecognizer()
         print(f"  Model: {recognizer.model_name}")
         print(f"  Embedding dim: {recognizer.embedding_dim()}")
-        print(f"  InsightFace: LOADED")
+        print("  InsightFace: LOADED")
 
         # Test with a simple image
         if Path("dataset/lena.jpg").exists():
@@ -302,30 +305,32 @@ def cmd_debug(args: argparse.Namespace) -> None:
             if emb is not None:
                 print(f"  Test embedding: shape={emb.shape}, norm={np.linalg.norm(emb):.2f}")
             else:
-                print(f"  [WARN] No face detected in lena.jpg")
+                print("  [WARN] No face detected in lena.jpg")
     except Exception as e:
         print(f"  [FAIL] {e}")
 
     # FAISS
-    print(f"\n[6/6] FAISS database:")
+    print("\n[6/6] FAISS database:")
     try:
         from app.enrollment import FaceEnrollment
+
         enrollment = FaceEnrollment()
         print(f"  Embeddings: {enrollment.count()}")
         print(f"  Persons: {enrollment.all_persons()}")
         print(f"  Index path: {cfg.FAISS_INDEX_PATH}")
         print(f"  Metadata path: {cfg.METADATA_PATH}")
-        print(f"  FAISS: LOADED")
+        print("  FAISS: LOADED")
     except Exception as e:
         print(f"  [FAIL] {e}")
 
     # Download Lena if not present
     if not Path("dataset/lena.jpg").exists():
-        print(f"\n[EXTRA] Downloading test image...")
+        print("\n[EXTRA] Downloading test image...")
         import urllib.request
+
         url = "https://raw.githubusercontent.com/opencv/opencv/master/samples/data/lena.jpg"
         urllib.request.urlretrieve(url, "dataset/lena.jpg")
-        print(f"  Downloaded: dataset/lena.jpg")
+        print("  Downloaded: dataset/lena.jpg")
 
     print("\n" + "=" * 60)
     print("Diagnostic complete")
@@ -348,22 +353,32 @@ Examples:
         """,
     )
 
-    parser.add_argument("--camera-id", type=int, default=cfg.CAMERA_ID,
-                        help="Camera device ID (default: 0)")
-    parser.add_argument("--source-type", type=str, default=cfg.CAMERA_SOURCE_TYPE,
-                        choices=["webcam", "usb_auto", "android_usb", "android_wifi",
-                                 "iphone_usb", "iphone_wifi", "ip_camera"],
-                        help="Camera source type (default: from settings)")
-    parser.add_argument("--camera-url", type=str, default=cfg.CAMERA_URL,
-                        help="Camera URL for phone/IP cameras (e.g. http://192.168.1.100:8080/video)")
-    parser.add_argument("--image", type=str, default=None,
-                        help="Path to an image file to process")
-    parser.add_argument("--enroll", type=str, default=None,
-                        help="Enroll a face from webcam with this name")
-    parser.add_argument("--test", action="store_true",
-                        help="Run pipeline test on test images")
-    parser.add_argument("--debug", action="store_true",
-                        help="Run diagnostic checks")
+    parser.add_argument("--camera-id", type=int, default=cfg.CAMERA_ID, help="Camera device ID (default: 0)")
+    parser.add_argument(
+        "--source-type",
+        type=str,
+        default=cfg.CAMERA_SOURCE_TYPE,
+        choices=[
+            "webcam",
+            "usb_auto",
+            "android_usb",
+            "android_wifi",
+            "iphone_usb",
+            "iphone_wifi",
+            "ip_camera",
+        ],
+        help="Camera source type (default: from settings)",
+    )
+    parser.add_argument(
+        "--camera-url",
+        type=str,
+        default=cfg.CAMERA_URL,
+        help="Camera URL for phone/IP cameras (e.g. http://192.168.1.100:8080/video)",
+    )
+    parser.add_argument("--image", type=str, default=None, help="Path to an image file to process")
+    parser.add_argument("--enroll", type=str, default=None, help="Enroll a face from webcam with this name")
+    parser.add_argument("--test", action="store_true", help="Run pipeline test on test images")
+    parser.add_argument("--debug", action="store_true", help="Run diagnostic checks")
 
     args = parser.parse_args()
 

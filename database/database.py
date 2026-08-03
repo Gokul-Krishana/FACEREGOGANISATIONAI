@@ -70,8 +70,7 @@ if DB_TYPE == "postgres":
     # checked-out connections so stale sockets after a DB restart are
     # transparently recycled instead of surfacing as application errors.
     _engine_kwargs: dict = {
-        "pool_pre_ping": os.getenv("DB_POOL_PRE_PING", "true").lower()
-        in ("1", "true", "yes", "on"),
+        "pool_pre_ping": os.getenv("DB_POOL_PRE_PING", "true").lower() in ("1", "true", "yes", "on"),
         "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
         "max_overflow": int(os.getenv("DB_POOL_MAX_OVERFLOW", "10")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
@@ -86,7 +85,7 @@ else:
 
 engine = create_engine(
     DATABASE_URL,
-    echo=False,               # Set to True to see all SQL queries
+    echo=False,  # Set to True to see all SQL queries
     connect_args=connect_args,
     **_engine_kwargs,
 )
@@ -119,8 +118,7 @@ def retry_on_transient(max_attempts: int = 3, base_delay: float = 0.5) -> Callab
                         break
                     delay = base_delay * attempt
                     logger.warning(
-                        "Transient database failure on %s (attempt %d/%d); "
-                        "retrying in %.1fs",
+                        "Transient database failure on %s (attempt %d/%d); retrying in %.1fs",
                         getattr(fn, "__name__", "db_operation"),
                         attempt,
                         max_attempts,

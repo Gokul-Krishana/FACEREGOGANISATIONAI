@@ -7,7 +7,6 @@ disappearance handling, pruning, identity smoothing, and edge cases.
 
 from __future__ import annotations
 
-import time
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -207,14 +206,16 @@ class TestMultiFrameTracker:
 
     def test_score_accumulation(self, tracker):
         """Track should accumulate scores across frames."""
-        det = [{
-            "bbox": (10, 10, 50, 50),
-            "name": "Alice",
-            "arcface_distance": 0.5,
-            "liveness_score": 0.8,
-            "quality_score": 0.9,
-            "amfr_decision": "ACCEPT",
-        }]
+        det = [
+            {
+                "bbox": (10, 10, 50, 50),
+                "name": "Alice",
+                "arcface_distance": 0.5,
+                "liveness_score": 0.8,
+                "quality_score": 0.9,
+                "amfr_decision": "ACCEPT",
+            }
+        ]
         for _ in range(5):
             tracker.update(det, (480, 640))
 
@@ -274,21 +275,25 @@ class TestMultiFrameTracker:
 
     def test_identity_switch_penalty(self, tracker):
         """When identity changes, confidence should be penalised."""
-        det_a = [{
-            "bbox": (10, 10, 50, 50),
-            "name": "Alice",
-            "arcface_distance": 0.5,
-        }]
+        det_a = [
+            {
+                "bbox": (10, 10, 50, 50),
+                "name": "Alice",
+                "arcface_distance": 0.5,
+            }
+        ]
         tracker.update(det_a, (480, 640))
         track = tracker._active_tracks()[0]
         orig_confidence = track.identity_confidence
 
         # Identity switches to Bob
-        det_b = [{
-            "bbox": (10, 10, 50, 50),
-            "name": "Bob",
-            "arcface_distance": 0.6,
-        }]
+        det_b = [
+            {
+                "bbox": (10, 10, 50, 50),
+                "name": "Bob",
+                "arcface_distance": 0.6,
+            }
+        ]
         tracker.update(det_b, (480, 640))
 
         # Confidence should be penalised (halved)
@@ -298,11 +303,13 @@ class TestMultiFrameTracker:
 
     def test_spoof_frame_tracking(self, tracker):
         """Repeated REJECT_SPOOF decisions should increment spoof count."""
-        det = [{
-            "bbox": (10, 10, 50, 50),
-            "name": "Unknown",
-            "amfr_decision": "REJECT_SPOOF",
-        }]
+        det = [
+            {
+                "bbox": (10, 10, 50, 50),
+                "name": "Unknown",
+                "amfr_decision": "REJECT_SPOOF",
+            }
+        ]
         for _ in range(5):
             tracker.update(det, (480, 640))
 

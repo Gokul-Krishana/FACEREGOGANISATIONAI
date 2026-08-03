@@ -54,7 +54,10 @@ _THROTTLE_LOCK = threading.Lock()
 def is_enabled() -> bool:
     """Whether email alerting is configured and switched on."""
     return os.getenv("ALERT_EMAIL_ENABLED", "false").strip().lower() in (
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     )
 
 
@@ -158,6 +161,7 @@ def send_alert(
 
 # ── Semantic helpers ─────────────────────────────────────────────────
 
+
 def send_security_alert(
     description: str,
     details: Optional[Dict] = None,
@@ -166,9 +170,7 @@ def send_security_alert(
     """Send a security alert (spoof attempt, session revocation, etc.)."""
     body = description
     if details:
-        body += "\n\nDetails:\n" + "\n".join(
-            f"  {k}: {v}" for k, v in details.items()
-        )
+        body += "\n\nDetails:\n" + "\n".join(f"  {k}: {v}" for k, v in details.items())
     return send_alert(
         "security",
         "Security Alert — Face Recognition AI",

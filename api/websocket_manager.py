@@ -29,13 +29,12 @@ Usage::
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import List, Optional
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +100,7 @@ class WebSocketManager:
         async with self._lock:
             self._connections.append(client)
 
-        logger.info(
-            "WebSocket connected: %s (total: %d)",
-            client, len(self._connections)
-        )
+        logger.info("WebSocket connected: %s (total: %d)", client, len(self._connections))
 
         # Send recent events buffer to new client
         for event in self._event_buffer:
@@ -127,10 +123,7 @@ class WebSocketManager:
             if client in self._connections:
                 self._connections.remove(client)
 
-        logger.info(
-            "WebSocket disconnected: %s (remaining: %d)",
-            client, len(self._connections)
-        )
+        logger.info("WebSocket disconnected: %s (remaining: %d)", client, len(self._connections))
 
     async def broadcast_event(self, event: dict) -> int:
         """
@@ -149,7 +142,7 @@ class WebSocketManager:
         # Buffer the event
         self._event_buffer.append(event)
         if len(self._event_buffer) > self._max_buffer_size:
-            self._event_buffer = self._event_buffer[-self._max_buffer_size:]
+            self._event_buffer = self._event_buffer[-self._max_buffer_size :]
 
         sent_count = 0
         dead_clients = []
@@ -215,9 +208,7 @@ class WebSocketManager:
                             dead.append(client)
                             continue
                         try:
-                            asyncio.create_task(
-                                client.websocket.send_json({"type": "ping"})
-                            )
+                            asyncio.create_task(client.websocket.send_json({"type": "ping"}))
                         except Exception:
                             dead.append(client)
 

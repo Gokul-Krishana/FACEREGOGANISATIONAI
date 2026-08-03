@@ -7,6 +7,7 @@ Checks:
   4. Database type and today's attendance count
   5. YOLO model presence
 """
+
 from __future__ import annotations
 
 import sys
@@ -16,7 +17,7 @@ ROOT = str(Path(__file__).resolve().parents[2])
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-import cv2
+import cv2  # noqa: E402
 
 print("=" * 60)
 print("  Environment Probe — Real Camera Validation")
@@ -37,8 +38,10 @@ for idx in range(5):
             fps = cap.get(cv2.CAP_PROP_FPS)
             backend = cap.getBackendName()
             found.append({"idx": idx, "frame": ok, "res": (w, h), "fps": fps, "backend": backend})
-            print(f"    Camera #{idx}: {'FRAME OK' if ok else 'opened, no frame'} "
-                  f"{w}x{h} @ {fps:.0f}fps ({backend})")
+            print(
+                f"    Camera #{idx}: {'FRAME OK' if ok else 'opened, no frame'} "
+                f"{w}x{h} @ {fps:.0f}fps ({backend})"
+            )
             cap.release()
         else:
             print(f"    Camera #{idx}: not found")
@@ -52,6 +55,7 @@ print()
 print("[2] FAISS Enrollment")
 try:
     from app.enrollment import FaceEnrollment
+
     enr = FaceEnrollment()
     total = enr.count()
     print(f"    embeddings      : {total}")
@@ -71,9 +75,11 @@ except Exception as e:
 print()
 print("[3] Database")
 try:
-    from database.database import DB_TYPE, DATABASE_URL
+    from database.database import DB_TYPE
+
     print(f"    type            : {DB_TYPE}")
     from services.attendance_service import AttendanceService
+
     stats = AttendanceService.get_statistics()
     print(f"    today records   : {stats.get('today_count', 'n/a')}")
     print(f"    unique today    : {stats.get('unique_today', 'n/a')}")
@@ -86,9 +92,10 @@ print()
 print("[4] Models")
 try:
     import config.config as cfg
+
     yolo = Path(cfg.YOLO_MODEL_PATH)
     if yolo.exists():
-        print(f"    YOLO model      : EXISTS ({yolo.stat().st_size/1e6:.1f} MB)")
+        print(f"    YOLO model      : EXISTS ({yolo.stat().st_size / 1e6:.1f} MB)")
     else:
         print(f"    YOLO model      : MISSING ({cfg.YOLO_MODEL_PATH})")
 except Exception as e:

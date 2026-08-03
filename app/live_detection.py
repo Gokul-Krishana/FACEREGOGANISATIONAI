@@ -58,17 +58,17 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import config.config as cfg
-from app.amfr_engine import AMFREngine, AMFRDecision
-from app.face_detector import FaceDetector
-from app.recognizer import FaceRecognizer
-from app.enrollment import FaceEnrollment
-from app.attendance import AttendanceTracker
-from camera.selector import create_camera
-from camera.base import CameraSource
-from database.database import get_session
-from database.repository import AttendanceRepo, UnknownFaceRepo
-from services.employee_service import EmployeeService
+import config.config as cfg  # noqa: E402
+from app.amfr_engine import AMFREngine, AMFRDecision  # noqa: E402
+from app.face_detector import FaceDetector  # noqa: E402
+from app.recognizer import FaceRecognizer  # noqa: E402
+from app.enrollment import FaceEnrollment  # noqa: E402
+from app.attendance import AttendanceTracker  # noqa: E402
+from camera.selector import create_camera  # noqa: E402
+from camera.base import CameraSource  # noqa: E402
+from database.database import get_session  # noqa: E402
+from database.repository import AttendanceRepo, UnknownFaceRepo  # noqa: E402
+from services.employee_service import EmployeeService  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -193,64 +193,85 @@ class LiveDetection:
                 # ── High confidence + live → mark attendance ──
                 logger.info(
                     "AMFR ACCEPT: %s | risk=%.2f%% | liveness=%.2f%%",
-                    name, risk_score * 100, liveness_score * 100,
+                    name,
+                    risk_score * 100,
+                    liveness_score * 100,
                 )
                 if name not in self._marked_this_session:
                     self.attendance.mark(name, risk_score)
                     self._log_attendance_db(name, risk_score)
                     self._marked_this_session.add(name)
-                recognised.append({
-                    "bbox": bbox,
-                    "name": name,
-                    "confidence": risk_score,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                })
+                recognised.append(
+                    {
+                        "bbox": bbox,
+                        "name": name,
+                        "confidence": risk_score,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                    }
+                )
 
             elif decision == AMFRDecision.BORDERLINE.value:
                 # ── Uncertain — needs more frames ─────────────
-                logger.info("AMFR BORDERLINE: %s? | risk=%.2f%% | collecting more frames", name, risk_score * 100)
-                recognised.append({
-                    "bbox": bbox,
-                    "name": f"{name}?",
-                    "confidence": risk_score,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                })
+                logger.info(
+                    "AMFR BORDERLINE: %s? | risk=%.2f%% | collecting more frames", name, risk_score * 100
+                )
+                recognised.append(
+                    {
+                        "bbox": bbox,
+                        "name": f"{name}?",
+                        "confidence": risk_score,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                    }
+                )
 
             elif decision == AMFRDecision.REJECT_SPOOF.value:
                 # ── Spoof detected! ───────────────────────────
-                logger.warning("AMFR SPOOF REJECTED | liveness=%.2f%% | risk=%.2f%%", liveness_score * 100, risk_score * 100)
-                recognised.append({
-                    "bbox": bbox,
-                    "name": "SPOOF",
-                    "confidence": 0.0,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                })
+                logger.warning(
+                    "AMFR SPOOF REJECTED | liveness=%.2f%% | risk=%.2f%%",
+                    liveness_score * 100,
+                    risk_score * 100,
+                )
+                recognised.append(
+                    {
+                        "bbox": bbox,
+                        "name": "SPOOF",
+                        "confidence": 0.0,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                    }
+                )
 
             else:  # LOW_CONFIDENCE / No Face
                 # ── Unknown person ─────────────────────────────
-                logger.info("AMFR UNKNOWN | risk=%.2f%% | quality=%.2f%%", risk_score * 100, quality_score * 100)
+                logger.info(
+                    "AMFR UNKNOWN | risk=%.2f%% | quality=%.2f%%", risk_score * 100, quality_score * 100
+                )
                 person_crop = self.detector.crop_person(frame, bbox)
-                if person_crop.size > 0 and (time.time() - getattr(self, '_last_unknown_save', 0)) > self._unknown_save_cooldown:
+                if (
+                    person_crop.size > 0
+                    and (time.time() - getattr(self, "_last_unknown_save", 0)) > self._unknown_save_cooldown
+                ):
                     self._save_unknown_face(person_crop)
                     self._last_unknown_save = time.time()
-                recognised.append({
-                    "bbox": bbox,
-                    "name": "Unknown",
-                    "confidence": risk_score,
-                    "amfr_decision": decision,
-                    "risk_score": risk_score,
-                    "liveness_score": liveness_score,
-                    "quality_score": quality_score,
-                })
+                recognised.append(
+                    {
+                        "bbox": bbox,
+                        "name": "Unknown",
+                        "confidence": risk_score,
+                        "amfr_decision": decision,
+                        "risk_score": risk_score,
+                        "liveness_score": liveness_score,
+                        "quality_score": quality_score,
+                    }
+                )
 
         self._last_recognised = recognised
         return self._draw_overlay(frame, recognised)
@@ -258,8 +279,9 @@ class LiveDetection:
     # ── Shared Camera Helpers ─────────────────────────────────
 
     @staticmethod
-    def open_camera(camera_id: int = cfg.CAMERA_ID, source_type: Optional[str] = None,
-                    camera_url: Optional[str] = None) -> Optional[CameraSource]:
+    def open_camera(
+        camera_id: int = cfg.CAMERA_ID, source_type: Optional[str] = None, camera_url: Optional[str] = None
+    ) -> Optional[CameraSource]:
         """Open a camera via the unified CameraSource factory.
 
         All camera types (webcam, usb_auto, android_*, iphone_*, ip_camera)
@@ -279,9 +301,13 @@ class LiveDetection:
         """
         source_type = source_type or cfg.CAMERA_SOURCE_TYPE
 
-        logger = __import__('logging').getLogger(__name__)
-        logger.info("Opening camera source: %s (device=%s, url=%s)",
-                     source_type, camera_id, camera_url or cfg.CAMERA_URL)
+        logger = __import__("logging").getLogger(__name__)
+        logger.info(
+            "Opening camera source: %s (device=%s, url=%s)",
+            source_type,
+            camera_id,
+            camera_url or cfg.CAMERA_URL,
+        )
 
         kwargs = {
             "device_id": camera_id,
@@ -295,7 +321,7 @@ class LiveDetection:
         if cam.open():
             cam.set_resolution(640, 480)
             info = cam.info()
-            logger.info("Camera connected: %s (res=%s)", cam.name, info.get('resolution', 'N/A'))
+            logger.info("Camera connected: %s (res=%s)", cam.name, info.get("resolution", "N/A"))
             return cam
 
         logger.error("Could not open %s camera", source_type)
@@ -303,8 +329,12 @@ class LiveDetection:
 
     # ── Webcam Loop ───────────────────────────────────────────
 
-    def run(self, camera_id: int = cfg.CAMERA_ID, source_type: Optional[str] = None,
-            camera_url: Optional[str] = None) -> None:
+    def run(
+        self,
+        camera_id: int = cfg.CAMERA_ID,
+        source_type: Optional[str] = None,
+        camera_url: Optional[str] = None,
+    ) -> None:
         """Open webcam and run live recognition.
 
         Args:
@@ -330,7 +360,7 @@ class LiveDetection:
                 logger.warning("Failed to read frame from camera")
                 break
 
-            frame = self.process_frame(frame)
+            frame = self.process_frame(frame)  # type: ignore[arg-type]
             cv2.imshow("Face Recognition AI - Live", frame)
 
             key = cv2.waitKey(1) & 0xFF
@@ -363,8 +393,7 @@ class LiveDetection:
             raise FileNotFoundError(f"Could not read image: {image_path}")
         return self.process_frame(frame)
 
-    def process_video(self, video_path: str | Path, output_path: str | Path | None = None
-                      ) -> None:
+    def process_video(self, video_path: str | Path, output_path: str | Path | None = None) -> None:
         """Run the pipeline on a video file (optionally saving the result).
 
         Args:
@@ -384,7 +413,7 @@ class LiveDetection:
         if output_path:
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
             writer = cv2.VideoWriter(str(output_path), fourcc, fps, (w, h))
 
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -447,7 +476,7 @@ class LiveDetection:
 
     def status(self) -> dict:
         """Return a snapshot of the current system state including AMFR."""
-        amfr_state = self.amfr.status() if hasattr(self, 'amfr') and self.amfr else {}
+        amfr_state = self.amfr.status() if hasattr(self, "amfr") and self.amfr else {}
         return {
             "fps": round(self._fps, 1),
             "frame_count": self._frame_count,
@@ -464,7 +493,7 @@ class LiveDetection:
         for item in recognised:
             x1, y1, x2, y2 = item["bbox"]
             name = item["name"]
-            conf = item["confidence"]
+            _conf = item["confidence"]
             decision = item.get("amfr_decision", "")
             liveness = item.get("liveness_score", 0.0)
             risk = item.get("risk_score", 0.0)
@@ -474,7 +503,7 @@ class LiveDetection:
                 color = (0, 200, 0)  # Green
                 if name not in self._employee_cache:
                     emp = EmployeeService.get_by_name(name) if name else None
-                    self._employee_cache[name] = emp.employee_id if emp else None
+                    self._employee_cache[name] = emp.employee_id if emp else None  # type: ignore[assignment]
                 emp_id = self._employee_cache.get(name)
                 attendance_str = "[OK] Attendance Marked" if name in self._marked_this_session else ""
                 card_lines = [
@@ -483,7 +512,7 @@ class LiveDetection:
                     f"Risk: {risk:.1%}  Live: {liveness:.1%}",
                     attendance_str,
                 ]
-                card_lines = [l for l in card_lines if l]
+                card_lines = [line for line in card_lines if line]
             elif decision == AMFRDecision.BORDERLINE.value:
                 color = (0, 200, 200)  # Yellow
                 card_lines = [f"{name} (borderline)", f"Risk: {risk:.1%}", "Collecting more frames..."]
@@ -503,7 +532,7 @@ class LiveDetection:
         # ── HUD ───────────────────────────────────────────────
         enrolled = self.enrollment.count()
         today_count = len(self.attendance.today())
-        amfr_tracks = len(self.amfr.get_all_tracks()) if hasattr(self, 'amfr') and self.amfr else 0
+        amfr_tracks = len(self.amfr.get_all_tracks()) if hasattr(self, "amfr") and self.amfr else 0
         hud_lines = [
             f"FPS: {self._fps:.1f}",
             f"Enrolled: {enrolled}",
@@ -513,13 +542,18 @@ class LiveDetection:
         ]
         for i, line in enumerate(hud_lines):
             y = 25 + i * 22
-            cv2.putText(frame, line, (10, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+            cv2.putText(frame, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
 
         return frame
 
-    def _draw_info_card(self, frame: np.ndarray, bbox_left: int, bbox_bottom: int,
-                       lines: List[str], color: Tuple[int, int, int]) -> None:
+    def _draw_info_card(
+        self,
+        frame: np.ndarray,
+        bbox_left: int,
+        bbox_bottom: int,
+        lines: List[str],
+        color: Tuple[int, int, int],
+    ) -> None:
         """Draw a rich dark-themed info card below a detection bounding box.
 
         Card layout (example for a known person)::
@@ -571,17 +605,11 @@ class LiveDetection:
 
         # ── Draw card background (dark semi-transparent) ────
         overlay = frame.copy()
-        cv2.rectangle(overlay,
-                      (card_x, card_y),
-                      (card_x + card_w, card_y + card_h),
-                      (25, 25, 25), -1)
+        cv2.rectangle(overlay, (card_x, card_y), (card_x + card_w, card_y + card_h), (25, 25, 25), -1)
         cv2.addWeighted(overlay, 0.88, frame, 0.12, 0, frame)
 
         # ── Draw colored accent border ─────────────────────
-        cv2.rectangle(frame,
-                      (card_x, card_y),
-                      (card_x + card_w, card_y + card_h),
-                      color, 1)
+        cv2.rectangle(frame, (card_x, card_y), (card_x + card_w, card_y + card_h), color, 1)
 
         # ── Draw the colored indicator circle ──────────────
         circle_cx = card_x + padding_x + indicator_r
@@ -592,8 +620,7 @@ class LiveDetection:
         text_x = card_x + padding_x + indicator_r * 2 + 8
         for i, line in enumerate(lines):
             text_y = card_y + padding_y + (i + 1) * line_height - 6
-            cv2.putText(frame, line, (text_x, text_y),
-                        font, font_scale, (255, 255, 255), thickness)
+            cv2.putText(frame, line, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
 
     def _log_attendance_db(self, name: str, confidence: float) -> None:
         """Log an attendance event to the SQLite database.
@@ -612,13 +639,13 @@ class LiveDetection:
                 return  # no DB record for this person
             with get_session() as session:
                 # Avoid duplicates: check if already marked today
-                if not AttendanceRepo.is_marked_today(session, emp.id):
+                if not AttendanceRepo.is_marked_today(session, emp.id):  # type: ignore[arg-type]
                     AttendanceRepo.create(
                         session,
-                        employee_id=emp.id,
+                        employee_id=emp.id,  # type: ignore[arg-type]
                         confidence=round(confidence, 4),
                     )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to log attendance to DB")
 
     def _save_unknown_face(self, face_img: np.ndarray) -> None:
@@ -657,7 +684,7 @@ class LiveDetection:
                     image_path=str(save_path),
                     confidence=0.0,
                 )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to save unknown face")
 
     def _interactive_enroll(self, frame: np.ndarray) -> None:
@@ -668,7 +695,7 @@ class LiveDetection:
             return
 
         largest = self.detector.get_largest_detection(detections)
-        person_crop = self.detector.crop_person(frame, largest["bbox"])
+        person_crop = self.detector.crop_person(frame, largest["bbox"])  # type: ignore[index]
         embedding = self.recognizer.extract_embedding(person_crop)
         if embedding is None:
             logger.warning("No face found in the detected person.")
@@ -677,7 +704,9 @@ class LiveDetection:
         # Check if already enrolled
         matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
         if matches:
-            logger.warning("Face already enrolled as: %s (conf=%.2f)", matches[0]["name"], matches[0]["confidence"])
+            logger.warning(
+                "Face already enrolled as: %s (conf=%.2f)", matches[0]["name"], matches[0]["confidence"]
+            )
             return
 
         # In a real GUI you'd pop an input dialog; here we use the terminal

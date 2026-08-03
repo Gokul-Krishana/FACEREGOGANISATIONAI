@@ -22,7 +22,6 @@ Layout::
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from pathlib import Path
 import sys
 
@@ -30,12 +29,11 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import pandas as pd
+import streamlit as st  # noqa: E402
 
-from services.unknown_face_service import UnknownFaceService
-from database.database import get_session
-from database.repository import CameraRepo
+from services.unknown_face_service import UnknownFaceService  # noqa: E402
+from database.database import get_session  # noqa: E402
+from database.repository import CameraRepo  # noqa: E402
 
 st.set_page_config(page_title="Unknown Faces", page_icon="🔴", layout="wide")
 
@@ -89,9 +87,7 @@ with st.expander("🔍 Search & Filter", expanded=True):
     with fcol2:
         filter_end = st.date_input("To", value=None)
     with fcol3:
-        filter_reviewed = st.selectbox(
-            "Status", ["All", "Not Reviewed", "Reviewed", "Converted"]
-        )
+        filter_reviewed = st.selectbox("Status", ["All", "Not Reviewed", "Reviewed", "Converted"])
     with fcol4:
         filter_limit = st.number_input("Max Results", min_value=10, max_value=500, value=50, step=10)
 
@@ -126,6 +122,7 @@ except Exception as _exc:
     faces = []
 
 # ── Helper Functions (defined before use for Streamlit rerun safety) ──
+
 
 @st.cache_data(ttl=60)
 def _get_camera_name(camera_id):
@@ -246,7 +243,9 @@ if "register_face_id" in st.session_state and st.session_state["register_face_id
         emp_dept = st.text_input("Department", placeholder="e.g. Engineering")
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            submitted = st.form_submit_button("✅ Register Employee", type="primary", use_container_width=True)
+            submitted = st.form_submit_button(
+                "✅ Register Employee", type="primary", use_container_width=True
+            )
         with col_s2:
             cancelled = st.form_submit_button("Cancel", use_container_width=True)
 
@@ -262,7 +261,9 @@ if "register_face_id" in st.session_state and st.session_state["register_face_id
                         department=emp_dept.strip() or None,
                     )
                 if success:
-                    st.success(f"✅ {emp_name} ({emp_id}) has been enrolled and will be recognized automatically!")
+                    st.success(
+                        f"✅ {emp_name} ({emp_id}) has been enrolled and will be recognized automatically!"
+                    )
                     # Clear session state
                     del st.session_state["register_face_id"]
                     del st.session_state["register_image_path"]

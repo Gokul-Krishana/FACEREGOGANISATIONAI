@@ -48,7 +48,7 @@ except Exception:
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 BACKUPS_DIR = ROOT / "backups"
 EMBEDDINGS_DIR = cfg.EMBEDDINGS_DIR
@@ -77,9 +77,7 @@ def find_pg_bin() -> Path:
     for cand in PG_BIN_CANDIDATES:
         if (Path(cand) / "pg_dump.exe").exists() or (Path(cand) / "pg_dump").exists():
             return Path(cand)
-    raise FileNotFoundError(
-        "pg_dump not found. Install PostgreSQL or add its bin directory to PATH."
-    )
+    raise FileNotFoundError("pg_dump not found. Install PostgreSQL or add its bin directory to PATH.")
 
 
 def sha256(path: Path) -> str:
@@ -109,9 +107,14 @@ def extract_credentials(url: str) -> tuple[str, str, str, str, str]:
 def preflight_check(url: str) -> None:
     """Verify PostgreSQL is reachable before dumping."""
     import psycopg2
+
     host, port, user, password, dbname = extract_credentials(url)
     conn = psycopg2.connect(
-        host=host, port=port, user=user, password=password, dbname=dbname,
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        dbname=dbname,
         connect_timeout=5,
     )
     conn.close()
@@ -119,10 +122,10 @@ def preflight_check(url: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Backup PostgreSQL + FAISS + metadata")
-    parser.add_argument("--output", default=str(BACKUPS_DIR),
-                        help="Base output directory (default: backups/)")
-    parser.add_argument("--url", default=DEFAULT_URL,
-                        help="PostgreSQL URL to dump")
+    parser.add_argument(
+        "--output", default=str(BACKUPS_DIR), help="Base output directory (default: backups/)"
+    )
+    parser.add_argument("--url", default=DEFAULT_URL, help="PostgreSQL URL to dump")
     args = parser.parse_args()
 
     url = args.url
@@ -164,9 +167,17 @@ def main() -> int:
             env["PGPASSWORD"] = password
         cmd = [
             str(pg_bin / "pg_dump"),
-            "-h", host, "-p", port, "-U", user,
-            "--no-owner", "--no-privileges",
-            "-f", str(dump_path), dbname,
+            "-h",
+            host,
+            "-p",
+            port,
+            "-U",
+            user,
+            "--no-owner",
+            "--no-privileges",
+            "-f",
+            str(dump_path),
+            dbname,
         ]
         print("\n[1/3] Dumping PostgreSQL...")
         result = subprocess.run(cmd, env=env, capture_output=True, text=True)
@@ -212,8 +223,10 @@ def main() -> int:
 
         print("\n" + "=" * 64)
         print(f"  Backup complete: {backup_dir}")
-        print("  Restore with: python scripts/restore.py --backup-dir "
-              f"{backup_dir.name} --url postgresql://{user}:***@{host}:{port}/{dbname}")
+        print(
+            "  Restore with: python scripts/restore.py --backup-dir "
+            f"{backup_dir.name} --url postgresql://{user}:***@{host}:{port}/{dbname}"
+        )
         print("=" * 64)
         return 0
     except Exception:

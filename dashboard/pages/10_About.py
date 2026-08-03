@@ -20,20 +20,21 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
+import streamlit as st  # noqa: E402
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
 
 st.set_page_config(page_title="About", page_icon="ℹ️", layout="wide")
 
 
 # ── Helper ─────────────────────────────────────────────────────
 
+
 def _pill(label: str, items: list[str]) -> None:
     """Render a label with clickable-looking pill badges."""
     badges = " ".join(
         f'<span style="display: inline-block; background: #2d2d2d; '
-        f'border: 1px solid #555; border-radius: 12px; padding: 2px 10px; '
+        f"border: 1px solid #555; border-radius: 12px; padding: 2px 10px; "
         f'margin: 2px 4px 2px 0; font-size: 0.85em;">{item}</span>'
         for item in items
     )
@@ -179,6 +180,7 @@ with right_col:
 
     ver_df_data = [{"Component": k, "Version": v} for k, v in version_info.items()]
     import pandas as pd
+
     st.dataframe(
         pd.DataFrame(ver_df_data),
         use_container_width=True,
@@ -287,6 +289,5 @@ with credit_col3:
 
 st.divider()
 st.caption(
-    "© 2026 Face Recognition AI. Built with ❤️ using open-source software. "
-    f"Configuration: {cfg.SETTINGS_PATH}"
+    f"© 2026 Face Recognition AI. Built with ❤️ using open-source software. Configuration: {cfg.SETTINGS_PATH}"
 )

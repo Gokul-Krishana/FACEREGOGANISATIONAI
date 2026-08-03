@@ -26,16 +26,17 @@ if _project_root not in sys.path:
 
 # ── Module-level imports used by TestPipeline ───────────────────
 # These must be at module level so @patch('test_repair.create_camera') works
-import config.config as cfg
-from app.amfr_engine import AMFRDecision
-from services.recognition_service import RecognitionService
-from camera.base import CameraSource
-from camera.selector import create_camera as _real_create_camera
-from dashboard.latency_logger import LatencyLogger
+import config.config as cfg  # noqa: E402
+from app.amfr_engine import AMFRDecision  # noqa: E402
+from services.recognition_service import RecognitionService  # noqa: E402
+from camera.base import CameraSource  # noqa: E402
+from camera.selector import create_camera as _real_create_camera  # noqa: E402
+from dashboard.latency_logger import LatencyLogger  # noqa: E402
 
 # ═══════════════════════════════════════════════════════════════
 #  TestPipeline — minimal replication of LiveRecognitionPipeline
 # ═══════════════════════════════════════════════════════════════
+
 
 class MockSessionState:
     """Mock Streamlit session state supporting both attribute and dict access.
@@ -48,58 +49,58 @@ class MockSessionState:
     """
 
     def __init__(self) -> None:
-        object.__setattr__(self, '_data', {})
+        object.__setattr__(self, "_data", {})
 
     # ── attribute-based access ─────────────────────────────────
 
     def __getattr__(self, name: str):
-        if name.startswith('_'):
+        if name.startswith("_"):
             raise AttributeError(name)
-        d = object.__getattribute__(self, '_data')
+        d = object.__getattribute__(self, "_data")
         if name in d:
             return d[name]
         return None
 
     def __setattr__(self, name: str, value) -> None:
-        if name.startswith('_'):
+        if name.startswith("_"):
             object.__setattr__(self, name, value)
         else:
-            d = object.__getattribute__(self, '_data')
+            d = object.__getattribute__(self, "_data")
             d[name] = value
 
     def __delattr__(self, name: str) -> None:
-        if name in object.__getattribute__(self, '_data'):
-            del object.__getattribute__(self, '_data')[name]
+        if name in object.__getattribute__(self, "_data"):
+            del object.__getattribute__(self, "_data")[name]
 
     # ── item-based access ──────────────────────────────────────
 
     def __getitem__(self, key: str):
-        return object.__getattribute__(self, '_data')[key]
+        return object.__getattribute__(self, "_data")[key]
 
     def __setitem__(self, key: str, value) -> None:
-        object.__getattribute__(self, '_data')[key] = value
+        object.__getattribute__(self, "_data")[key] = value
 
     def __delitem__(self, key: str) -> None:
-        del object.__getattribute__(self, '_data')[key]
+        del object.__getattribute__(self, "_data")[key]
 
     def __contains__(self, key: object) -> bool:
-        return key in object.__getattribute__(self, '_data')
+        return key in object.__getattribute__(self, "_data")
 
     def get(self, key: str, default=None):
         """Dict-style .get() method."""
-        return object.__getattribute__(self, '_data').get(key, default)
+        return object.__getattribute__(self, "_data").get(key, default)
 
     def keys(self):
-        return object.__getattribute__(self, '_data').keys()
+        return object.__getattribute__(self, "_data").keys()
 
     def values(self):
-        return object.__getattribute__(self, '_data').values()
+        return object.__getattribute__(self, "_data").values()
 
     def items(self):
-        return object.__getattribute__(self, '_data').items()
+        return object.__getattribute__(self, "_data").items()
 
     def __len__(self) -> int:
-        return len(object.__getattribute__(self, '_data'))
+        return len(object.__getattribute__(self, "_data"))
 
     def __repr__(self) -> str:
         return f"MockSessionState({object.__getattribute__(self, '_data')})"
@@ -116,9 +117,7 @@ class _TestPipeline:
         self._service = MagicMock()
         self._service.enrollment.count.return_value = 42
         self._service.enrollment.unique_count.return_value = 10
-        self._service.process_frame_detailed.return_value = (
-            np.zeros((480, 640, 3), dtype=np.uint8), []
-        )
+        self._service.process_frame_detailed.return_value = (np.zeros((480, 640, 3), dtype=np.uint8), [])
         self._service.amfr = MagicMock()
         self._service.status.return_value = {"enrolled": 42, "amfr": {}}
         self._thread: threading.Thread | None = None
@@ -161,7 +160,9 @@ class _TestPipeline:
         self._status = "CONNECTING"
         self._reconnect_attempts = 0
         self._thread = threading.Thread(
-            target=self._capture_loop, name="TestPipeline", daemon=True,
+            target=self._capture_loop,
+            name="TestPipeline",
+            daemon=True,
         )
         self._thread.start()
         return True
@@ -305,11 +306,9 @@ class _TestPipeline:
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
             cv2.rectangle(frame, (x1, max(y1 - 32, 0)), (x1 + tw + 10, y1), color, -1)
-            cv2.putText(frame, label, (x1 + 5, y1 - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, label, (x1 + 5, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
             for i, sub in enumerate(sublines):
-                cv2.putText(frame, sub, (x1, y2 + 20 + i * 18),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+                cv2.putText(frame, sub, (x1, y2 + 20 + i * 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
         return frame
 
     # ── Thread-safe accessors ────────────────────────────────
@@ -373,13 +372,23 @@ class _TestPipeline:
 #  Helpers
 # ═══════════════════════════════════════════════════════════════
 
+
 def _det(**overrides) -> dict:
     """Create a detection result dict with sensible defaults."""
     d = dict(
-        bbox=(10, 10, 100, 100), name="EMP001", emp_name="Gokul",
-        emp_id=1, confidence=0.95, is_known=True, attendance_marked=False,
-        amfr_decision="ACCEPT", risk_score=0.95, liveness_score=0.92,
-        quality_score=0.88, arcface_distance=0.45, track_id="T000001-abc123",
+        bbox=(10, 10, 100, 100),
+        name="EMP001",
+        emp_name="Gokul",
+        emp_id=1,
+        confidence=0.95,
+        is_known=True,
+        attendance_marked=False,
+        amfr_decision="ACCEPT",
+        risk_score=0.95,
+        liveness_score=0.92,
+        quality_score=0.88,
+        arcface_distance=0.45,
+        track_id="T000001-abc123",
     )
     d.update(overrides)
     return d
@@ -388,6 +397,7 @@ def _det(**overrides) -> dict:
 # ═══════════════════════════════════════════════════════════════
 #  Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture()
 def pipeline():
@@ -406,8 +416,12 @@ def mock_camera():
     cam.get_resolution.return_value = (640, 480)
     cam.name = "Mock Camera"
     cam.source_type = "webcam"
-    cam.info.return_value = {"source_type": "webcam", "device_id": 0,
-                             "resolution": [640, 480], "is_opened": True}
+    cam.info.return_value = {
+        "source_type": "webcam",
+        "device_id": 0,
+        "resolution": [640, 480],
+        "is_opened": True,
+    }
     return cam
 
 
@@ -427,6 +441,7 @@ def mock_camera_disconnects():
         yield (True, np.zeros((480, 640, 3), dtype=np.uint8))
         while True:
             yield (False, None)
+
     cam = MagicMock(spec=CameraSource)
     cam.open.return_value = True
     cam.is_opened.return_value = True
@@ -445,15 +460,15 @@ def empty_frame():
 #  Pipeline Lifecycle Tests
 # ═══════════════════════════════════════════════════════════════
 
-class TestLifecycle:
 
+class TestLifecycle:
     def test_initial_state(self, pipeline):
         assert pipeline.status == "STOPPED"
         assert pipeline.is_running is False
         assert pipeline.error is None
         assert pipeline.resolution == "N/A"
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_start_success(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         assert pipeline.start() is True
@@ -462,19 +477,19 @@ class TestLifecycle:
         mock_camera.set_resolution.assert_called_once_with(640, 480)
         pipeline.stop()
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_start_fails_when_create_returns_none(self, mock_create, pipeline):
         mock_create.return_value = None
         assert pipeline.start() is False
         assert pipeline.status == "ERROR"
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_start_fails_when_open_fails(self, mock_create, pipeline, mock_camera_fail_open):
         mock_create.return_value = mock_camera_fail_open
         assert pipeline.start() is False
         assert pipeline.status == "ERROR"
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_stop_releases_camera(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         pipeline.start()
@@ -487,7 +502,7 @@ class TestLifecycle:
         pipeline.stop()
         assert pipeline.status == "STOPPED"
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_start_stop_start_cycle(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         assert pipeline.start() is True
@@ -501,7 +516,7 @@ class TestLifecycle:
         assert pipeline.start() is True
         pipeline.stop()
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_stop_clears_results(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         pipeline.start()
@@ -516,8 +531,8 @@ class TestLifecycle:
 #  Overlay Drawing Tests
 # ═══════════════════════════════════════════════════════════════
 
-class TestOverlays:
 
+class TestOverlays:
     def test_no_results(self, pipeline, empty_frame):
         a = pipeline._draw_overlays(empty_frame, [])
         np.testing.assert_array_equal(a, empty_frame)
@@ -542,10 +557,18 @@ class TestOverlays:
         assert px[1] > 100 and px[2] > 100, f"Expected yellow, got BGR={px}"
 
     def test_unknown_grey(self, pipeline, empty_frame):
-        a = pipeline._draw_overlays(empty_frame, [_det(
-            amfr_decision="LOW_CONFIDENCE", is_known=False,
-            name="Unknown", emp_name="Unknown", emp_id=None,
-        )])
+        a = pipeline._draw_overlays(
+            empty_frame,
+            [
+                _det(
+                    amfr_decision="LOW_CONFIDENCE",
+                    is_known=False,
+                    name="Unknown",
+                    emp_name="Unknown",
+                    emp_id=None,
+                )
+            ],
+        )
         px = tuple(a[10, 10])
         assert max(px) > 100 and (max(px) - min(px)) < 50, f"Expected grey, got BGR={px}"
 
@@ -560,12 +583,29 @@ class TestOverlays:
     def test_multiple_results(self, pipeline, empty_frame):
         results = [
             _det(bbox=(10, 10, 100, 100), amfr_decision="ACCEPT"),
-            _det(bbox=(200, 200, 350, 350), amfr_decision="REJECT_SPOOF",
-                 name="SPOOF", emp_name="SPOOF", emp_id=None, is_known=False),
-            _det(bbox=(400, 100, 550, 250), amfr_decision="BORDERLINE",
-                 name="EMP003", emp_name="Divya", is_known=False),
-            _det(bbox=(50, 300, 150, 450), amfr_decision="LOW_CONFIDENCE",
-                 name="Unknown", emp_name="Unknown", emp_id=None, is_known=False),
+            _det(
+                bbox=(200, 200, 350, 350),
+                amfr_decision="REJECT_SPOOF",
+                name="SPOOF",
+                emp_name="SPOOF",
+                emp_id=None,
+                is_known=False,
+            ),
+            _det(
+                bbox=(400, 100, 550, 250),
+                amfr_decision="BORDERLINE",
+                name="EMP003",
+                emp_name="Divya",
+                is_known=False,
+            ),
+            _det(
+                bbox=(50, 300, 150, 450),
+                amfr_decision="LOW_CONFIDENCE",
+                name="Unknown",
+                emp_name="Unknown",
+                emp_id=None,
+                is_known=False,
+            ),
         ]
         a = pipeline._draw_overlays(empty_frame.copy(), results)
         assert a.shape == (480, 640, 3)
@@ -606,9 +646,9 @@ class TestOverlays:
 #  Camera Disconnect Tests
 # ═══════════════════════════════════════════════════════════════
 
-class TestDisconnect:
 
-    @patch('tests.test_repair._real_create_camera')
+class TestDisconnect:
+    @patch("tests.test_repair._real_create_camera")
     def test_disconnect_changes_status(self, mock_create, pipeline, mock_camera_disconnects):
         mock_create.return_value = mock_camera_disconnects
         pipeline.start()
@@ -616,7 +656,7 @@ class TestDisconnect:
         pipeline.stop()
         assert pipeline.status in ("DISCONNECTED", "RECONNECTING", "STOPPED")
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_no_crash_after_disconnect(self, mock_create, pipeline, mock_camera_disconnects):
         mock_create.return_value = mock_camera_disconnects
         pipeline.start()
@@ -629,9 +669,9 @@ class TestDisconnect:
 #  Thread Safety Tests
 # ═══════════════════════════════════════════════════════════════
 
-class TestThreadSafety:
 
-    @patch('tests.test_repair._real_create_camera')
+class TestThreadSafety:
+    @patch("tests.test_repair._real_create_camera")
     def test_latest_thread_safe(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         pipeline.start()
@@ -640,7 +680,7 @@ class TestThreadSafety:
         assert isinstance(results, list)
         pipeline.stop()
 
-    @patch('tests.test_repair._real_create_camera')
+    @patch("tests.test_repair._real_create_camera")
     def test_properties_thread_safe(self, mock_create, pipeline, mock_camera):
         mock_create.return_value = mock_camera
         pipeline.start()
@@ -656,6 +696,7 @@ class TestThreadSafety:
 # ═══════════════════════════════════════════════════════════════
 #  These test the real RecognitionService._maybe_mark_attendance
 #  with all AI sub-components mocked to avoid model loading.
+
 
 @pytest.fixture()
 def mock_recog_service():
@@ -673,50 +714,44 @@ def mock_recog_service():
 
 
 class TestAttendanceDedup:
-
     def test_first_call_returns_true(self, mock_recog_service):
-        with patch('services.recognition_service.AttendanceService.mark',
-                   return_value=True) as mk:
+        with patch("services.recognition_service.AttendanceService.mark", return_value=True) as mk:
             r = mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95)
         assert r is True
         mk.assert_called_once()
 
     def test_second_call_returns_false(self, mock_recog_service):
-        with patch('services.recognition_service.AttendanceService.mark',
-                   return_value=True) as mk:
+        with patch("services.recognition_service.AttendanceService.mark", return_value=True) as mk:
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is True
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is False
         mk.assert_called_once()
 
     def test_different_names_independent(self, mock_recog_service):
-        with patch('services.recognition_service.AttendanceService.mark',
-                   return_value=True) as mk:
+        with patch("services.recognition_service.AttendanceService.mark", return_value=True) as mk:
             assert mock_recog_service._maybe_mark_attendance("A", 1, 0.95) is True
             assert mock_recog_service._maybe_mark_attendance("B", 2, 0.88) is True
         assert mk.call_count == 2
 
     def test_no_employee_id_skips(self, mock_recog_service):
-        with patch('services.recognition_service.AttendanceService.mark') as mk:
+        with patch("services.recognition_service.AttendanceService.mark") as mk:
             assert mock_recog_service._maybe_mark_attendance("A", None, 0.95) is False
         mk.assert_not_called()
 
     def test_session_cache_on_db_already_marked(self, mock_recog_service):
-        with patch('services.recognition_service.AttendanceService.mark',
-                   return_value=False) as mk:
+        with patch("services.recognition_service.AttendanceService.mark", return_value=False) as mk:
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is False
         assert "EMP001" in mock_recog_service._marked_this_session
         mk.assert_called_once()
 
     def test_no_db_call_when_in_session(self, mock_recog_service):
         mock_recog_service._marked_this_session.add("EMP001")
-        with patch('services.recognition_service.AttendanceService.mark') as mk:
+        with patch("services.recognition_service.AttendanceService.mark") as mk:
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is False
         mk.assert_not_called()
 
     def test_cooldown_prevents_repeat_track(self, mock_recog_service):
         """Cooldown in _marked_this_session prevents repeated marks."""
-        with patch('services.recognition_service.AttendanceService.mark',
-                   return_value=True) as mk:
+        with patch("services.recognition_service.AttendanceService.mark", return_value=True) as mk:
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is True
             assert mock_recog_service._maybe_mark_attendance("EMP001", 1, 0.95) is False
         # Only one DB call for the same employee
@@ -728,6 +763,7 @@ class TestAttendanceDedup:
 # ═══════════════════════════════════════════════════════════════
 #  Verify that the critical bug-fix fields are present in the
 #  result dicts returned by RecognitionService.process_frame_detailed.
+
 
 class TestResultDictStructure:
     """Verify that all result dicts contain the required fields.
@@ -760,20 +796,36 @@ class TestResultDictStructure:
     def _has_critical_fields(self, result: dict) -> bool:
         """Check all critical bug-fix fields are present."""
         keys = self._result_keys(result)
-        required = {"attendance_marked", "track_id", "emp_id", "emp_name",
-                     "name", "confidence", "is_known", "amfr_decision",
-                     "risk_score", "bbox"}
+        required = {
+            "attendance_marked",
+            "track_id",
+            "emp_id",
+            "emp_name",
+            "name",
+            "confidence",
+            "is_known",
+            "amfr_decision",
+            "risk_score",
+            "bbox",
+        }
         return required.issubset(keys)
 
     def test_accept_result_has_attendance_marked(self, svc):
         """ACCEPT results must include attendance_marked field."""
         # Simulate what RecognitionService builds for ACCEPT
         result = dict(
-            bbox=(10, 10, 100, 100), name="EMP001", emp_name="Gokul",
-            emp_id=1, confidence=0.95, is_known=True,
-            attendance_marked=True, track_id="T000001-abc123",
-            amfr_decision="ACCEPT", risk_score=0.92,
-            quality_score=0.88, liveness_score=0.95,
+            bbox=(10, 10, 100, 100),
+            name="EMP001",
+            emp_name="Gokul",
+            emp_id=1,
+            confidence=0.95,
+            is_known=True,
+            attendance_marked=True,
+            track_id="T000001-abc123",
+            amfr_decision="ACCEPT",
+            risk_score=0.92,
+            quality_score=0.88,
+            liveness_score=0.95,
         )
         assert "attendance_marked" in result
         assert result["attendance_marked"] is True
@@ -781,10 +833,16 @@ class TestResultDictStructure:
     def test_accept_result_has_track_id(self, svc):
         """ACCEPT results must include track_id from AMFR."""
         result = dict(
-            bbox=(10, 10, 100, 100), name="EMP001", emp_name="Gokul",
-            emp_id=1, confidence=0.95, is_known=True,
-            attendance_marked=True, track_id="T000042-xyz789",
-            amfr_decision="ACCEPT", risk_score=0.92,
+            bbox=(10, 10, 100, 100),
+            name="EMP001",
+            emp_name="Gokul",
+            emp_id=1,
+            confidence=0.95,
+            is_known=True,
+            attendance_marked=True,
+            track_id="T000042-xyz789",
+            amfr_decision="ACCEPT",
+            risk_score=0.92,
         )
         assert "track_id" in result
         assert result["track_id"] == "T000042-xyz789"
@@ -792,10 +850,16 @@ class TestResultDictStructure:
     def test_accept_result_has_emp_id_and_name(self, svc):
         """ACCEPT results must include resolved emp_id and emp_name."""
         result = dict(
-            bbox=(10, 10, 100, 100), name="EMP005", emp_name="Divya",
-            emp_id=5, confidence=0.97, is_known=True,
-            attendance_marked=False, track_id="T000099-xyz",
-            amfr_decision="ACCEPT", risk_score=0.87,
+            bbox=(10, 10, 100, 100),
+            name="EMP005",
+            emp_name="Divya",
+            emp_id=5,
+            confidence=0.97,
+            is_known=True,
+            attendance_marked=False,
+            track_id="T000099-xyz",
+            amfr_decision="ACCEPT",
+            risk_score=0.87,
         )
         assert result["emp_id"] == 5
         assert result["emp_name"] == "Divya"
@@ -804,10 +868,16 @@ class TestResultDictStructure:
     def test_spoof_result_has_all_fields(self, svc):
         """REJECT_SPOOF results must include all critical fields."""
         result = dict(
-            bbox=(50, 50, 150, 150), name="Unknown", emp_name="Unknown",
-            emp_id=None, confidence=0.0, is_known=False,
-            attendance_marked=False, track_id="T000200-spoof",
-            amfr_decision="REJECT_SPOOF", risk_score=0.12,
+            bbox=(50, 50, 150, 150),
+            name="Unknown",
+            emp_name="Unknown",
+            emp_id=None,
+            confidence=0.0,
+            is_known=False,
+            attendance_marked=False,
+            track_id="T000200-spoof",
+            amfr_decision="REJECT_SPOOF",
+            risk_score=0.12,
             liveness_score=0.05,
         )
         assert self._has_critical_fields(result)
@@ -817,10 +887,16 @@ class TestResultDictStructure:
     def test_borderline_result_has_all_fields(self, svc):
         """BORDERLINE results must include all critical fields."""
         result = dict(
-            bbox=(20, 20, 80, 80), name="EMP003", emp_name="Hari",
-            emp_id=3, confidence=0.45, is_known=False,
-            attendance_marked=False, track_id="T000300-border",
-            amfr_decision="BORDERLINE", risk_score=0.55,
+            bbox=(20, 20, 80, 80),
+            name="EMP003",
+            emp_name="Hari",
+            emp_id=3,
+            confidence=0.45,
+            is_known=False,
+            attendance_marked=False,
+            track_id="T000300-border",
+            amfr_decision="BORDERLINE",
+            risk_score=0.55,
             quality_score=0.32,
         )
         assert self._has_critical_fields(result)
@@ -830,10 +906,16 @@ class TestResultDictStructure:
     def test_low_confidence_result_has_unknown_fields(self, svc):
         """LOW_CONFIDENCE results must include basic fields even with no match."""
         result = dict(
-            bbox=(30, 30, 90, 90), name="Unknown", emp_name="Unknown",
-            emp_id=None, confidence=0.0, is_known=False,
-            attendance_marked=False, track_id="T000400-low",
-            amfr_decision="LOW_CONFIDENCE", risk_score=0.0,
+            bbox=(30, 30, 90, 90),
+            name="Unknown",
+            emp_name="Unknown",
+            emp_id=None,
+            confidence=0.0,
+            is_known=False,
+            attendance_marked=False,
+            track_id="T000400-low",
+            amfr_decision="LOW_CONFIDENCE",
+            risk_score=0.0,
         )
         assert result["attendance_marked"] is False
         assert result["emp_id"] is None
@@ -841,16 +923,32 @@ class TestResultDictStructure:
     def test_result_has_all_required_keys(self, svc):
         """Smoke test: every result dict has the required keys."""
         sample = dict(
-            bbox=(10, 10, 100, 100), name="EMP001", emp_name="Gokul",
-            emp_id=1, confidence=0.95, is_known=True,
-            attendance_marked=True, track_id="T000500-test",
-            amfr_decision="ACCEPT", risk_score=0.92,
-            quality_score=0.88, liveness_score=0.94,
+            bbox=(10, 10, 100, 100),
+            name="EMP001",
+            emp_name="Gokul",
+            emp_id=1,
+            confidence=0.95,
+            is_known=True,
+            attendance_marked=True,
+            track_id="T000500-test",
+            amfr_decision="ACCEPT",
+            risk_score=0.92,
+            quality_score=0.88,
+            liveness_score=0.94,
             arcface_distance=0.45,
         )
-        required = {"attendance_marked", "track_id", "emp_id", "emp_name",
-                     "name", "confidence", "is_known", "amfr_decision",
-                     "risk_score", "bbox"}
+        required = {
+            "attendance_marked",
+            "track_id",
+            "emp_id",
+            "emp_name",
+            "name",
+            "confidence",
+            "is_known",
+            "amfr_decision",
+            "risk_score",
+            "bbox",
+        }
         missing = required - self._result_keys(sample)
         assert not missing, f"Missing required keys: {missing}"
 
@@ -859,6 +957,7 @@ class TestResultDictStructure:
 #  Unknown Face Cooldown Tests
 # ═══════════════════════════════════════════════════════════════
 #  Verify that _handle_unknown_face does not flood the disk.
+
 
 class TestUnknownFaceCooldown:
     """Tests for the unknown face save cooldown."""
@@ -876,35 +975,35 @@ class TestUnknownFaceCooldown:
         s._unknown_save_cooldown = 3.0
         return s
 
-    @patch('services.recognition_service.cv2.imwrite', return_value=True)
-    @patch('services.recognition_service.datetime')
+    @patch("services.recognition_service.cv2.imwrite", return_value=True)
+    @patch("services.recognition_service.datetime")
     def test_first_call_saves(self, mock_dt, mock_imwrite, svc):
         """First call to _handle_unknown_face should save."""
         mock_dt.now.return_value.strftime.return_value = "20260730_120000_000000"
         mock_frame = np.zeros((100, 100, 3), dtype=np.uint8)
 
-        with patch('services.recognition_service.get_session'):
+        with patch("services.recognition_service.get_session"):
             svc._handle_unknown_face(mock_frame)
 
         mock_imwrite.assert_called_once()
 
-    @patch('services.recognition_service.cv2.imwrite', return_value=True)
-    @patch('services.recognition_service.datetime')
+    @patch("services.recognition_service.cv2.imwrite", return_value=True)
+    @patch("services.recognition_service.datetime")
     def test_immediate_second_call_skipped(self, mock_dt, mock_imwrite, svc):
         """Second call within cooldown should not save."""
         # Set last save to NOW so that cooldown check: now - last_save < cooldown
         mock_dt.now.return_value.strftime.return_value = "20260730_120000_000000"
         svc._last_unknown_save = time.time()  # Just now → cooldown still active
-        svc._unknown_save_cooldown = 10.0     # Long cooldown
+        svc._unknown_save_cooldown = 10.0  # Long cooldown
         mock_frame = np.zeros((100, 100, 3), dtype=np.uint8)
 
-        with patch('services.recognition_service.get_session'):
+        with patch("services.recognition_service.get_session"):
             svc._handle_unknown_face(mock_frame)
 
         mock_imwrite.assert_not_called()
 
-    @patch('services.recognition_service.cv2.imwrite', return_value=True)
-    @patch('services.recognition_service.datetime')
+    @patch("services.recognition_service.cv2.imwrite", return_value=True)
+    @patch("services.recognition_service.datetime")
     def test_after_cooldown_expired_saves_again(self, mock_dt, mock_imwrite, svc):
         """After cooldown expires, save is allowed."""
         mock_dt.now.return_value.strftime.return_value = "20260730_120005_000000"
@@ -912,7 +1011,7 @@ class TestUnknownFaceCooldown:
         svc._unknown_save_cooldown = 0.0  # No cooldown for test
         mock_frame = np.zeros((100, 100, 3), dtype=np.uint8)
 
-        with patch('services.recognition_service.get_session'):
+        with patch("services.recognition_service.get_session"):
             svc._handle_unknown_face(mock_frame)
 
         mock_imwrite.assert_called_once()
@@ -923,6 +1022,7 @@ class TestUnknownFaceCooldown:
 # ═══════════════════════════════════════════════════════════════
 #  Verify that deleting an employee also removes their embedding
 #  from FAISS, using the test database (no real AI involved).
+
 
 class TestEmployeeServiceIntegration:
     """Tests for EmployeeService.delete() and FAISS sync.
@@ -937,15 +1037,18 @@ class TestEmployeeServiceIntegration:
         Uses reset_db to avoid SQLite locking from nested sessions.
         """
         from services.employee_service import EmployeeService
+
         # Create employee using the service (which manages its own session)
         EmployeeService.create(
-            employee_id="DEL-TEST", name="Delete Test User", operator="test",
+            employee_id="DEL-TEST",
+            name="Delete Test User",
+            operator="test",
         )
 
         # FaceEnrollment is imported INSIDE EmployeeService.delete() via:
         #   from app.enrollment import FaceEnrollment
         # So patch it at its source: app.enrollment.FaceEnrollment
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.return_value = True
@@ -959,11 +1062,14 @@ class TestEmployeeServiceIntegration:
     def test_delete_handles_faiss_error_gracefully(self, reset_db):
         """FAISS failure should not prevent DB deletion."""
         from services.employee_service import EmployeeService
+
         EmployeeService.create(
-            employee_id="DEL-TEST2", name="Delete Test 2", operator="test",
+            employee_id="DEL-TEST2",
+            name="Delete Test 2",
+            operator="test",
         )
 
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.side_effect = Exception("FAISS error")
@@ -975,13 +1081,15 @@ class TestEmployeeServiceIntegration:
     def test_delete_non_existent_returns_false(self, reset_db):
         """Deleting a non-existent employee returns False."""
         from services.employee_service import EmployeeService
+
         result = EmployeeService.delete("NONEXISTENT", operator="test")
         assert result is False
 
     def test_remove_faiss_embedding_calls_remove_by_name(self):
         """remove_faiss_embedding must attempt removal by display name first."""
         from services.employee_service import EmployeeService
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.return_value = True
@@ -994,15 +1102,14 @@ class TestEmployeeServiceIntegration:
     def test_remove_faiss_embedding_falls_back_to_employee_id(self):
         """If the display name is not in FAISS, fall back to employee_id."""
         from services.employee_service import EmployeeService
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             # Display name not found → fall back to employee_id, which is found
             mock_enroll.remove_by_name.side_effect = [False, True]
 
-            removed = EmployeeService.remove_faiss_embedding(
-                "Delete Test User", fallback="DEL-TEST"
-            )
+            removed = EmployeeService.remove_faiss_embedding("Delete Test User", fallback="DEL-TEST")
 
         assert removed is True
         assert mock_enroll.remove_by_name.call_count == 2
@@ -1012,14 +1119,13 @@ class TestEmployeeServiceIntegration:
     def test_remove_faiss_embedding_no_fallback_when_found(self):
         """Fallback must NOT be attempted when the display name is removed."""
         from services.employee_service import EmployeeService
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.return_value = True
 
-            removed = EmployeeService.remove_faiss_embedding(
-                "Delete Test User", fallback="DEL-TEST"
-            )
+            removed = EmployeeService.remove_faiss_embedding("Delete Test User", fallback="DEL-TEST")
 
         assert removed is True
         mock_enroll.remove_by_name.assert_called_once_with("Delete Test User")
@@ -1027,7 +1133,8 @@ class TestEmployeeServiceIntegration:
     def test_remove_faiss_embedding_handles_error_gracefully(self):
         """FAISS errors must not raise — logged and return False."""
         from services.employee_service import EmployeeService
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.side_effect = Exception("FAISS error")
@@ -1039,17 +1146,22 @@ class TestEmployeeServiceIntegration:
     def test_update_renames_faiss_when_name_changes(self, reset_db):
         """Updating the display name must rename the FAISS metadata too."""
         from services.employee_service import EmployeeService
+
         EmployeeService.create(
-            employee_id="EDIT-TEST", name="Old Name", operator="test",
+            employee_id="EDIT-TEST",
+            name="Old Name",
+            operator="test",
         )
 
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.rename.return_value = True
 
             updated = EmployeeService.update(
-                "EDIT-TEST", name="New Name", operator="test",
+                "EDIT-TEST",
+                name="New Name",
+                operator="test",
             )
 
         assert updated is not None
@@ -1060,16 +1172,21 @@ class TestEmployeeServiceIntegration:
     def test_update_does_not_rename_faiss_when_name_unchanged(self, reset_db):
         """Department-only edits must NOT touch FAISS metadata."""
         from services.employee_service import EmployeeService
+
         EmployeeService.create(
-            employee_id="EDIT-TEST2", name="Stable Name", operator="test",
+            employee_id="EDIT-TEST2",
+            name="Stable Name",
+            operator="test",
         )
 
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
 
             updated = EmployeeService.update(
-                "EDIT-TEST2", department="Science", operator="test",
+                "EDIT-TEST2",
+                department="Science",
+                operator="test",
             )
 
         assert updated is not None
@@ -1079,17 +1196,22 @@ class TestEmployeeServiceIntegration:
     def test_update_faiss_rename_error_is_graceful(self, reset_db):
         """FAISS rename failure must not block the DB update."""
         from services.employee_service import EmployeeService
+
         EmployeeService.create(
-            employee_id="EDIT-TEST3", name="Old", operator="test",
+            employee_id="EDIT-TEST3",
+            name="Old",
+            operator="test",
         )
 
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.rename.side_effect = Exception("FAISS rename error")
 
             updated = EmployeeService.update(
-                "EDIT-TEST3", name="New", operator="test",
+                "EDIT-TEST3",
+                name="New",
+                operator="test",
             )
 
         assert updated is not None
@@ -1101,6 +1223,7 @@ class TestEmployeeServiceIntegration:
 # ═══════════════════════════════════════════════════════════════
 #  Test the FaceEnrollment.remove_by_name() logic directly.
 #  Uses a real FAISS index with Random data (no AI models).
+
 
 class TestFAISSRemove:
     """Tests for FaceEnrollment.remove_by_name().
@@ -1114,7 +1237,6 @@ class TestFAISSRemove:
         """Create a temporary FaceEnrollment with test data."""
         # Save original paths and restore after test
         from app.enrollment import FaceEnrollment
-        import config.config as cfg
 
         orig_index_path = cfg.FAISS_INDEX_PATH
         orig_meta_path = cfg.METADATA_PATH
@@ -1231,6 +1353,7 @@ class TestFAISSRemove:
 # ═══════════════════════════════════════════════════════════════
 #  Verify the fallback chain: get_by_name() → get_by_employee_id()
 
+
 class TestEmployeeLookup:
     """Tests for employee lookup chain used in RecognitionService.
 
@@ -1242,12 +1365,11 @@ class TestEmployeeLookup:
         """get_by_name should find employee by display name."""
         from database.repository import EmployeeRepo
         from services.employee_service import EmployeeService
-        EmployeeRepo.create(
-            db_session, employee_id="LKUP-001", name="Lookup User"
-        )
+
+        EmployeeRepo.create(db_session, employee_id="LKUP-001", name="Lookup User")
         db_session.commit()
 
-        with patch('services.employee_service.get_session') as mock_get_session:
+        with patch("services.employee_service.get_session") as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = db_session
             found = EmployeeService.get_by_name("Lookup User")
 
@@ -1259,12 +1381,11 @@ class TestEmployeeLookup:
         """get_by_name should be case-insensitive."""
         from database.repository import EmployeeRepo
         from services.employee_service import EmployeeService
-        EmployeeRepo.create(
-            db_session, employee_id="LKUP-002", name="Case Test"
-        )
+
+        EmployeeRepo.create(db_session, employee_id="LKUP-002", name="Case Test")
         db_session.commit()
 
-        with patch('services.employee_service.get_session') as mock_get_session:
+        with patch("services.employee_service.get_session") as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = db_session
             found = EmployeeService.get_by_name("case test")
 
@@ -1275,12 +1396,11 @@ class TestEmployeeLookup:
         """get_by_employee_id should find by employee ID string."""
         from database.repository import EmployeeRepo
         from services.employee_service import EmployeeService
-        EmployeeRepo.create(
-            db_session, employee_id="LKUP-003", name="ID Lookup"
-        )
+
+        EmployeeRepo.create(db_session, employee_id="LKUP-003", name="ID Lookup")
         db_session.commit()
 
-        with patch('services.employee_service.get_session') as mock_get_session:
+        with patch("services.employee_service.get_session") as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = db_session
             found = EmployeeService.get_by_employee_id("LKUP-003")
 
@@ -1290,7 +1410,8 @@ class TestEmployeeLookup:
     def test_get_by_name_returns_none_for_missing(self, db_session):
         """get_by_name returns None for non-existent name."""
         from services.employee_service import EmployeeService
-        with patch('services.employee_service.get_session') as mock_get_session:
+
+        with patch("services.employee_service.get_session") as mock_get_session:
             mock_get_session.return_value.__enter__.return_value = db_session
             found = EmployeeService.get_by_name("NonExistent Name")
 
@@ -1334,19 +1455,21 @@ def _import_live_page() -> object:
     mock_st.button = MagicMock(return_value=False)
     mock_st.text_input = MagicMock(return_value="")
     mock_st.number_input = MagicMock(return_value=1)
+
     def _columns_side_effect(*args, **kwargs):
         """Return the right number of column mocks based on input."""
         if args:
             a = args[0]
             if isinstance(a, int):
                 n = a
-            elif hasattr(a, '__iter__'):
+            elif hasattr(a, "__iter__"):
                 n = len(a)
             else:
                 n = 1
         else:
             n = 1
         return tuple(MagicMock() for _ in range(n))
+
     mock_st.columns = MagicMock(side_effect=_columns_side_effect)
     mock_st.spinner = MagicMock(return_value=MagicMock().__enter__())
     mock_st.markdown = MagicMock()
@@ -1369,8 +1492,8 @@ def _import_live_page() -> object:
     mock_cap = MagicMock()
     mock_cap.isOpened.return_value = False  # No cameras detected at import
 
-    with patch('cv2.VideoCapture', return_value=mock_cap):
-        with patch.dict('sys.modules', {'streamlit': mock_st}):
+    with patch("cv2.VideoCapture", return_value=mock_cap):
+        with patch.dict("sys.modules", {"streamlit": mock_st}):
             spec = importlib.util.spec_from_file_location("live_page", live_path)
             mod = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = mod
@@ -1439,7 +1562,7 @@ def _columns_side_effect(*args, **kwargs) -> tuple:
         a = args[0]
         if isinstance(a, int):
             n = a
-        elif hasattr(a, '__iter__'):
+        elif hasattr(a, "__iter__"):
             n = len(a)
         else:
             n = 1
@@ -1462,6 +1585,7 @@ def _cache_data_side_effect(*args, **kwargs):
 
     def _decorator(fn):
         return fn
+
     return _decorator
 
 
@@ -1527,11 +1651,9 @@ def _import_page(rel_name: str, extra_modules: dict | None = None) -> object:
     mock_cap = MagicMock()
     mock_cap.isOpened.return_value = False  # No cameras detected at import
 
-    with patch('cv2.VideoCapture', return_value=mock_cap):
-        with patch.dict('sys.modules', modules):
-            spec = importlib.util.spec_from_file_location(
-                "page_" + rel_name.replace(".", "_"), page_path
-            )
+    with patch("cv2.VideoCapture", return_value=mock_cap):
+        with patch.dict("sys.modules", modules):
+            spec = importlib.util.spec_from_file_location("page_" + rel_name.replace(".", "_"), page_path)
             mod = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = mod
             spec.loader.exec_module(mod)
@@ -1548,6 +1670,7 @@ def _import_page(rel_name: str, extra_modules: dict | None = None) -> object:
 #  Streamlit runtime. This catches NameErrors, missing config attributes,
 #  missing service/repo methods, and unguarded DB/empty-data crashes.
 
+
 class TestDashboardPageImports:
     """Smoke tests: all dashboard pages import/execute without crashing."""
 
@@ -1556,17 +1679,20 @@ class TestDashboardPageImports:
         """Fresh, migrated tables before each page body executes."""
         yield
 
-    @pytest.mark.parametrize("page_file,extra_key,expected_symbols", [
-        ("01_Dashboard.py", None, ["get_home_stats", "get_recent_attendance_df", "status_badge"]),
-        ("02_Employees.py", None, []),
-        ("03_Enroll.py", None, ["_process_enrollment"]),
-        ("05_Attendance.py", "webrtc", ["PhoneAttendanceFeed", "AttendanceVideoTransformer"]),
-        ("06_Unknown.py", None, []),
-        ("07_Analytics.py", None, []),
-        ("08_Settings.py", None, []),
-        ("09_Health.py", None, ["render_status", "check_database"]),
-        ("10_About.py", None, ["_pill"]),
-    ])
+    @pytest.mark.parametrize(
+        "page_file,extra_key,expected_symbols",
+        [
+            ("01_Dashboard.py", None, ["get_home_stats", "get_recent_attendance_df", "status_badge"]),
+            ("02_Employees.py", None, []),
+            ("03_Enroll.py", None, ["_process_enrollment"]),
+            ("05_Attendance.py", "webrtc", ["PhoneAttendanceFeed", "AttendanceVideoTransformer"]),
+            ("06_Unknown.py", None, []),
+            ("07_Analytics.py", None, []),
+            ("08_Settings.py", None, []),
+            ("09_Health.py", None, ["render_status", "check_database"]),
+            ("10_About.py", None, ["_pill"]),
+        ],
+    )
     def test_page_imports(self, page_file, extra_key, expected_symbols):
         extra = {}
         if extra_key == "webrtc":
@@ -1584,6 +1710,7 @@ class TestDashboardPageImports:
 # ═══════════════════════════════════════════════════════════════
 #  Verify CAMERA_OPTIONS and PHONE_CONNECTION_OPTIONS dicts
 #  correctly map UI labels to internal source type strings.
+
 
 class TestCameraOptions:
     """Verify that CAMERA_OPTIONS and PHONE_CONNECTION_OPTIONS
@@ -1643,6 +1770,7 @@ class TestCameraOptions:
 #  Tests for scan_local_cameras() which probes camera indices
 #  using cv2.VideoCapture with mocked hardware.
 
+
 class TestScanLocalCameras:
     """Tests for scan_local_cameras() with mocked cv2.VideoCapture.
 
@@ -1664,6 +1792,7 @@ class TestScanLocalCameras:
                 for each camera index. Missing indices return not-opened.
         """
         mock_config = mock_config or {}
+
         def _video_capture(idx: int, backend: int = cv2.CAP_DSHOW) -> MagicMock:
             cap = MagicMock()
             if idx in mock_config:
@@ -1675,7 +1804,7 @@ class TestScanLocalCameras:
                 cap.isOpened.return_value = False
             return cap
 
-        with patch.object(live_mod.cv2, 'VideoCapture', side_effect=_video_capture):
+        with patch.object(live_mod.cv2, "VideoCapture", side_effect=_video_capture):
             return live_mod.scan_local_cameras(max_devices=max_devices)
 
     def test_detects_one_camera(self, live_mod):
@@ -1695,7 +1824,8 @@ class TestScanLocalCameras:
     def test_some_cameras_detect(self, live_mod):
         """Camera 0 opens, camera 1 fails, camera 2 opens."""
         available = self._test_scan(
-            live_mod, max_devices=3,
+            live_mod,
+            max_devices=3,
             mock_config={0: (True, True, "DShow"), 2: (True, True, "MSMF")},
         )
         assert len(available) == 2
@@ -1705,7 +1835,8 @@ class TestScanLocalCameras:
     def test_custom_max_devices(self, live_mod):
         """Respect the max_devices parameter."""
         available = self._test_scan(
-            live_mod, max_devices=5,
+            live_mod,
+            max_devices=5,
             mock_config={i: (True, True, "DShow") for i in range(5)},
         )
         assert len(available) == 5
@@ -1714,7 +1845,8 @@ class TestScanLocalCameras:
     def test_read_failure_still_reports(self, live_mod):
         """Camera opens but read fails — has_frame should be False."""
         available = self._test_scan(
-            live_mod, max_devices=1,
+            live_mod,
+            max_devices=1,
             mock_config={0: (True, False, "DShow")},
         )
         assert len(available) == 1
@@ -1723,6 +1855,7 @@ class TestScanLocalCameras:
 
     def test_exception_during_open_skipped(self, live_mod):
         """Exception when opening a camera index should be gracefully skipped."""
+
         def _vc_with_exception(idx: int, backend: int = cv2.CAP_DSHOW) -> MagicMock:
             if idx == 0:
                 raise RuntimeError("Camera access denied")
@@ -1732,7 +1865,7 @@ class TestScanLocalCameras:
             cap.getBackendName.return_value = "DShow"
             return cap
 
-        with patch.object(live_mod.cv2, 'VideoCapture', side_effect=_vc_with_exception):
+        with patch.object(live_mod.cv2, "VideoCapture", side_effect=_vc_with_exception):
             available = live_mod.scan_local_cameras(max_devices=3)
 
         # Camera 0 skipped due to exception, 1 and 2 work
@@ -1743,7 +1876,8 @@ class TestScanLocalCameras:
     def test_all_cameras_opened(self, live_mod):
         """When all indices open successfully, all are returned."""
         available = self._test_scan(
-            live_mod, max_devices=3,
+            live_mod,
+            max_devices=3,
             mock_config={i: (True, True, "DShow") for i in range(3)},
         )
         assert len(available) == 3
@@ -1753,7 +1887,8 @@ class TestScanLocalCameras:
     def test_returned_dict_has_required_fields(self, live_mod):
         """Each discovered camera dict must have all required fields."""
         available = self._test_scan(
-            live_mod, max_devices=1,
+            live_mod,
+            max_devices=1,
             mock_config={0: (True, True, "MSMF")},
         )
         assert len(available) == 1
@@ -1770,6 +1905,7 @@ class TestScanLocalCameras:
 # ═══════════════════════════════════════════════════════════════
 #  Tests for _render_camera_config() which builds the config dict
 #  for the selected camera type.  Streamlit UI functions are mocked.
+
 
 class TestRenderCameraConfig:
     """Tests for _render_camera_config() configuration logic.
@@ -1912,6 +2048,7 @@ class TestRenderCameraConfig:
 # ═══════════════════════════════════════════════════════════════
 #  End-to-end scenarios combining multiple components.
 
+
 class TestFullRegression:
     """End-to-end regression tests combining multiple bug fixes."""
 
@@ -1933,10 +2070,11 @@ class TestFullRegression:
     def test_enroll_then_delete_syncs_faiss(self, reset_db, tmp_path):
         """Simulate: enroll employee → verify exists → delete → verify FAISS synced."""
         from services.employee_service import EmployeeService
-        import config.config as cfg
 
         EmployeeService.create(
-            employee_id="REGR-001", name="Regression Test", operator="test",
+            employee_id="REGR-001",
+            name="Regression Test",
+            operator="test",
         )
 
         # Setup FAISS with matching embedding
@@ -1946,6 +2084,7 @@ class TestFullRegression:
         cfg.METADATA_PATH = str(tmp_path / "regr_meta.json")
 
         from app.enrollment import FaceEnrollment
+
         enrollment = FaceEnrollment(
             index_path=str(tmp_path / "regr_faiss.index"),
             metadata_path=str(tmp_path / "regr_meta.json"),
@@ -1956,7 +2095,7 @@ class TestFullRegression:
         enrollment.enroll("Regression Test", emb)
 
         # FaceEnrollment is imported INSIDE EmployeeService.delete()
-        with patch('app.enrollment.FaceEnrollment') as MockEnroll:
+        with patch("app.enrollment.FaceEnrollment") as MockEnroll:
             mock_enroll = MagicMock()
             MockEnroll.return_value = mock_enroll
             mock_enroll.remove_by_name.return_value = True
@@ -1978,9 +2117,9 @@ class TestFullRegression:
         regr_svc._unknown_save_cooldown = 3.0
         mock_frame = np.zeros((100, 100, 3), dtype=np.uint8)
 
-        with patch('services.recognition_service.cv2.imwrite', return_value=True) as mock_write:
-            with patch('services.recognition_service.get_session'):
-                with patch('services.recognition_service.datetime') as mock_dt:
+        with patch("services.recognition_service.cv2.imwrite", return_value=True) as mock_write:
+            with patch("services.recognition_service.get_session"):
+                with patch("services.recognition_service.datetime") as mock_dt:
                     mock_dt.now.return_value.strftime.return_value = "t"
                     for _ in range(10):
                         regr_svc._handle_unknown_face(mock_frame)

@@ -36,10 +36,10 @@ def _search_per_query(index, queries: np.ndarray, k: int) -> Tuple[np.ndarray, D
     for i in range(n):
         q = queries[i : i + 1]
         t0 = time.perf_counter()
-        _, I = index.search(q, k)
+        _, idx = index.search(q, k)
         t1 = time.perf_counter()
         per_times[i] = (t1 - t0) * 1000
-        all_indices[i] = I[0]
+        all_indices[i] = idx[0]
     per_times.sort()
     return all_indices, {
         "avg_ms": round(float(per_times.mean()), 4),
@@ -68,8 +68,15 @@ def _serialize_size(index) -> Dict[str, float]:
     return {"index_size_mb": round(mb, 2)}
 
 
-def tune_ivf(size: int, dim: int, queries: int, k: int,
-             nprobe_values: List[int], nlist_values: List[int], seed: int = 42) -> List[Dict[str, Any]]:
+def tune_ivf(
+    size: int,
+    dim: int,
+    queries: int,
+    k: int,
+    nprobe_values: List[int],
+    nlist_values: List[int],
+    seed: int = 42,
+) -> List[Dict[str, Any]]:
     rng = np.random.default_rng(seed)
     vectors = _normalize(rng.random((size, dim), dtype=np.float32))
     probe = _normalize(rng.random((queries, dim), dtype=np.float32))
@@ -97,14 +104,25 @@ def tune_ivf(size: int, dim: int, queries: int, k: int,
             r10 = _recall(gt, actual_idx, 10)
             mem = _serialize_size(ivf)
             qps = round(1000.0 / max(lat["avg_ms"], 1e-9), 2)
-            print(f"Recall@1={r1:.4f}  Recall@5={r5:.4f}  "
-                  f"avg={lat['avg_ms']:.4f}ms  P95={lat['p95_ms']:.4f}ms  QPS={qps}")
-            results.append({
-                "nlist": nlist, "nprobe": nprobe, "size": size, "dimension": dim,
-                "recall_at_1": round(r1, 4), "recall_at_5": round(r5, 4), "recall_at_10": round(r10, 4),
-                "build_ms": round(build_time * 1000, 2), "queries_per_sec": qps,
-                **lat, **mem,
-            })
+            print(
+                f"Recall@1={r1:.4f}  Recall@5={r5:.4f}  "
+                f"avg={lat['avg_ms']:.4f}ms  P95={lat['p95_ms']:.4f}ms  QPS={qps}"
+            )
+            results.append(
+                {
+                    "nlist": nlist,
+                    "nprobe": nprobe,
+                    "size": size,
+                    "dimension": dim,
+                    "recall_at_1": round(r1, 4),
+                    "recall_at_5": round(r5, 4),
+                    "recall_at_10": round(r10, 4),
+                    "build_ms": round(build_time * 1000, 2),
+                    "queries_per_sec": qps,
+                    **lat,
+                    **mem,
+                }
+            )
     return results
 
 
@@ -131,8 +149,11 @@ def main() -> int:
 
     all_results: Dict[str, Any] = {
         "config": {
-            "dimension": args.dim, "queries": args.queries, "k": args.k,
-            "nprobe_values": args.nprobe_values, "nlist_values": nlist_values,
+            "dimension": args.dim,
+            "queries": args.queries,
+            "k": args.k,
+            "nprobe_values": args.nprobe_values,
+            "nlist_values": nlist_values,
             "note": "Synthetic L2-normalized 512-D vectors. Final index selection needs real data validation.",
         },
         "results": [],
@@ -148,8 +169,7 @@ def main() -> int:
         print(f"  SIZE: {size:,}")
         print(f"  nlist candidates: {nlist_candidates}")
         print(dash)
-        size_results = tune_ivf(size, args.dim, args.queries, args.k,
-                                args.nprobe_values, nlist_candidates)
+        size_results = tune_ivf(size, args.dim, args.queries, args.k, args.nprobe_values, nlist_candidates)
         all_results["results"].extend(size_results)
 
     output_path = Path(args.output)

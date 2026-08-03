@@ -22,14 +22,13 @@ Usage::
 
 from __future__ import annotations
 
-import time
 from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 import requests
 
-from camera.base import CameraSource, CameraError
+from camera.base import CameraSource
 from utils.logging_setup import get_logger, redact_url
 
 logger = get_logger(__name__)
@@ -38,6 +37,7 @@ logger = get_logger(__name__)
 # ==================================================================
 # Android — Wi-Fi (IP Webcam)
 # ==================================================================
+
 
 class AndroidWiFiSource(CameraSource):
     """Android phone camera via IP Webcam HTTP stream.
@@ -147,6 +147,7 @@ class AndroidWiFiSource(CameraSource):
 # Android — USB (DroidCam)
 # ==================================================================
 
+
 class AndroidUSBSource(CameraSource):
     """Android phone camera via DroidCam USB connection.
 
@@ -159,8 +160,7 @@ class AndroidUSBSource(CameraSource):
         device_id: OpenCV device index if detected.
     """
 
-    def __init__(self, droidcam_ip: str = "192.168.1.100:4747",
-                 device_id: int = 1) -> None:
+    def __init__(self, droidcam_ip: str = "192.168.1.100:4747", device_id: int = 1) -> None:
         self._droidcam_ip = droidcam_ip
         self._device_id = device_id
         self._cap: Optional[cv2.VideoCapture] = None
@@ -260,6 +260,7 @@ class AndroidUSBSource(CameraSource):
 # iPhone — Wi-Fi (EpocCam)
 # ==================================================================
 
+
 class iPhoneWiFiSource(CameraSource):
     """iPhone camera via EpocCam Wi-Fi.
 
@@ -279,7 +280,7 @@ class iPhoneWiFiSource(CameraSource):
 
     @property
     def name(self) -> str:
-        return f"iPhone (Wi-Fi) — EpocCam"
+        return "iPhone (Wi-Fi) — EpocCam"
 
     @property
     def source_type(self) -> str:
@@ -348,6 +349,7 @@ class iPhoneWiFiSource(CameraSource):
 # ==================================================================
 # IP Camera — Generic RTSP/HTTP/MJPEG stream
 # ==================================================================
+
 
 class IPCameraSource(CameraSource):
     """Generic IP / network camera via RTSP, HTTP MJPEG, or ONVIF stream.
@@ -450,6 +452,7 @@ class IPCameraSource(CameraSource):
 # ==================================================================
 # iPhone — USB (EpocCam / Camera)
 # ==================================================================
+
 
 class iPhoneUSBSource(CameraSource):
     """iPhone camera via USB.

@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import numpy as np
 import faiss
@@ -45,8 +45,9 @@ class FaceEnrollment:
         dimension: Embedding dimensionality (512 for ArcFace).
     """
 
-    def __init__(self, index_path: str = cfg.FAISS_INDEX_PATH,
-                 metadata_path: str = cfg.METADATA_PATH) -> None:
+    def __init__(
+        self, index_path: str = cfg.FAISS_INDEX_PATH, metadata_path: str = cfg.METADATA_PATH
+    ) -> None:
         """Load an existing index or create a new one.
 
         Args:
@@ -63,13 +64,13 @@ class FaceEnrollment:
         if self.index_path.exists() and self.metadata_path.exists():
             self.index = faiss.read_index(str(self.index_path))
             # Restore HNSW search parameters (not persisted by faiss.write_index)
-            if hasattr(self.index, 'hnsw'):
+            if hasattr(self.index, "hnsw"):
                 self.index.hnsw.efSearch = cfg.FAISS_HNSW_EF_SEARCH
             with open(self.metadata_path, "r") as f:
                 self.metadata: List[Dict] = json.load(f)
         else:
             self.index = self._create_index()
-            self.metadata: List[Dict] = []
+            self.metadata = []
 
     def _create_index(self) -> faiss.Index:
         """Create a new FAISS index based on the configured index type.
@@ -91,12 +92,12 @@ class FaceEnrollment:
 
         elif index_type == "ivf":
             quantizer = faiss.IndexFlatL2(self.dimension)
-            index = faiss.IndexIVFFlat(
+            index = faiss.IndexIVFFlat(  # type: ignore[assignment]
                 quantizer,
                 self.dimension,
                 cfg.FAISS_IVF_NLIST,
             )
-            index.nprobe = cfg.FAISS_IVF_NPROBE
+            index.nprobe = cfg.FAISS_IVF_NPROBE  # type: ignore[attr-defined]
             return index
 
         else:
@@ -122,8 +123,9 @@ class FaceEnrollment:
         self._save()
         return True
 
-    def search(self, embedding: np.ndarray, k: int = 1,
-               threshold: float = cfg.RECOGNITION_THRESHOLD) -> List[Dict]:
+    def search(
+        self, embedding: np.ndarray, k: int = 1, threshold: float = cfg.RECOGNITION_THRESHOLD
+    ) -> List[Dict]:
         """Find the *k* nearest neighbours in the embedding space.
 
         Args:
@@ -169,11 +171,13 @@ class FaceEnrollment:
             #   dist=1.5  →  31%  (probably different)
             #   dist=2.0  →  20%  (different person)
             confidence = 1.0 / (1.0 + dist * dist)
-            results.append({
-                "name": name,
-                "confidence": round(confidence, 4),
-                "distance": round(dist, 4),
-            })
+            results.append(
+                {
+                    "name": name,
+                    "confidence": round(confidence, 4),
+                    "distance": round(dist, 4),
+                }
+            )
 
         return results
 
@@ -229,7 +233,7 @@ class FaceEnrollment:
             new_index = self._create_index()
             kept_ids = [i for i, m in enumerate(self.metadata) if m["name"] != name]
 
-            if hasattr(self.index, 'reconstruct'):
+            if hasattr(self.index, "reconstruct"):
                 # index.reconstruct() works for IndexFlat, IndexHNSW, IndexIVF
                 for kid in kept_ids:
                     vec = self.index.reconstruct(kid)
@@ -237,10 +241,9 @@ class FaceEnrollment:
                 self.index = new_index
             else:
                 # Fallback: clear everything
-                logger = __import__('logging').getLogger(__name__)
+                logger = __import__("logging").getLogger(__name__)
                 logger.warning(
-                    "FAISS index type %s does not support reconstruction. "
-                    "Clearing all embeddings.",
+                    "FAISS index type %s does not support reconstruction. Clearing all embeddings.",
                     type(self.index).__name__,
                 )
                 self.index = self._create_index()
@@ -252,7 +255,7 @@ class FaceEnrollment:
 
         self._save()
         removed = before - (len(self.metadata) - kept_count)
-        logger = __import__('logging').getLogger(__name__)
+        logger = __import__("logging").getLogger(__name__)
         logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, name)
         return True
 
@@ -291,16 +294,15 @@ class FaceEnrollment:
 
         # Rebuild the index with all vectors, renamed metadata
         new_index = self._create_index()
-        if hasattr(self.index, 'reconstruct'):
+        if hasattr(self.index, "reconstruct"):
             for i in range(self.index.ntotal):
                 vec = self.index.reconstruct(i)
                 new_index.add(vec.reshape(1, -1))
             self.index = new_index
         else:
-            logger = __import__('logging').getLogger(__name__)
+            logger = __import__("logging").getLogger(__name__)
             logger.warning(
-                "FAISS index type %s does not support reconstruction. "
-                "Clearing all embeddings during rename.",
+                "FAISS index type %s does not support reconstruction. Clearing all embeddings during rename.",
                 type(self.index).__name__,
             )
             self.index = self._create_index()
@@ -313,7 +315,7 @@ class FaceEnrollment:
             m["id"] = i
 
         self._save()
-        logger = __import__('logging').getLogger(__name__)
+        logger = __import__("logging").getLogger(__name__)
         logger.info("Renamed %d embedding(s) '%s' → '%s' in FAISS", before, old_name, new_name)
         return True
 
@@ -366,25 +368,26 @@ class FaceEnrollment:
         new_metadata: List[Dict] = []
         dropped = 0
 
-        if hasattr(self.index, 'reconstruct'):
+        if hasattr(self.index, "reconstruct"):
             for i in range(old_count):
                 try:
                     vec = self.index.reconstruct(i)
                     new_index.add(vec.reshape(1, -1))
                     # Only keep metadata if reconstruction succeeded
                     if i < len(self.metadata):
-                        new_metadata.append({
-                            "name": self.metadata[i]["name"],
-                            "id": len(new_metadata),
-                        })
+                        new_metadata.append(
+                            {
+                                "name": self.metadata[i]["name"],
+                                "id": len(new_metadata),
+                            }
+                        )
                 except Exception as exc:
                     dropped += 1
                     logger.warning("Failed to reconstruct embedding %d: %s", i, exc)
             self.index = new_index
         else:
             logger.warning(
-                "FAISS index type %s does not support reconstruction. "
-                "Clearing all embeddings.",
+                "FAISS index type %s does not support reconstruction. Clearing all embeddings.",
                 type(self.index).__name__,
             )
             self.index = self._create_index()
@@ -398,13 +401,16 @@ class FaceEnrollment:
             logger.warning(
                 "FAISS index rebuilt — %d/%d embedding(s) preserved, %d dropped."
                 " Metadata for %d person(s) updated.",
-                self.index.ntotal, old_count, dropped, len(self.metadata),
+                self.index.ntotal,
+                old_count,
+                dropped,
+                len(self.metadata),
             )
         else:
             logger.info(
-                "FAISS index rebuilt — all %d embedding(s) preserved."
-                " Metadata for %d person(s) updated.",
-                self.index.ntotal, len(self.metadata),
+                "FAISS index rebuilt — all %d embedding(s) preserved. Metadata for %d person(s) updated.",
+                self.index.ntotal,
+                len(self.metadata),
             )
 
     def status(self) -> Dict:

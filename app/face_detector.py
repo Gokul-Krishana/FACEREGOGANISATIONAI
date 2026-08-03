@@ -15,10 +15,8 @@ Model: yolo11n.pt (COCO-trained, detects "person" class)
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List, Optional, Tuple
 
-import cv2
 import numpy as np
 from ultralytics import YOLO
 
@@ -44,8 +42,7 @@ class FaceDetector:
 
     # ── Public API ────────────────────────────────────────────
 
-    def detect(self, frame: np.ndarray, conf_threshold: float = cfg.YOLO_CONFIDENCE
-               ) -> List[dict]:
+    def detect(self, frame: np.ndarray, conf_threshold: float = cfg.YOLO_CONFIDENCE) -> List[dict]:
         """Detect people in a frame.
 
         Only detections of class ``person`` (COCO class 0) are returned.
@@ -78,16 +75,19 @@ class FaceDetector:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             confidence = float(box.conf[0])
 
-            detections.append({
-                "bbox": (x1, y1, x2, y2),
-                "confidence": confidence,
-                "class_id": class_id,
-            })
+            detections.append(
+                {
+                    "bbox": (x1, y1, x2, y2),
+                    "confidence": confidence,
+                    "class_id": class_id,
+                }
+            )
 
         return detections
 
-    def crop_person(self, frame: np.ndarray, bbox: Tuple[int, int, int, int],
-                    padding: float = 0.15) -> np.ndarray:
+    def crop_person(
+        self, frame: np.ndarray, bbox: Tuple[int, int, int, int], padding: float = 0.15
+    ) -> np.ndarray:
         """Crop the person region from the frame with padding.
 
         Args:

@@ -18,27 +18,25 @@ import os
 from pathlib import Path
 import sys
 import time
-import threading
 
 _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
-import pandas as pd
+import streamlit as st  # noqa: E402
 
-from database.database import get_session
-from database.repository import EmployeeRepo, AttendanceRepo, UnknownFaceRepo
-from services.attendance_service import AttendanceService
-from services.employee_service import EmployeeService
-import config.config as cfg
+from database.database import get_session  # noqa: E402
+from database.repository import EmployeeRepo, UnknownFaceRepo  # noqa: E402
+from services.attendance_service import AttendanceService  # noqa: E402
+from services.employee_service import EmployeeService  # noqa: E402
+import config.config as cfg  # noqa: E402
 
 st.set_page_config(page_title="System Health", page_icon="🩺", layout="wide")
 
 
 # ── Health Check Functions ─────────────────────────────────────
 
-from sqlalchemy import text as _sa_text
+from sqlalchemy import text as _sa_text  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +57,18 @@ def check_database() -> dict:
 def check_camera() -> dict:
     """Check if a camera device is available (cached to avoid repeated open/close)."""
     import cv2
+
     try:
         cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if cap.isOpened():
             ret, frame = cap.read()
             cap.release()
             if ret and frame is not None:
-                return {"status": "ok", "device": "Device #0", "resolution": f"{frame.shape[1]}x{frame.shape[0]}"}
+                return {
+                    "status": "ok",
+                    "device": "Device #0",
+                    "resolution": f"{frame.shape[1]}x{frame.shape[0]}",
+                }
             return {"status": "warning", "device": "Device #0", "message": "Opened but no frame"}
         return {"status": "error", "message": "No camera found on index 0"}
     except Exception as e:
@@ -77,6 +80,7 @@ def check_yolo() -> dict:
     """Check if YOLO model file exists and can be loaded (cached 10s)."""
     try:
         from app.face_detector import FaceDetector
+
         model_path = Path(cfg.YOLO_MODEL_PATH)
         if not model_path.exists():
             return {"status": "error", "message": f"Model not found: {model_path}"}
@@ -96,6 +100,7 @@ def check_arcface() -> dict:
     """Check if InsightFace is loaded (cached 10s)."""
     try:
         from app.recognizer import FaceRecognizer
+
         recognizer = FaceRecognizer()
         dim = recognizer.embedding_dim()
         return {
@@ -112,6 +117,7 @@ def check_faiss() -> dict:
     """Check if FAISS index is loaded (cached 10s)."""
     try:
         from app.enrollment import FaceEnrollment
+
         enrollment = FaceEnrollment()
         count = enrollment.count()
         index_path = Path(cfg.FAISS_INDEX_PATH)
@@ -134,8 +140,8 @@ def check_recognition_pipeline() -> dict:
         import numpy as np
 
         detector = FaceDetector()
-        recognizer = FaceRecognizer()
-        enrollment = FaceEnrollment()
+        _recognizer = FaceRecognizer()
+        _enrollment = FaceEnrollment()
 
         test_img = np.zeros((480, 640, 3), dtype=np.uint8)
         detections = detector.detect(test_img)
@@ -154,13 +160,14 @@ def check_recognition_pipeline() -> dict:
 def check_disk_space() -> dict:
     """Check available disk space (cached 10s)."""
     import shutil
+
     try:
         total, used, free = shutil.disk_usage(cfg.ROOT_DIR)
-        free_gb = free / (1024 ** 3)
+        free_gb = free / (1024**3)
         return {
             "status": "ok" if free_gb > 1 else "warning",
             "free_gb": round(free_gb, 1),
-            "total_gb": round(total / (1024 ** 3), 1),
+            "total_gb": round(total / (1024**3), 1),
         }
     except Exception as _exc:
         logger.warning("Disk-space check failed: %s", _exc)
@@ -177,6 +184,7 @@ def check_redis() -> dict:
     """
     try:
         import redis as redis_lib
+
         url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         client = redis_lib.Redis.from_url(url, socket_timeout=2, socket_connect_timeout=2)
         pong = client.ping()
@@ -196,6 +204,7 @@ def check_gpu() -> dict:
     """Check GPU (CUDA) availability for inference acceleration (cached 10s)."""
     try:
         import torch
+
         if torch.cuda.is_available():
             return {
                 "status": "ok",
@@ -225,13 +234,23 @@ def check_spoof_attempts() -> dict:
         _now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         start_of_day = _now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         with get_session() as session:
-            today = session.query(_sa_func.count(RecognitionLog.id)).filter(
-                RecognitionLog.is_spoof.is_(True),
-                RecognitionLog.timestamp >= start_of_day,
-            ).scalar() or 0
-            total = session.query(_sa_func.count(RecognitionLog.id)).filter(
-                RecognitionLog.is_spoof.is_(True),
-            ).scalar() or 0
+            today = (
+                session.query(_sa_func.count(RecognitionLog.id))
+                .filter(
+                    RecognitionLog.is_spoof.is_(True),
+                    RecognitionLog.timestamp >= start_of_day,
+                )
+                .scalar()
+                or 0
+            )
+            total = (
+                session.query(_sa_func.count(RecognitionLog.id))
+                .filter(
+                    RecognitionLog.is_spoof.is_(True),
+                )
+                .scalar()
+                or 0
+            )
         return {"status": "ok", "today": int(today), "total": int(total)}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -257,6 +276,7 @@ def get_live_pipeline_status() -> dict:
 
 # ── Render Status Indicator ────────────────────────────────────
 
+
 def render_status(status: str, label: str, detail: str = "", help_text: str = "") -> None:
     """Render a color-coded status indicator."""
     icons = {"ok": "✅", "warning": "⚠️", "error": "❌", "unknown": "❓"}
@@ -276,8 +296,8 @@ def render_status(status: str, label: str, detail: str = "", help_text: str = ""
                 <span style="font-size: 24px;">{icon}</span>
                 <div>
                     <strong style="color: {color};">{label}</strong>
-                    {f'<br><span style="color: #aaaaaa; font-size: 0.85em;">{detail}</span>' if detail else ''}
-                    {f'<br><span style="color: #ff6666; font-size: 0.85em;">{help_text}</span>' if help_text else ''}
+                    {f'<br><span style="color: #aaaaaa; font-size: 0.85em;">{detail}</span>' if detail else ""}
+                    {f'<br><span style="color: #ff6666; font-size: 0.85em;">{help_text}</span>' if help_text else ""}
                 </div>
             </div>
         </div>
@@ -391,10 +411,16 @@ all_ok = all(
 if all_ok:
     st.success("✅ **All systems operational** — every component is running normally.")
 else:
-    warnings = sum(1 for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
-                   if h.get("status") == "warning")
-    errors = sum(1 for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
-                 if h.get("status") == "error")
+    warnings = sum(
+        1
+        for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
+        if h.get("status") == "warning"
+    )
+    errors = sum(
+        1
+        for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
+        if h.get("status") == "error"
+    )
     st.warning(f"⚠️ **{errors} error(s), {warnings} warning(s)** — some components need attention.")
 
 st.divider()
@@ -409,7 +435,9 @@ with col1:
     render_status(db_health["status"], "SQLite Database", db_detail, db_error)
 
     st.markdown("### 📷 Camera")
-    cam_detail = cam_health.get("resolution", "") if cam_health["status"] == "ok" else cam_health.get("message", "")
+    cam_detail = (
+        cam_health.get("resolution", "") if cam_health["status"] == "ok" else cam_health.get("message", "")
+    )
     cam_error = cam_health.get("message", "") if cam_health["status"] == "error" else ""
     render_status(cam_health["status"], "Camera Device", cam_detail, cam_error)
 
@@ -420,18 +448,24 @@ with col2:
     render_status(yolo_health["status"], "Person Detection (YOLO11)", yolo_detail, yolo_error)
 
     st.markdown("### 👤 ArcFace")
-    arcface_detail = f"Dim: {arcface_health.get('embedding_dim', '?')}" if arcface_health["status"] == "ok" else ""
+    arcface_detail = (
+        f"Dim: {arcface_health.get('embedding_dim', '?')}" if arcface_health["status"] == "ok" else ""
+    )
     arcface_error = arcface_health.get("message", "") if arcface_health["status"] != "ok" else ""
     render_status(arcface_health["status"], "Face Recognition (ArcFace)", arcface_detail, arcface_error)
 
 with col3:
     st.markdown("### 🔍 FAISS")
-    faiss_detail = f"{faiss_health.get('embeddings', '?')} embeddings" if faiss_health["status"] == "ok" else ""
+    faiss_detail = (
+        f"{faiss_health.get('embeddings', '?')} embeddings" if faiss_health["status"] == "ok" else ""
+    )
     faiss_error = faiss_health.get("message", "") if faiss_health["status"] != "ok" else ""
     render_status(faiss_health["status"], "Vector Search (FAISS)", faiss_detail, faiss_error)
 
     st.markdown("### 💾 Disk")
-    disk_detail = f"{disk_health.get('free_gb', '?')} GB free" if disk_health["status"] in ("ok", "warning") else ""
+    disk_detail = (
+        f"{disk_health.get('free_gb', '?')} GB free" if disk_health["status"] in ("ok", "warning") else ""
+    )
     disk_error = "Low disk space" if disk_health["status"] == "warning" else ""
     render_status(disk_health["status"], "Disk Space", disk_detail, disk_error)
 
@@ -447,7 +481,11 @@ with col4:
 with col5:
     st.markdown("### 🎮 GPU")
     gpu_detail = gpu_health.get("device", "") if gpu_health["status"] in ("ok", "warning") else ""
-    gpu_error = gpu_health.get("message", "") if gpu_health["status"] not in ("ok", "warning") else gpu_health.get("message", "")
+    gpu_error = (
+        gpu_health.get("message", "")
+        if gpu_health["status"] not in ("ok", "warning")
+        else gpu_health.get("message", "")
+    )
     render_status(gpu_health["status"], "Inference Accelerator", gpu_detail, gpu_error)
 
 with col6:
@@ -458,7 +496,11 @@ with col6:
     elif live_health["status"] == "error":
         render_status("error", "Pipeline Unavailable", live_health.get("message", ""))
     else:
-        _live_color = "ok" if live_health["status"] == "LIVE" else ("warning" if live_health["status"] in ("CONNECTING", "RECONNECTING") else "error")
+        _live_color = (
+            "ok"
+            if live_health["status"] == "LIVE"
+            else ("warning" if live_health["status"] in ("CONNECTING", "RECONNECTING") else "error")
+        )
         render_status(
             _live_color,
             f"Camera {live_health['status']}",
@@ -517,10 +559,10 @@ with st.expander("📋 Detailed System Information"):
         st.markdown("**Configuration**")
         st.code(f"""
 Python:      {sys.version.split()[0]}
-Streamlit:   {st.__version__ if hasattr(st, '__version__') else '?'}
+Streamlit:   {st.__version__ if hasattr(st, "__version__") else "?"}
 Config File: {cfg.SETTINGS_PATH}
 Models Dir:  {cfg.MODELS_DIR}
-DB Path:     {cfg.ROOT_DIR / 'data' / 'app.db'}
+DB Path:     {cfg.ROOT_DIR / "data" / "app.db"}
 FAISS Index: {cfg.FAISS_INDEX_PATH}
         """)
 

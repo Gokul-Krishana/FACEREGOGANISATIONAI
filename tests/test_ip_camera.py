@@ -26,6 +26,7 @@ from camera.phone import IPCameraSource
 #  Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture()
 def sample_frame() -> np.ndarray:
     """Return a fake 480x640 BGR frame."""
@@ -35,6 +36,7 @@ def sample_frame() -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════
 #  Mock helpers
 # ═══════════════════════════════════════════════════════════════
+
 
 def _mock_cap_opened(ret_read: bool = True, frame=None):
     """Create a mock ``cv2.VideoCapture`` that reports as opened."""
@@ -49,13 +51,15 @@ def _mock_cap_opened(ret_read: bool = True, frame=None):
         )
     else:
         mock_cap.read.return_value = (False, None)
+
     # Simulate cap.get(prop) returning values like 640, 480
     def mock_get(prop):
-        if prop == 3:   # CAP_PROP_FRAME_WIDTH
+        if prop == 3:  # CAP_PROP_FRAME_WIDTH
             return 640.0
-        if prop == 4:   # CAP_PROP_FRAME_HEIGHT
+        if prop == 4:  # CAP_PROP_FRAME_HEIGHT
             return 480.0
         return 0.0
+
     mock_cap.get.side_effect = mock_get
     mock_cap.set.return_value = True
     return mock_cap
@@ -71,6 +75,7 @@ def _mock_cap_closed():
 # ═══════════════════════════════════════════════════════════════
 #  Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestIPCameraSource:
     """Tests for IPCameraSource construction and metadata."""
@@ -194,8 +199,8 @@ class TestIPCameraSource:
         assert cam._width == 1280
         assert cam._height == 720
         # Verify set() was called on the VideoCapture
-        cam._cap.set.assert_any_call(3, 1280)    # CAP_PROP_FRAME_WIDTH
-        cam._cap.set.assert_any_call(4, 720)    # CAP_PROP_FRAME_HEIGHT
+        cam._cap.set.assert_any_call(3, 1280)  # CAP_PROP_FRAME_WIDTH
+        cam._cap.set.assert_any_call(4, 720)  # CAP_PROP_FRAME_HEIGHT
 
     @patch("cv2.VideoCapture")
     def test_get_resolution_before_open(self, mock_vc):
@@ -229,7 +234,7 @@ class TestIPCameraSource:
         # open() should create the capture then apply stored resolution
         cam.open()
         # Verify set() was called on the VideoCapture with the stored values
-        mock_cap.set.assert_any_call(3, 1920)   # CAP_PROP_FRAME_WIDTH
+        mock_cap.set.assert_any_call(3, 1920)  # CAP_PROP_FRAME_WIDTH
         mock_cap.set.assert_any_call(4, 1080)  # CAP_PROP_FRAME_HEIGHT
 
     # ── Info dict ─────────────────────────────────────────────

@@ -13,12 +13,10 @@ Workflow::
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from datetime import date
 from typing import List, Optional
 
 import cv2
-import numpy as np
 
 import config.config as cfg
 from database.database import get_session
@@ -165,10 +163,10 @@ class UnknownFaceService:
                 employee_id=employee_id,
                 name=name,
                 department=department,
-                photo_path=image_path,
+                photo_path=image_path,  # type: ignore[arg-type]
                 operator="dashboard",
             )
-            emp_db_id = emp.id
+            _emp_db_id = emp.id
         except ValueError as exc:
             logger.warning("Employee creation failed: %s", exc)
             return False
@@ -177,7 +175,7 @@ class UnknownFaceService:
         try:
             enrollment = FaceEnrollment()
             enrollment.enroll(name, embedding)
-            faiss_id = enrollment.count() - 1  # 0-based index of the new entry
+            _faiss_id = enrollment.count() - 1  # 0-based index of the new entry
         except Exception as exc:
             logger.error("Failed to add to FAISS: %s", exc)
             # Clean up the employee record since FAISS failed
@@ -194,7 +192,9 @@ class UnknownFaceService:
         )
         logger.info(
             "Converted unknown face #%d → %s (%s)",
-            face_id, name, employee_id,
+            face_id,
+            name,
+            employee_id,
         )
         return True
 

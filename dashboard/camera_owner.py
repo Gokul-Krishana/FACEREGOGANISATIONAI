@@ -7,14 +7,14 @@ resource conflicts between multiple components.
 
 Usage:
     from dashboard.camera_owner import CameraOwner
-    
+
     owner = CameraOwner.get()
-    
+
     # Check if we can acquire
     if owner.can_acquire():
         owner.acquire(camera, pipeline)
         # ... use camera ...
-    
+
     # Release when done
     owner.release()
 """
@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from importlib import import_module
     from camera.base import CameraSource
+
     # NOTE: "04_Live" is not a valid Python module identifier (starts with a
     # digit), so it cannot be used in a plain ``from ... import`` statement.
     # Load it via importlib for static type checkers only (never runs).
@@ -37,24 +38,24 @@ if TYPE_CHECKING:
 class CameraOwner:
     """
     Singleton that manages exclusive camera ownership.
-    
+
     Key principles:
     1. Only one owner at a time
     2. Clean START→STOP→START transitions
     3. Survives Streamlit reruns
     4. Thread-safe operations
     """
-    
+
     _instance: Optional["CameraOwner"] = None
     _lock = threading.Lock()
-    
+
     def __new__(cls) -> "CameraOwner":
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance._initialize()
             return cls._instance
-    
+
     def _initialize(self) -> None:
         """Initialize camera owner state."""
         self._camera: Optional["CameraSource"] = None
@@ -62,12 +63,12 @@ class CameraOwner:
         self._owner_id: Optional[str] = None
         self._state: str = "FREE"  # FREE, ACQUIRED, RELEASING
         self._state_lock = threading.Lock()
-    
+
     @classmethod
     def get(cls) -> "CameraOwner":
         """Get singleton instance."""
         return cls()
-    
+
     @classmethod
     def reset(cls) -> None:
         """Reset singleton (for testing/debugging)."""
@@ -75,23 +76,23 @@ class CameraOwner:
             if cls._instance is not None:
                 cls._instance._force_release()
                 cls._instance = None
-    
+
     @property
     def camera(self) -> Optional["CameraSource"]:
         """Get current camera if owned."""
         return self._camera
-    
+
     @property
     def pipeline(self) -> Optional["LiveRecognitionPipeline"]:
         """Get current pipeline if owned."""
         return self._pipeline
-    
+
     @property
     def state(self) -> str:
         """Get current ownership state."""
         with self._state_lock:
             return self._state
-    
+
     def can_acquire(self, pipeline_id: Optional[str] = None) -> bool:
         """Check if camera can be acquired.
 
@@ -101,23 +102,23 @@ class CameraOwner:
         """
         with self._state_lock:
             return self._state == "FREE"
-    
+
     def acquire(self, camera: "CameraSource", pipeline: "LiveRecognitionPipeline") -> bool:
         """
         Acquire camera ownership.
-        
+
         Returns True if acquisition successful, False if already owned.
         """
         with self._state_lock:
             if self._state != "FREE":
                 return False
-            
+
             self._camera = camera
             self._pipeline = pipeline
             self._owner_id = f"pipeline_{id(pipeline)}"
             self._state = "ACQUIRED"
             return True
-    
+
     def release(self) -> None:
         """Release camera ownership and clean up resources.
 
@@ -155,7 +156,7 @@ class CameraOwner:
                 camera.release()
             except Exception:
                 pass
-    
+
     def _force_release(self) -> None:
         """Force release without cleanup (for reset)."""
         try:
@@ -163,23 +164,23 @@ class CameraOwner:
                 self._pipeline.stop()
         except Exception:
             pass
-        
+
         try:
             if self._camera is not None:
                 self._camera.release()
         except Exception:
             pass
-        
+
         self._camera = None
         self._pipeline = None
         self._owner_id = None
         self._state = "FREE"
-    
+
     def is_owned(self) -> bool:
         """Check if camera is currently owned."""
         with self._state_lock:
             return self._state == "ACQUIRED"
-    
+
     def get_status(self) -> dict:
         """Get detailed ownership status."""
         with self._state_lock:

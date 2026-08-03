@@ -32,24 +32,24 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 # Ensure project root is on path
 _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import cv2
-import requests
+import cv2  # noqa: E402
+import requests  # noqa: E402
 
-from camera.discovery import scan_network
-from camera.webcam import list_webcams
-from camera.selector import create_camera
+from camera.discovery import scan_network  # noqa: E402
+from camera.webcam import list_webcams  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════
 #  ANSI helpers
 # ═══════════════════════════════════════════════════════════════
+
 
 class Color:
     GREEN = "\033[92m"
@@ -64,17 +64,22 @@ class Color:
 def ok(text: str) -> str:
     return f"{Color.GREEN}✅ {text}{Color.RESET}"
 
+
 def warn(text: str) -> str:
     return f"{Color.YELLOW}⚠️  {text}{Color.RESET}"
+
 
 def fail(text: str) -> str:
     return f"{Color.RED}❌ {text}{Color.RESET}"
 
+
 def info(text: str) -> str:
     return f"{Color.CYAN}{text}{Color.RESET}"
 
+
 def dim(text: str) -> str:
     return f"{Color.GRAY}{text}{Color.RESET}"
+
 
 def heading(text: str) -> str:
     return f"\n{Color.BOLD}{'=' * 60}\n  {text}\n{'=' * 60}{Color.RESET}"
@@ -151,6 +156,7 @@ def test_usb_cameras() -> Dict[str, List[int]]:
     for dev_id in range(1, 4):
         try:
             from camera.phone import AndroidUSBSource
+
             cam = AndroidUSBSource(device_id=dev_id)
             if cam.open():
                 info = cam.info()
@@ -182,6 +188,7 @@ def test_usb_cameras() -> Dict[str, List[int]]:
     for dev_id in range(2, 5):
         try:
             from camera.phone import iPhoneUSBSource
+
             cam = iPhoneUSBSource(device_id=dev_id)
             if cam.open():
                 info = cam.info()
@@ -295,7 +302,7 @@ def test_custom_urls() -> None:
 
     while True:
         try:
-            ip = input(f"  Enter IP to test (or press Enter to skip): ").strip()
+            ip = input("  Enter IP to test (or press Enter to skip): ").strip()
             if not ip:
                 break
 
@@ -364,32 +371,46 @@ def print_summary(
     # Android USB (DroidCam)
     usb_android = usb_results.get("android_usb", [])
     if usb_android:
-        print(f"  {'📱 Android (USB) DroidCam':<28} {ok('Available'):<12} {f'Device index(es): {usb_android}'}")
+        print(
+            f"  {'📱 Android (USB) DroidCam':<28} {ok('Available'):<12} {f'Device index(es): {usb_android}'}"
+        )
     else:
-        print(f"  {'📱 Android (USB) DroidCam':<28} {warn('Not tested'):<12} {'Connect phone via USB, start DroidCam'}")
+        print(
+            f"  {'📱 Android (USB) DroidCam':<28} {warn('Not tested'):<12} {'Connect phone via USB, start DroidCam'}"
+        )
 
     # iPhone USB (EpocCam)
     usb_iphone = usb_results.get("iphone_usb", [])
     if usb_iphone:
         print(f"  {'📱 iPhone (USB) EpocCam':<28} {ok('Available'):<12} {f'Device index(es): {usb_iphone}'}")
     else:
-        print(f"  {'📱 iPhone (USB) EpocCam':<28} {warn('Not tested'):<12} {'Connect iPhone via USB, start EpocCam'}")
+        print(
+            f"  {'📱 iPhone (USB) EpocCam':<28} {warn('Not tested'):<12} {'Connect iPhone via USB, start EpocCam'}"
+        )
 
     # Android Wi-Fi (IP Webcam)
     if wifi_results.get("android_wifi"):
-        print(f"  {'📱 Android (Wi-Fi) IP Webcam':<28} {ok('Available'):<12} {'http://192.168.1.100:8080/video'}")
+        print(
+            f"  {'📱 Android (Wi-Fi) IP Webcam':<28} {ok('Available'):<12} {'http://192.168.1.100:8080/video'}"
+        )
     else:
-        print(f"  {'📱 Android (Wi-Fi) IP Webcam':<28} {warn('Not found'):<12} {'Start IP Webcam on Android'}")
+        print(
+            f"  {'📱 Android (Wi-Fi) IP Webcam':<28} {warn('Not found'):<12} {'Start IP Webcam on Android'}"
+        )
 
     # Android Wi-Fi (DroidCam)
     if wifi_results.get("android_usb"):
-        print(f"  {'📱 Android Wi-Fi DroidCam':<28} {ok('Available'):<12} {'http://192.168.1.100:4747/video'}")
+        print(
+            f"  {'📱 Android Wi-Fi DroidCam':<28} {ok('Available'):<12} {'http://192.168.1.100:4747/video'}"
+        )
     else:
         print(f"  {'📱 Android Wi-Fi DroidCam':<28} {warn('Not found'):<12} {'Start DroidCam in Wi-Fi mode'}")
 
     # iPhone Wi-Fi (EpocCam)
     if wifi_results.get("iphone_wifi"):
-        print(f"  {'📱 iPhone (Wi-Fi) EpocCam':<28} {ok('Available'):<12} {'http://192.168.1.101:8080/video'}")
+        print(
+            f"  {'📱 iPhone (Wi-Fi) EpocCam':<28} {ok('Available'):<12} {'http://192.168.1.101:8080/video'}"
+        )
     else:
         print(f"  {'📱 iPhone (Wi-Fi) EpocCam':<28} {warn('Not found'):<12} {'Start EpocCam on iPhone'}")
 
@@ -415,6 +436,7 @@ def print_summary(
 #  Main
 # ═══════════════════════════════════════════════════════════════
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Diagnose all phone camera types for the Face Recognition AI system.",
@@ -422,17 +444,20 @@ def main() -> None:
         epilog=__doc__,
     )
     parser.add_argument(
-        "--network-scan", "-n",
+        "--network-scan",
+        "-n",
         action="store_true",
         help="Perform a full /24 subnet scan (takes ~10 seconds)",
     )
     parser.add_argument(
-        "--quick", "-q",
+        "--quick",
+        "-q",
         action="store_true",
         help="Skip network tests — USB / webcam only",
     )
     parser.add_argument(
-        "--custom", "-c",
+        "--custom",
+        "-c",
         action="store_true",
         help="Prompt for custom IP addresses to test",
     )

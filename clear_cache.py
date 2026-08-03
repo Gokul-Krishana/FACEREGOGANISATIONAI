@@ -47,16 +47,12 @@ def clear_cache(root: Path, dry_run: bool = False) -> int:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Clear all __pycache__ directories in the project"
+    parser = argparse.ArgumentParser(description="Clear all __pycache__ directories in the project")
+    parser.add_argument(
+        "--dry", action="store_true", help="Preview what would be deleted without actually deleting"
     )
     parser.add_argument(
-        "--dry", action="store_true",
-        help="Preview what would be deleted without actually deleting"
-    )
-    parser.add_argument(
-        "--root", type=str, default=None,
-        help="Root directory to search (default: script's parent directory)"
+        "--root", type=str, default=None, help="Root directory to search (default: script's parent directory)"
     )
     args = parser.parse_args()
 

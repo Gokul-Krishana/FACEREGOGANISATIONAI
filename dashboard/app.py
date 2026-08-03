@@ -27,7 +27,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import streamlit as st
+import streamlit as st  # noqa: E402
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
@@ -65,6 +65,7 @@ st.sidebar.divider()
 # ── Auto-initialization ─────────────────────────────────────
 try:
     from database.database import init_db
+
     init_db()
 except Exception as e:
     st.sidebar.error(f"DB init failed: {e}")
@@ -72,6 +73,7 @@ except Exception as e:
 # ── Auto-cleanup → Silently handle errors ───────────────────
 try:
     from services.unknown_face_service import UnknownFaceService
+
     deleted = UnknownFaceService.auto_cleanup()
     if deleted:
         st.sidebar.info(f"🧹 Auto-cleaned {deleted} old unknown faces")
@@ -85,12 +87,14 @@ st.sidebar.caption("**Face Recognition AI v1.0**")
 # Try to show enrolled count
 try:
     from app.enrollment import FaceEnrollment
+
     _enr = FaceEnrollment()
     st.sidebar.caption(f"🧠 {_enr.count()} embeddings in FAISS")
 except Exception:
     pass
 
-import config.config as cfg
+import config.config as cfg  # noqa: E402
+
 st.sidebar.caption(f"⚙️ Threshold: {cfg.RECOGNITION_THRESHOLD}")
 st.sidebar.caption(f"📷 Source: {cfg.CAMERA_SOURCE_TYPE}")
 

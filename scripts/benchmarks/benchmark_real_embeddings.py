@@ -29,8 +29,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.recognizer import FaceRecognizer
-from app.enrollment import FaceEnrollment
+from app.recognizer import FaceRecognizer  # noqa: E402
+from app.enrollment import FaceEnrollment  # noqa: E402
 
 
 def _search_per_query(index, queries: np.ndarray, k: int) -> Tuple[np.ndarray, Dict[str, float]]:
@@ -40,17 +40,19 @@ def _search_per_query(index, queries: np.ndarray, k: int) -> Tuple[np.ndarray, D
     for i in range(n):
         q = queries[i : i + 1]
         t0 = time.perf_counter()
-        _, I = index.search(q, k)
+        _, idx = index.search(q, k)
         t1 = time.perf_counter()
         per_times[i] = (t1 - t0) * 1000
-        all_indices[i] = I[0]
+        all_indices[i] = idx[0]
     per_times.sort()
-    return all_indices, {"avg_ms": round(float(per_times.mean()), 4),
-                         "p50_ms": round(float(np.median(per_times)), 4),
-                         "p95_ms": round(float(per_times[int(n * 0.95)]), 4),
-                         "p99_ms": round(float(per_times[int(n * 0.99)]), 4),
-                         "min_ms": round(float(per_times[0]), 4),
-                         "max_ms": round(float(per_times[-1]), 4)}
+    return all_indices, {
+        "avg_ms": round(float(per_times.mean()), 4),
+        "p50_ms": round(float(np.median(per_times)), 4),
+        "p95_ms": round(float(per_times[int(n * 0.95)]), 4),
+        "p99_ms": round(float(per_times[int(n * 0.99)]), 4),
+        "min_ms": round(float(per_times[0]), 4),
+        "max_ms": round(float(per_times[-1]), 4),
+    }
 
 
 def _recall(reference: np.ndarray, actual: np.ndarray, k: int) -> float:
@@ -86,7 +88,9 @@ def load_real_embeddings() -> Tuple[List[np.ndarray], List[str], List[str]]:
     enrolled_count = enrollment.count()
     enrolled_names = enrollment.all_persons()
     if enrolled_count > 0:
-        print(f"\n  Existing FAISS index: {enrolled_count} embeddings ({len(enrolled_names)} unique): {enrolled_names}")
+        print(
+            f"\n  Existing FAISS index: {enrolled_count} embeddings ({len(enrolled_names)} unique): {enrolled_names}"
+        )
         print(f"  Extracted {len(embeddings)} embeddings from dataset/ images")
 
     if len(embeddings) < 2:
@@ -129,7 +133,7 @@ def main() -> int:
     nlist = max(4, int(np.sqrt(n)))
     quantizer = faiss.IndexFlatL2(dim)
     ivf = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_L2)
-    ivf.train(embeddings[:min(n, max(nlist * 20, n))])
+    ivf.train(embeddings[: min(n, max(nlist * 20, n))])
     ivf.add(embeddings)
     ivf.nprobe = min(16, nlist)
 
@@ -144,16 +148,32 @@ def main() -> int:
     hnsw_idx, hnsw_lat = _search_per_query(hnsw, embeddings[:nq], k)
 
     results: Dict[str, Any] = {
-        "config": {"n_embeddings": n, "dimension": dim, "queries": nq, "k": k,
-                   "names": names[:nq],
-                   "note": "Real ArcFace embeddings. Small N - limited statistical significance."},
+        "config": {
+            "n_embeddings": n,
+            "dimension": dim,
+            "queries": nq,
+            "k": k,
+            "names": names[:nq],
+            "note": "Real ArcFace embeddings. Small N - limited statistical significance.",
+        },
         "flat_baseline": {"index": "IndexFlatL2 (exact)", **flat_lat, "recall_at_1": 1.0},
-        "ivf": {"index": "IndexIVFFlat", "nlist": nlist, "nprobe": ivf.nprobe, **ivf_lat,
-                "recall_at_1": round(_recall(gt, ivf_idx, 1), 4),
-                "recall_at_5": round(_recall(gt, ivf_idx, 5), 4)},
-        "hnsw": {"index": "IndexHNSWFlat", "M": 32, "efConstruction": 200, "efSearch": 128, **hnsw_lat,
-                 "recall_at_1": round(_recall(gt, hnsw_idx, 1), 4),
-                 "recall_at_5": round(_recall(gt, hnsw_idx, 5), 4)},
+        "ivf": {
+            "index": "IndexIVFFlat",
+            "nlist": nlist,
+            "nprobe": ivf.nprobe,
+            **ivf_lat,
+            "recall_at_1": round(_recall(gt, ivf_idx, 1), 4),
+            "recall_at_5": round(_recall(gt, ivf_idx, 5), 4),
+        },
+        "hnsw": {
+            "index": "IndexHNSWFlat",
+            "M": 32,
+            "efConstruction": 200,
+            "efSearch": 128,
+            **hnsw_lat,
+            "recall_at_1": round(_recall(gt, hnsw_idx, 1), 4),
+            "recall_at_5": round(_recall(gt, hnsw_idx, 5), 4),
+        },
     }
 
     print("\n[3/3] Saving results...")
@@ -161,13 +181,15 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(results, indent=2))
 
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * 72}")
     print("  RESULTS SUMMARY")
-    print(f"{'='*72}")
+    print(f"{'=' * 72}")
     print(f"\n  Database: {n} real ArcFace embeddings, Queries: {nq}")
-    for key, label in [("flat_baseline", "IndexFlatL2 (exact)"),
-                        ("ivf", f"IVF (nlist={nlist}, nprobe={ivf.nprobe})"),
-                        ("hnsw", "HNSW (M=32, efSearch=128)")]:
+    for key, label in [
+        ("flat_baseline", "IndexFlatL2 (exact)"),
+        ("ivf", f"IVF (nlist={nlist}, nprobe={ivf.nprobe})"),
+        ("hnsw", "HNSW (M=32, efSearch=128)"),
+    ]:
         idx = results.get(key, {})
         print(f"  {label}:")
         print(f"    Avg: {idx.get('avg_ms', 'N/A'):>8} ms  |  P95: {idx.get('p95_ms', 'N/A'):>8} ms")

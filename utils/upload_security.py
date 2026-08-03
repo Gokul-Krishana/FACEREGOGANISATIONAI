@@ -25,7 +25,6 @@ Usage::
 from __future__ import annotations
 
 import io
-import os
 import uuid
 from pathlib import Path
 from typing import Optional, Set, Tuple
@@ -34,8 +33,8 @@ from typing import Optional, Set, Tuple
 
 # Magic bytes -> extension mapping (first few bytes of the file)
 _MAGIC_BYTES: dict[bytes, str] = {
-    b"\xff\xd8\xff": ".jpg",   # JPEG
-    b"\x89PNG\r\n\x1a\n": ".png",   # PNG
+    b"\xff\xd8\xff": ".jpg",  # JPEG
+    b"\x89PNG\r\n\x1a\n": ".png",  # PNG
     b"GIF87a": ".gif",
     b"GIF89a": ".gif",
     b"RIFF": ".webp",  # WebP starts with RIFF
@@ -56,6 +55,7 @@ _MAX_MEGA_PIXELS = 8.0  # 8 MP
 
 class UploadSecurityError(ValueError):
     """Raised when an uploaded file fails a validation check."""
+
     pass
 
 
@@ -94,8 +94,7 @@ def validate_image_upload(
     max_size_bytes = int(max_size_mb * 1024 * 1024)
     if len(file_data) > max_size_bytes:
         raise UploadSecurityError(
-            f"File too large: {len(file_data) / 1024 / 1024:.1f} MB "
-            f"(max {max_size_mb:.1f} MB)"
+            f"File too large: {len(file_data) / 1024 / 1024:.1f} MB (max {max_size_mb:.1f} MB)"
         )
     if len(file_data) == 0:
         raise UploadSecurityError("Uploaded file is empty")
@@ -111,8 +110,7 @@ def validate_image_upload(
     ext_lower = detected_ext.lower()
     if ext_lower not in {f.lower() for f in allowed_formats}:
         raise UploadSecurityError(
-            f"File format '{detected_ext}' is not allowed. "
-            f"Allowed: {', '.join(sorted(allowed_formats))}"
+            f"File format '{detected_ext}' is not allowed. Allowed: {', '.join(sorted(allowed_formats))}"
         )
 
     # 4. Verify with Pillow (catches truncated/corrupt images)
@@ -137,7 +135,7 @@ def _detect_format(file_data: bytes) -> Optional[str]:
     sufficient validation for enrollment image uploads.
     """
     for magic_bytes, ext in _MAGIC_BYTES.items():
-        if file_data[:len(magic_bytes)] == magic_bytes:
+        if file_data[: len(magic_bytes)] == magic_bytes:
             return ext
 
     return None
@@ -147,6 +145,7 @@ def _verify_pillow(file_data: bytes) -> None:
     """Verify the file is a valid image using Pillow."""
     try:
         from PIL import Image
+
         img = Image.open(io.BytesIO(file_data))
         img.verify()  # Verify it's a valid image
     except Exception as exc:
@@ -157,19 +156,16 @@ def _check_dimensions(file_data: bytes) -> None:
     """Check image dimensions are within limits."""
     try:
         from PIL import Image
+
         img = Image.open(io.BytesIO(file_data))
         w, h = img.size
 
         if w > _MAX_WIDTH or h > _MAX_HEIGHT:
-            raise UploadSecurityError(
-                f"Image dimensions {w}x{h} exceed maximum {_MAX_WIDTH}x{_MAX_HEIGHT}"
-            )
+            raise UploadSecurityError(f"Image dimensions {w}x{h} exceed maximum {_MAX_WIDTH}x{_MAX_HEIGHT}")
 
         megapixels = (w * h) / 1_000_000
         if megapixels > _MAX_MEGA_PIXELS:
-            raise UploadSecurityError(
-                f"Image too large: {megapixels:.1f} MP (max {_MAX_MEGA_PIXELS:.0f} MP)"
-            )
+            raise UploadSecurityError(f"Image too large: {megapixels:.1f} MP (max {_MAX_MEGA_PIXELS:.0f} MP)")
     except UploadSecurityError:
         raise
     except Exception as exc:
@@ -187,6 +183,7 @@ def _generate_safe_filename(ext: str) -> str:
         - Filename collisions
     """
     import time
+
     timestamp = int(time.time())
     unique_id = uuid.uuid4().hex[:12]
     return f"enroll_{timestamp}_{unique_id}{ext}"

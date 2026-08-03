@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 import redis
@@ -35,10 +35,7 @@ class RedisClient:
     def set_student_last_seen(self, student_id: int, camera_id: int) -> None:
         """Track when a student was last seen."""
         key = f"student:last_seen:{student_id}"
-        self.client.hset(key, mapping={
-            "camera_id": camera_id,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        self.client.hset(key, mapping={"camera_id": camera_id, "timestamp": datetime.utcnow().isoformat()})
         self.client.expire(key, 86400)  # 24 hours
 
     def get_student_last_seen(self, student_id: int) -> Optional[dict]:
@@ -100,11 +97,14 @@ class RedisClient:
     def set_track_identity(self, track_id: str, student_id: int, confidence: float) -> None:
         """Cache track identity for smoothing."""
         key = f"track:identity:{track_id}"
-        self.client.hset(key, mapping={
-            "student_id": student_id,
-            "confidence": confidence,
-            "updated_at": datetime.utcnow().isoformat()
-        })
+        self.client.hset(
+            key,
+            mapping={
+                "student_id": student_id,
+                "confidence": confidence,
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+        )
         self.client.expire(key, 300)  # 5 minutes
 
     def get_track_identity(self, track_id: str) -> Optional[dict]:

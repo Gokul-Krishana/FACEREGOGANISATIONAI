@@ -1,4 +1,5 @@
 """Regenerate the master SDD document with a clean header, TOC, and sections."""
+
 import os
 from pathlib import Path
 
@@ -6,13 +7,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SDD = ROOT / "docs" / "sdd"
 MASTER = ROOT / "docs" / "PROJECT_DOCUMENTATION.md"
 
-section_files = sorted(
-    [f for f in os.listdir(SDD) if f[0].isdigit() and f.endswith(".md")]
-)
+section_files = sorted([f for f in os.listdir(SDD) if f[0].isdigit() and f.endswith(".md")])
+
 
 def title_from_name(name: str) -> str:
     body = name[3:-3].replace("_", " ")
     return body[:1].upper() + body[1:]
+
 
 out = []
 out.append("# FaceRecognitionAI — Complete Software Design Document (Master)")

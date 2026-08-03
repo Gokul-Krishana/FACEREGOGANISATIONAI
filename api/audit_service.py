@@ -6,17 +6,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api.redis_client import get_redis
-from database.models import AuditLog, User
+from database.models import AuditLog
 
 
 class AuditAction(str, Enum):
     """Audit action types."""
+
     USER_LOGIN = "USER_LOGIN"
     USER_LOGOUT = "USER_LOGOUT"
     ATTENDANCE_MARKED = "ATTENDANCE_MARKED"
@@ -100,9 +99,9 @@ class AuditService:
     ) -> AuditLog:
         """Log a recognition event."""
         from database.models import RecognitionLog
-        
+
         is_known = student_id is not None or employee_id is not None
-        
+
         recognition = RecognitionLog(
             employee_id=employee_id,
             student_id=student_id,
@@ -199,10 +198,15 @@ class AuditService:
         date_to: datetime,
     ) -> list[dict]:
         """Export audit logs for compliance."""
-        logs = session.query(AuditLog).filter(
-            AuditLog.timestamp >= date_from,
-            AuditLog.timestamp <= date_to,
-        ).order_by(AuditLog.timestamp).all()
+        logs = (
+            session.query(AuditLog)
+            .filter(
+                AuditLog.timestamp >= date_from,
+                AuditLog.timestamp <= date_to,
+            )
+            .order_by(AuditLog.timestamp)
+            .all()
+        )
 
         return [
             {

@@ -32,6 +32,7 @@ Usage:
     python scripts/benchmarks/camera_validation.py
     python scripts/benchmarks/camera_validation.py --seconds 10 --device 0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,12 +46,12 @@ ROOT = str(Path(__file__).resolve().parents[2])
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-import cv2
+import cv2  # noqa: E402
 
-import config.config as cfg
-from camera.selector import create_camera
-from services.recognition_service import RecognitionService
-from dashboard.frame_buffer import frame_buffer, results_buffer
+import config.config as cfg  # noqa: E402
+from camera.selector import create_camera  # noqa: E402
+from services.recognition_service import RecognitionService  # noqa: E402
+from dashboard.frame_buffer import frame_buffer, results_buffer  # noqa: E402
 
 AI_PROCESS_SIZE = (320, 240)
 DISPLAY_CADENCE = 0.05  # matches 04_Live.py time.sleep(0.05) + st.rerun()
@@ -145,8 +146,10 @@ def phase_raw_camera(device_id: int, seconds: float) -> Dict:
         print(f"  Frames read   : {captures}")
         print(f"  Frames shown  : {consumed} (unique {len(unique_shown)})")
         print(f"  Dropped frames: {dropped} (consumer slower than producer)")
-        print(f"  E2E latency   : P50={e2e_p50:.1f}ms  P95={e2e_p95:.1f}ms  "
-              f"(n={len(e2e)}, incl. display sampling)")
+        print(
+            f"  E2E latency   : P50={e2e_p50:.1f}ms  P95={e2e_p95:.1f}ms  "
+            f"(n={len(e2e)}, incl. display sampling)"
+        )
         if errors:
             print(f"  Errors        : {errors[:3]}")
 
@@ -192,6 +195,7 @@ def phase_ai_pipeline(device_id: int, seconds: float, no_write: bool = False) ->
         # AuditService.log is called at module level inside the pipeline,
         # so patch it on the imported module (this process only).
         import services.recognition_service as _rs
+
         _rs.AuditService.log = staticmethod(lambda *a, **k: None)
         print("  [--no-write] All DB/disk writes disabled (read-only validation)")
     print(f"  Enrolled      : {service.enrollment.count()} embedding(s)")
@@ -222,8 +226,7 @@ def phase_ai_pipeline(device_id: int, seconds: float, no_write: bool = False) ->
                     if frame_count % frame_skip != 0:
                         continue
                     t0 = time.perf_counter()
-                    small = cv2.resize(frame, AI_PROCESS_SIZE,
-                                       interpolation=cv2.INTER_LINEAR)
+                    small = cv2.resize(frame, AI_PROCESS_SIZE, interpolation=cv2.INTER_LINEAR)
                     _, results = service.process_frame_detailed(small)
                     ai_latencies.append((time.perf_counter() - t0) * 1000)
                     ai_frames += 1
@@ -237,8 +240,7 @@ def phase_ai_pipeline(device_id: int, seconds: float, no_write: bool = False) ->
         for _ in range(4):
             ret, frame = cam.read()
             if ret and frame is not None:
-                small = cv2.resize(frame, AI_PROCESS_SIZE,
-                                   interpolation=cv2.INTER_LINEAR)
+                small = cv2.resize(frame, AI_PROCESS_SIZE, interpolation=cv2.INTER_LINEAR)
                 try:
                     service.process_frame_detailed(small)
                 except Exception:
@@ -257,8 +259,7 @@ def phase_ai_pipeline(device_id: int, seconds: float, no_write: bool = False) ->
         ai_p95 = pct(ai_latencies, 95)
 
         print(f"  Recognition FPS: {rec_fps:.1f} (AI frames/sec)")
-        print(f"  AI latency     : P50={ai_p50:.1f}ms  P95={ai_p95:.1f}ms  "
-              f"(n={len(ai_latencies)})")
+        print(f"  AI latency     : P50={ai_p50:.1f}ms  P95={ai_p95:.1f}ms  (n={len(ai_latencies)})")
         print(f"  AI frames done : {ai_frames} / {frame_count} captured (skip={frame_skip})")
 
         decisions: Dict[str, int] = {}
@@ -291,15 +292,14 @@ def phase_ai_pipeline(device_id: int, seconds: float, no_write: bool = False) ->
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Real-camera validation harness")
-    parser.add_argument("--seconds", type=float, default=8.0,
-                        help="Seconds per phase (default 8)")
-    parser.add_argument("--device", type=int, default=0,
-                        help="Camera device index (default 0)")
-    parser.add_argument("--phase-a-only", action="store_true",
-                        help="Only run raw camera (no AI) phase")
-    parser.add_argument("--no-write", action="store_true",
-                        help="Disable DB/disk writes during the AI phase "
-                             "(read-only validation, no production side effects)")
+    parser.add_argument("--seconds", type=float, default=8.0, help="Seconds per phase (default 8)")
+    parser.add_argument("--device", type=int, default=0, help="Camera device index (default 0)")
+    parser.add_argument("--phase-a-only", action="store_true", help="Only run raw camera (no AI) phase")
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Disable DB/disk writes during the AI phase (read-only validation, no production side effects)",
+    )
     args = parser.parse_args()
 
     print("Real-Camera Validation — Face Recognition AI")

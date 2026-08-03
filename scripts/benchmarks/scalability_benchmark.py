@@ -31,16 +31,16 @@ import tempfile
 import time
 import tracemalloc
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import create_engine, desc, func
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, desc, func  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from database.models import Base, Student, Attendance, RecognitionLog
+from database.models import Base, Student, Attendance, RecognitionLog  # noqa: E402
 
 # ── Acceptance targets (500K scale) ────────────────────────────────
 ACCEPTANCE_TARGETS: Dict[str, Dict[str, float]] = {
@@ -129,9 +129,7 @@ def _measure(label: str, func_to_run: Callable) -> dict:
     }
 
 
-def _measure_throughput(
-    label: str, func_to_run: Callable, num_rows: int
-) -> dict:
+def _measure_throughput(label: str, func_to_run: Callable, num_rows: int) -> dict:
     """Measure write throughput in rows/sec."""
     start = time.perf_counter()
     func_to_run()
@@ -159,32 +157,26 @@ def benchmark_size(
     Base.metadata.create_all(bind=engine)
 
     with SessionLocal() as session:
-        _seed_dataset(
-            session, size, attendance_per_student, recognition_per_student
-        )
+        _seed_dataset(session, size, attendance_per_student, recognition_per_student)
 
         # ── Read benchmarks ──────────────────────────────────
         student_search = _measure(
             "student_search",
-            lambda: session.query(Student)
-            .filter(Student.name.ilike("Student 0001%"))
-            .order_by(Student.name, Student.id)
-            .limit(50)
-            .all(),
+            lambda: (
+                session.query(Student)
+                .filter(Student.name.ilike("Student 0001%"))
+                .order_by(Student.name, Student.id)
+                .limit(50)
+                .all()
+            ),
         )
         attendance_page = _measure(
             "attendance_page",
-            lambda: session.query(Attendance)
-            .order_by(desc(Attendance.timestamp))
-            .limit(50)
-            .all(),
+            lambda: session.query(Attendance).order_by(desc(Attendance.timestamp)).limit(50).all(),
         )
         recognition_page = _measure(
             "recognition_page",
-            lambda: session.query(RecognitionLog)
-            .order_by(desc(RecognitionLog.timestamp))
-            .limit(50)
-            .all(),
+            lambda: session.query(RecognitionLog).order_by(desc(RecognitionLog.timestamp)).limit(50).all(),
         )
         pagination_count = _measure(
             "student_count",
@@ -266,11 +258,13 @@ def _assess_targets(
                     if key in b:
                         actual = b[key]
                         passed = actual <= threshold if "max" in key else actual >= threshold
-                        size_assess["checks"].append({
-                            "check": f"{label} {key} {'≤' if 'max' in key else '≥'} {threshold}",
-                            "measured": actual,
-                            "passed": passed,
-                        })
+                        size_assess["checks"].append(
+                            {
+                                "check": f"{label} {key} {'≤' if 'max' in key else '≥'} {threshold}",
+                                "measured": actual,
+                                "passed": passed,
+                            }
+                        )
                         if not passed:
                             size_assess["overall"] = "FAIL"
         assessments.append(size_assess)
@@ -286,8 +280,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--database-url",
-        default="sqlite:///"
-        + str(Path(tempfile.gettempdir()) / "faceai_benchmark.db"),
+        default="sqlite:///" + str(Path(tempfile.gettempdir()) / "faceai_benchmark.db"),
     )
     parser.add_argument(
         "--sizes",
@@ -336,9 +329,7 @@ def main() -> int:
         sep2 = "-" * 72
         print()
         print(sep2)
-        print(
-            f"  SIZE: {s:,}  |  Acceptance: {r['acceptance']['overall']}"
-        )
+        print(f"  SIZE: {s:,}  |  Acceptance: {r['acceptance']['overall']}")
         print(sep2)
         for b in r["benchmarks"]:
             label = b["label"]
@@ -349,15 +340,13 @@ def main() -> int:
             count = b.get("result_count", "")
 
             if rows_sec > 0:
-                print(
-                    f"  {label:40s}  {ms:>8.2f} ms  |  {rows_sec:>10.2f} rows/s"
-                )
+                print(f"  {label:40s}  {ms:>8.2f} ms  |  {rows_sec:>10.2f} rows/s")
             else:
                 print(
                     f"  {label:40s}  {ms:>8.2f} ms  |  {qps:>10.2f} QPS  |  peak={peak} MB  |  count={count}"
                 )
 
-        print(f"\n  Acceptance checks:")
+        print("\n  Acceptance checks:")
         for check in r["acceptance"]["checks"]:
             status = "PASS" if check["passed"] else "FAIL"
             print(f"    {status} | {check['check']}: {check['measured']}")
