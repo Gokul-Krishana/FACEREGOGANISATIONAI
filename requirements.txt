@@ -20,7 +20,7 @@ redis>=4.4.0                 # Redis cache
 onnxruntime>=1.15.0          # ONNX Runtime for deep-learning liveness inference
 
 # – Security/Infrastructure
-fastapi>=0.100.0
+fastapi>=0.141.1
 uvicorn[standard]>=0.21.5
 python-multipart>=0.0.6         # File upload parsing
 python-magic>=0.4.27            # Magic bytes file type detection
