@@ -184,8 +184,7 @@ jobs:
             --cov=database \
             --cov-report=term-missing \
             --cov-report=xml \
-            -k "not test_blink_cycle_detected" \
-            --ignore=tests/test_repository.py  # Known issue: instructor_id schema bug from model migration (TODO: fix)
+            -k "not test_blink_cycle_detected"
 
       - name: Upload coverage to Codecov
         if: success()

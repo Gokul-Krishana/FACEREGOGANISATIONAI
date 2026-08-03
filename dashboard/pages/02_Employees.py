@@ -13,6 +13,7 @@ Features:
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from pathlib import Path
 import sys
@@ -27,6 +28,8 @@ import pandas as pd
 from services.employee_service import EmployeeService
 from database.database import get_session
 from database.repository import AttendanceRepo
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Employees", page_icon="👥", layout="wide")
 
@@ -84,7 +87,8 @@ if filtered:
         with get_session() as s:
             for emp in filtered:
                 today_counts[emp.id] = len(AttendanceRepo.get_by_employee(s, emp.id))
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load today's attendance counts: %s", _exc)
         today_counts = {}  # Degrade gracefully — counts stay 0
 
     table_data = []
@@ -230,7 +234,8 @@ try:
                     "Time": r.timestamp.strftime("%I:%M %p"),
                     "Confidence": f"{r.confidence:.1%}",
                 })
-except Exception:
+except Exception as _exc:
+    logger.warning("Could not load attendance history: %s", _exc)
     all_attendance = []  # Degrade gracefully if attendance query fails
 
 if all_attendance:

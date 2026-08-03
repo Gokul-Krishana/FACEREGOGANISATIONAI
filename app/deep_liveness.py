@@ -59,13 +59,17 @@ logger = logging.getLogger(__name__)
 # ── Constants ────────────────────────────────────────────────────────
 
 # Model settings
+# NOTE: The upstream minivision-ai repo no longer ships the ONNX export on
+# `master` (it was moved/deleted — the old URL returns 404). We now pull the
+# maintained MiniFASNetV2 ONNX export from the yakhyo/face-anti-spoofing
+# release assets (same architecture, verified input 80x80 / 3-class output).
 _DEFAULT_MODEL_URL = (
-    "https://github.com/minivision-ai/Silent-Face-Anti-Spoofing/"
-    "raw/master/models/anti_spoof_2.7_128.onnx"
+    "https://github.com/yakhyo/face-anti-spoofing/"
+    "releases/download/weights/MiniFASNetV2.onnx"
 )
-_DEFAULT_MODEL_FILENAME = "anti_spoof_2.7_128.onnx"
-_MODEL_INPUT_SIZE = (128, 128)  # Width, Height (as used by MiniFASNet)
-_MODEL_INPUT_SHAPE = (1, 3, 128, 128)  # NCHW
+_DEFAULT_MODEL_FILENAME = "MiniFASNetV2.onnx"
+_MODEL_INPUT_SIZE = (80, 80)  # Width, Height (as used by MiniFASNetV2)
+_MODEL_INPUT_SHAPE = (1, 3, 80, 80)  # NCHW
 _MODEL_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _MODEL_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
@@ -287,16 +291,26 @@ class DeepLivenessDetector:
             None, {self._input_name: input_tensor}
         )
 
-        # Postprocess: MiniFASNet returns shape (1, 2) or (1, 1)
-        # - Output[0] is typically (1, 2) → [spoof_prob, live_prob]
-        # - We extract the live probability
-        raw_output = outputs[0].flatten()
-        if raw_output.shape[0] >= 2:
-            # Two-class: [spoof, live]
-            live_score = float(raw_output[1])
-            spoof_score = float(raw_output[0])
+        # Postprocess: MiniFASNet returns shape (1, 3) → [spoof, fake, live]
+        # or (1, 2) → [spoof, live], or (1, 1) → single logit.
+        # The ONNX export emits RAW LOGITS (sum ≠ 1), so probabilities must be
+        # derived with softmax/sigmoid before thresholding — taking a logit
+        # directly and clipping to [0,1] would distort the score.
+        raw_output = outputs[0].flatten().astype(np.float64)
+        if raw_output.shape[0] >= 3:
+            # Three-class (MiniFASNetV2): index 2 is the LIVE class.
+            probs = np.exp(raw_output - np.max(raw_output))
+            probs = probs / probs.sum()
+            live_score = float(probs[2])
+            spoof_score = float(probs[:2].max())
+        elif raw_output.shape[0] == 2:
+            # Two-class: [spoof, live] — softmax over both logits.
+            probs = np.exp(raw_output - np.max(raw_output))
+            probs = probs / probs.sum()
+            live_score = float(probs[1])
+            spoof_score = float(probs[0])
         else:
-            # Single score: higher = live
+            # Single logit: sigmoid (higher = live)
             live_score = float(1.0 / (1.0 + np.exp(-float(raw_output[0]))))
             spoof_score = 1.0 - live_score
 

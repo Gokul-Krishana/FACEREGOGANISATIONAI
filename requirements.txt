@@ -9,7 +9,9 @@ pandas>=2.0.0
 Pillow>=10.0.0
 
 # – AI Models
-torch>=2.0.0
+# NOTE: torch 2.4.0 is broken on Windows (fbgemm.dll WinError 126 on import) and
+# is explicitly excluded by ultralytics on win32. Pin to a known-good version.
+torch>=2.0.0,!=2.4.0
 ultralytics>=8.0.0          # YOLO11 person detection
 insightface>=0.7.3          # RetinaFace + ArcFace
 faiss-cpu>=1.7.0            # FAISS vector search (CPU)

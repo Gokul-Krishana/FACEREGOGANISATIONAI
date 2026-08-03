@@ -1,0 +1,25 @@
+[tool.ruff]
+# Consistent formatting & linting for the whole repository (enforced in CI:
+# .github/workflows/python-ci.yml → lint job).
+line-length = 110
+target-version = "py310"
+
+# Skip build artifacts and third-party trees (node_modules under .kilo, the
+# optional Next.js frontend, and generated data directories).
+extend-exclude = [
+    ".kilo",
+    "frontend",
+    "embeddings",
+    "backups",
+    "logs",
+    "data",
+]
+
+[tool.ruff.lint]
+# Conservative default set: import placement (E4 subset), statement/scope
+# errors (E7), undefined names (F), unused imports/variables (F4/F8).
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

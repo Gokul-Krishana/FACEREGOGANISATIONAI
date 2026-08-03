@@ -18,6 +18,7 @@ Pipeline role:  YOLO → RetinaFace → ArcFace → FAISS
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -25,6 +26,8 @@ import numpy as np
 import faiss
 
 import config.config as cfg
+
+logger = logging.getLogger(__name__)
 
 
 class FaceEnrollment:
@@ -174,23 +177,20 @@ class FaceEnrollment:
 
         return results
 
-    def remove(self, name: str) -> None:
+    def remove(self, name: str) -> bool:
         """Remove all entries for a given name.
 
-        .. warning::
-            ``NotImplemented`` — FAISS does **not** support deletion natively
-            and embeddings are not stored independently in this version.
-            Calling this will raise ``NotImplementedError``.
+        This is an alias for ``remove_by_name`` for API consistency.
+        Rebuilds the FAISS index from scratch keeping only entries
+        that do NOT match *name*.  O(N) in the number of embeddings.
 
-            To implement properly, store raw embeddings as ``.npy`` files
-            alongside metadata so the index can be faithfully rebuilt.
+        Args:
+            name: The name (employee_id string) to remove.
+
+        Returns:
+            ``True`` if any entries were removed, ``False`` otherwise.
         """
-        raise NotImplementedError(
-            "FAISS does not support deletion. To implement this, store "
-            "raw embeddings separately (e.g. as .npy files) alongside "
-            "metadata, then rebuild the index from scratch. "
-            "# TODO: implement proper deletion with separate .npy embedding store"
-        )
+        return self.remove_by_name(name)
 
     def remove_by_name(self, name: str) -> bool:
         """Remove all embeddings for a given name from the index.
@@ -348,19 +348,64 @@ class FaceEnrollment:
     def _rebuild_index(self) -> None:
         """Rebuild the FAISS index from scratch.
 
-        .. warning::
-            Embeddings are **not** stored independently in this simple
-            implementation, so rebuilding clears the index entirely.
-            A production system should store raw embeddings separately
-            (e.g. as ``.npy`` files) so the index can be faithfully
-            reconstructed.
+        Reconstructs every vector from the old index into a fresh one.
+        If any vector fails to reconstruct, its metadata entry is also
+        dropped so index-metadata alignment is never broken.
+
+        .. note::
+            This is a safety utility. Normal mutation flows
+            (``remove_by_name``, ``rename``, ``clear``) already handle
+            index rebuilds internally.
         """
         old_count = self.index.ntotal
-        self.index = self._create_index()
+        if old_count == 0:
+            self.metadata = []
+            return
+
+        new_index = self._create_index()
+        new_metadata: List[Dict] = []
+        dropped = 0
+
+        if hasattr(self.index, 'reconstruct'):
+            for i in range(old_count):
+                try:
+                    vec = self.index.reconstruct(i)
+                    new_index.add(vec.reshape(1, -1))
+                    # Only keep metadata if reconstruction succeeded
+                    if i < len(self.metadata):
+                        new_metadata.append({
+                            "name": self.metadata[i]["name"],
+                            "id": len(new_metadata),
+                        })
+                except Exception as exc:
+                    dropped += 1
+                    logger.warning("Failed to reconstruct embedding %d: %s", i, exc)
+            self.index = new_index
+        else:
+            logger.warning(
+                "FAISS index type %s does not support reconstruction. "
+                "Clearing all embeddings.",
+                type(self.index).__name__,
+            )
+            self.index = self._create_index()
+            new_metadata = []
+            dropped = old_count
+
+        self.metadata = new_metadata
         self._save()
-        if old_count > 0:
-            print(f"⚠️  FAISS index rebuilt — {old_count} embedding(s) lost. "
-                  f"Metadata for {len(self.metadata)} person(s) preserved.")
+
+        if dropped > 0:
+            logger.warning(
+                "FAISS index rebuilt — %d/%d embedding(s) preserved, %d dropped."
+                " Metadata for %d person(s) updated.",
+                self.index.ntotal, old_count, dropped, len(self.metadata),
+            )
+        else:
+            logger.info(
+                "FAISS index rebuilt — all %d embedding(s) preserved."
+                " Metadata for %d person(s) updated.",
+                self.index.ntotal, len(self.metadata),
+            )
 
     def status(self) -> Dict:
         """Return a summary dict of the enrollment state."""

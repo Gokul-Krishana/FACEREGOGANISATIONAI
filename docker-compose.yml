@@ -44,18 +44,19 @@ services:
     <<: *restart-policy
     image: redis:7-alpine
     container_name: faceai-redis
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-}
-      --appendonly no
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+    # NOTE: --requirepass is passed only when REDIS_PASSWORD is set. Passing an
+    # empty --requirepass would swallow the next flag and crash Redis.
+    command: ["/bin/sh", "-c", "exec redis-server --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru $$([ -n \"$$REDIS_PASSWORD\" ] && echo \"--requirepass $$REDIS_PASSWORD\")"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
     ports:
       - "127.0.0.1:6379:6379"  # Localhost only
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Auth only when a password is actually set (matching the command above) —
+      # `redis-cli -a "" ping` fails against a password-less server.
+      test: ["CMD-SHELL", "redis-cli $$([ -n \"$$REDIS_PASSWORD\" ] && echo \"-a $$REDIS_PASSWORD\") ping | grep PONG"]
       interval: 10s
       timeout: 3s
       retries: 5

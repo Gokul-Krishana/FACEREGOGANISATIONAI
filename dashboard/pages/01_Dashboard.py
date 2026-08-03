@@ -13,6 +13,7 @@ Displays:
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
@@ -32,6 +33,8 @@ from services.attendance_service import AttendanceService
 from services.employee_service import EmployeeService
 from services.unknown_face_service import UnknownFaceService
 import config.config as cfg
+
+logger = logging.getLogger(__name__)
 
 
 st.set_page_config(page_title="Dashboard", page_icon="🏠", layout="wide")
@@ -84,7 +87,8 @@ def get_recent_attendance_df(limit: int = 10) -> pd.DataFrame:
                     "Confidence": f"{r.confidence:.1%}",
                 })
             return pd.DataFrame(rows)
-    except Exception:
+    except Exception as _exc:
+        logger.warning("Could not load recent recognitions: %s", _exc)
         return pd.DataFrame()
 
 
