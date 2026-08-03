@@ -14,7 +14,7 @@ Pillow>=10.0.0
 torch>=2.0.0,!=2.4.0
 ultralytics>=8.0.0          # YOLO11 person detection
 insightface>=0.7.3          # RetinaFace + ArcFace
-faiss-cpu>=1.7.0            # FAISS vector search (CPU)
+faiss-cpu>=1.14.3            # FAISS vector search (CPU)
 psycopg2-binary>=2.9.0      # PostgreSQL adapter
 redis>=4.4.0                 # Redis cache
 onnxruntime>=1.15.0          # ONNX Runtime for deep-learning liveness inference
