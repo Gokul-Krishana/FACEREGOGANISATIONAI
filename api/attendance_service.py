@@ -14,6 +14,7 @@ from database.models import (
     Enrollment,
     Section,
     Timetable,
+    local_day_bounds_utc,
 )
 
 
@@ -102,9 +103,12 @@ class AttendanceService:
         section_id: Optional[int],
         session: Session,
     ) -> Optional[Attendance]:
-        """Check if student already has attendance today for the section."""
-        today_start = datetime.combine(datetime.today(), dt_time.min)
-        today_end = datetime.combine(datetime.today(), dt_time.max)
+        """Check if student already has attendance today for the section.
+
+        Timestamps are stored in UTC, so the local day's bounds are
+        converted to UTC before comparing (see ``local_day_bounds_utc``).
+        """
+        today_start, today_end = local_day_bounds_utc()
 
         query = session.query(Attendance).filter(
             Attendance.student_id == student_id,

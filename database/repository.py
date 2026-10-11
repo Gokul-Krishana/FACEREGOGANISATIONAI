@@ -33,6 +33,7 @@ from database.models import (
     RecognitionLog,
     Student,
     UnknownFace,
+    local_day_bounds_utc,
 )
 
 
@@ -275,8 +276,9 @@ class AttendanceRepo:
         limit: Optional[int] = None,
         skip: int = 0,
     ) -> List[Attendance]:
-        start = datetime.combine(target_date, datetime.min.time())
-        end = datetime.combine(target_date, datetime.max.time())
+        # Timestamps are stored in UTC — bounds are converted from the local
+        # calendar day so "today" matches the deployment site's day.
+        start, end = local_day_bounds_utc(target_date)
         query = (
             session.query(Attendance)
             .filter(Attendance.timestamp.between(start, end))
@@ -314,8 +316,7 @@ class AttendanceRepo:
 
     @staticmethod
     def is_marked_today(session: Session, employee_id: int) -> bool:
-        start = datetime.combine(date.today(), datetime.min.time())
-        end = datetime.combine(date.today(), datetime.max.time())
+        start, end = local_day_bounds_utc()
         return (
             session.query(func.count(Attendance.id))
             .filter(
@@ -328,8 +329,7 @@ class AttendanceRepo:
 
     @staticmethod
     def get_statistics(session: Session) -> dict:
-        start = datetime.combine(date.today(), datetime.min.time())
-        end = datetime.combine(date.today(), datetime.max.time())
+        start, end = local_day_bounds_utc()
         today_count = (
             session.query(func.count(Attendance.id)).filter(Attendance.timestamp.between(start, end)).scalar()
             or 0
@@ -506,11 +506,8 @@ class UnknownFaceRepo:
     @staticmethod
     def get_statistics(session: Session) -> dict:
         """Return aggregate statistics for unknown faces."""
-        today_start = datetime.combine(date.today(), datetime.min.time())
-        week_ago = datetime.combine(
-            date.today() - timedelta(days=7),
-            datetime.min.time(),
-        )
+        today_start, _ = local_day_bounds_utc()
+        week_ago, _ = local_day_bounds_utc(date.today() - timedelta(days=7))
         total = session.query(UnknownFace).count()
         today = session.query(UnknownFace).filter(UnknownFace.timestamp >= today_start).count()
         this_week = session.query(UnknownFace).filter(UnknownFace.timestamp >= week_ago).count()
@@ -622,10 +619,7 @@ class UnknownFaceRepo:
         Returns:
             Number of records deleted.
         """
-        cutoff = datetime.combine(
-            date.today() - timedelta(days=days),
-            datetime.min.time(),
-        )
+        cutoff, _ = local_day_bounds_utc(date.today() - timedelta(days=days))
         old_faces = session.query(UnknownFace).filter(UnknownFace.timestamp < cutoff).all()
         count = len(old_faces)
         for uf in old_faces:

@@ -25,7 +25,7 @@ Tables:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time as dt_time, timezone
 from enum import Enum
 
 from sqlalchemy import (
@@ -47,6 +47,26 @@ from sqlalchemy.orm import DeclarativeBase, relationship, synonym
 def _utcnow() -> datetime:
     """Return current UTC time as a naive datetime."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def local_day_bounds_utc(target: date | None = None) -> tuple[datetime, datetime]:
+    """Return naive-UTC ``(start, end)`` bounds for a local calendar day.
+
+    Timestamps are stored as naive UTC (``_utcnow``), but "today" is a
+    local-time concept for the deployment site. Day-scoped queries must
+    convert the local day's boundaries to UTC — comparing a naive-local
+    day range against naive-UTC timestamps silently returns empty
+    results whenever the host timezone is not UTC (e.g. every attendance
+    query between local midnight and UTC midnight).
+    """
+    day = target or date.today()
+    local_tz = datetime.now().astimezone().tzinfo
+    start = datetime.combine(day, dt_time.min, tzinfo=local_tz)
+    end = datetime.combine(day, dt_time.max, tzinfo=local_tz)
+    return (
+        start.astimezone(timezone.utc).replace(tzinfo=None),
+        end.astimezone(timezone.utc).replace(tzinfo=None),
+    )
 
 
 class Base(DeclarativeBase):
