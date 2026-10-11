@@ -228,10 +228,25 @@ class DeepLivenessDetector:
                 return
 
         try:
-            self._session = ort.InferenceSession(
-                str(model_path),
-                providers=["CPUExecutionProvider"],
-            )
+            from utils.inference_device import onnx_providers
+
+            try:
+                self._session = ort.InferenceSession(
+                    str(model_path),
+                    providers=onnx_providers(),
+                )
+            except Exception as gpu_exc:
+                # CUDA EP listed but failed to initialise — keep the feed
+                # alive on CPU rather than dropping to the CNN fallback.
+                logger.warning(
+                    "Deep liveness ONNX failed on %s — retrying on CPU (%s)",
+                    onnx_providers(),
+                    gpu_exc,
+                )
+                self._session = ort.InferenceSession(
+                    str(model_path),
+                    providers=["CPUExecutionProvider"],
+                )
             self._input_name = self._session.get_inputs()[0].name  # type: ignore[attr-defined]
             self._model_path = model_path
             self._model_available = True

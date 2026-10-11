@@ -21,6 +21,7 @@ import numpy as np
 from ultralytics import YOLO
 
 import config.config as cfg
+from utils.inference_device import torch_ctx_id
 
 
 class FaceDetector:
@@ -39,6 +40,9 @@ class FaceDetector:
         """
         self.model = YOLO(model_path)
         self.person_class_id = 0  # COCO person class
+        # Explicit device (resolved from INFERENCE_DEVICE) so GPU usage is
+        # deterministic instead of relying on ultralytics auto-detection.
+        self.device = "cuda:0" if torch_ctx_id() >= 0 else "cpu"
 
     # ── Public API ────────────────────────────────────────────
 
@@ -57,7 +61,7 @@ class FaceDetector:
                 - ``confidence``: float score.
                 - ``class_id``: int COCO class (always 0 = person).
         """
-        results = self.model(frame, conf=conf_threshold, verbose=False)
+        results = self.model(frame, conf=conf_threshold, verbose=False, device=self.device)
         if not results:
             return []
 

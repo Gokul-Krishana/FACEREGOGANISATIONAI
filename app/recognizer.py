@@ -20,6 +20,10 @@ import numpy as np
 from insightface.app import FaceAnalysis
 
 import config.config as cfg
+from utils.inference_device import onnx_providers, torch_ctx_id
+from utils.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class FaceRecognizer:
@@ -39,12 +43,27 @@ class FaceRecognizer:
             model_name: InsightFace model pack name (e.g. ``buffalo_l``, ``buffalo_s``).
         """
         self.model_name = model_name
-        self.app = FaceAnalysis(
-            name=model_name,
-            root=cfg.INSIGHTFACE_ROOT,
-            providers=["CPUExecutionProvider"],
-        )
-        self.app.prepare(ctx_id=-1, det_size=(640, 640))
+        try:
+            # GPU-first (resolved from INFERENCE_DEVICE); falls back to CPU
+            # below if the CUDA EP cannot initialise on this host.
+            self.app = FaceAnalysis(
+                name=model_name,
+                root=cfg.INSIGHTFACE_ROOT,
+                providers=onnx_providers(),
+            )
+            self.app.prepare(ctx_id=torch_ctx_id(), det_size=(640, 640))
+        except Exception as exc:
+            logger.warning(
+                "InsightFace failed on %s (%s) — retrying on CPU",
+                onnx_providers(),
+                exc,
+            )
+            self.app = FaceAnalysis(
+                name=model_name,
+                root=cfg.INSIGHTFACE_ROOT,
+                providers=["CPUExecutionProvider"],
+            )
+            self.app.prepare(ctx_id=-1, det_size=(640, 640))
 
     # ── Public API ────────────────────────────────────────────
 

@@ -127,6 +127,12 @@ INSIGHTFACE_MODEL = "buffalo_l"  # InsightFace model name
 INSIGHTFACE_ROOT = str(ROOT_DIR / "models" / ".insightface")
 EMBEDDING_DIM = 512  # ArcFace embedding dimension
 
+# ── Inference Device ──────────────────────────────────────────
+# "auto" (default) = use the CUDA GPU when onnxruntime + torch report one,
+# otherwise CPU. "cpu" / "gpu" force a specific device. Resolved once by
+# ``utils.inference_device``; all ONNX sessions and YOLO calls honour it.
+INFERENCE_DEVICE: str = _env("INFERENCE_DEVICE", _get("recognition", "inference_device", default="auto"))
+
 # ── Detection Thresholds (from YAML with fallback) ────────────
 YOLO_CONFIDENCE: float = _env("YOLO_CONFIDENCE", _get("recognition", "yolo_confidence", default=0.5))
 RECOGNITION_THRESHOLD: float = _env(
