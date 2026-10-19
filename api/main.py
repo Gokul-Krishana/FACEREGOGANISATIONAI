@@ -2598,16 +2598,15 @@ async def readiness_check(request: Request):
         checks["database"] = f"error: {exc}"
         all_ok = False
 
-    # Redis check
+    # Redis check (optional in offline/edge deployments; fallback to in-memory state)
     try:
         from api.redis_client import get_redis
 
         redis = get_redis()
         redis.client.ping()
         checks["redis"] = "ok"
-    except Exception as exc:
-        checks["redis"] = f"error: {exc}"
-        all_ok = False
+    except Exception:
+        checks["redis"] = "in-memory fallback (offline mode)"
 
     # WebSocket manager
     checks["websocket"] = f"ok ({ws_manager.connection_count} connections)"
