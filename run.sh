@@ -2,22 +2,28 @@
 # ============================================================
 # run.sh — Face Recognition AI Launcher
 # ============================================================
-# Launches the Streamlit dashboard (default) or runs the CLI
+# Launches the FastAPI backend + Next.js frontend (default), or runs the CLI
 # with a specific camera source.
 #
+# Prerequisites:
+#   - Python backend (FastAPI): pip install -r requirements.txt
+#   - Next.js frontend (optional): node/npm in PATH, then `npm install` in frontend/
+#
 # Usage:
-#   ./run.sh                        Start Streamlit dashboard
+#   ./run.sh                        Start backend (& frontend note)
 #   ./run.sh --no-cache             Skip cache clearing
 #
+#   ./run.sh backend                Start the FastAPI backend only
+#   ./run.sh frontend               Print Next.js dev startup hint
 #   ./run.sh cli                    Run laptop webcam (CLI)
 #   ./run.sh cli --debug            Run diagnostic mode
 #   ./run.sh cli webcam             Live with specific webcam
 #
 #   ./run.sh android-wifi URL       Android IP Webcam
 #   ./run.sh android-usb DEVICE     Android DroidCam USB
-#   ./run.sh iphone-wifi URL       iPhone EpocCam Wi-Fi
-#   ./run.sh iphone-usb DEVICE     iPhone EpocCam USB
-#   ./run.sh ip-camera URL         Generic IP/RTSP camera
+#   ./run.sh iphone-wifi URL        iPhone EpocCam Wi-Fi
+#   ./run.sh iphone-usb DEVICE      iPhone EpocCam USB
+#   ./run.sh ip-camera URL          Generic IP/RTSP camera
 #   ./run.sh usb-auto               USB Auto (plug & play)
 #
 # Examples — Phone Cameras:
@@ -59,6 +65,12 @@ fi
 
 # Parse sub-command
 case "$1" in
+    backend)
+        MODE=backend
+        ;;
+    frontend)
+        MODE=frontend
+        ;;
     cli)
         MODE="cli"
         shift
@@ -112,8 +124,12 @@ if [ $SKIP_CACHE -eq 0 ]; then
     echo ""
 fi
 
-# ── Dashboard Mode ────────────────────────────────────────────
+# ── Dashboard Mode (default) ─────────────────────────────────
 if [ "$MODE" = "dashboard" ]; then
+    MODE=backend
+fi
+
+if [ "$MODE" = "backend" ]; then
     # Check Python
     if ! command -v python3 &> /dev/null; then
         echo "  ❌ Python3 is not installed or not in PATH."
@@ -121,31 +137,36 @@ if [ "$MODE" = "dashboard" ]; then
         exit 1
     fi
 
-    # Check Streamlit
-    if ! python3 -c "import streamlit" &> /dev/null; then
-        echo "  ❌ Streamlit is not installed."
-        echo "     Run: pip install streamlit"
-        exit 1
-    fi
-
-    echo "  🚀 Starting Face Recognition AI Dashboard..."
-    echo "  📍 URL: http://localhost:8501"
+    echo "  🚀 Starting Face Recognition AI backend (FastAPI)..."
+    echo "  📍 Backend URL: http://localhost:8000"
+    echo "  📍 Frontend: run \`npm run dev\` inside the \`frontend/\` folder."
     echo "  ⏹  Press Ctrl+C to stop"
     echo ""
     echo "─────────────────────────────────────────────────────"
     echo ""
 
-    streamlit run dashboard/app.py --server.port 8501 --server.headless true
+    exec python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# ── CLI Mode ────────────────────────────────────────────────────
+elif [ "$MODE" = "frontend" ]; then
+    echo ""
+    echo "Frontend (Next.js) is in the \`frontend/\` directory."
+    if [ ! -d "frontend/node_modules" ]; then
+        echo "Node modules not detected. Install them first:"
+        echo "  cd frontend && npm install"
+    fi
+    echo "Then start the dev server with:"
+    echo "  cd frontend && npm run dev"
+    echo ""
+
 elif [ "$MODE" = "cli" ]; then
     echo "  🚀 Running CLI mode: python3 main.py $CLI_ARGS"
     echo ""
     echo "─────────────────────────────────────────────────────"
     echo ""
 
-    python3 main.py $CLI_ARGS
+    exec python3 main.py $CLI_ARGS
 
     echo ""
     echo "  ✅ Done."
 fi
+

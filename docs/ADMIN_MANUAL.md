@@ -27,7 +27,7 @@ The administrator is responsible for:
 Cameras (Webcam / USB / Android / iPhone / IP-RTSP)
     │
     ▼
-Streamlit Dashboard (port 8501)          FastAPI Backend (port 8000)
+Next.js Frontend (port 3000)            FastAPI Backend (port 8000)
     │  operator UI                          │  REST API + auth + jobs
     ▼                                       ▼
         ┌───────────────┴──────────────┐
@@ -44,7 +44,7 @@ Streamlit Dashboard (port 8501)          FastAPI Backend (port 8000)
 
 | Component | Command |
 |:----------|:--------|
-| Dashboard | `streamlit run dashboard/app.py` (or Docker `dashboard` service) |
+| Dashboard | Next.js dev server (`npm run dev` in `frontend/`) or a production Next.js build |
 | API | `uvicorn api.main:app --host 0.0.0.0 --port 8000` (Docker `api`) |
 | Database | PostgreSQL (Docker `db`) or SQLite (dev, auto-created) |
 
@@ -68,11 +68,11 @@ python scripts/seed_admin.py
 # 5. Start the API (recommended order: db → redis → api → dashboard)
 uvicorn api.main:app --host 0.0.0.0 --port 8000 &
 
-# 6. Start the dashboard
-streamlit run dashboard/app.py
+# 6. Start the frontend (separate terminal)
+cd frontend && npm run dev
 ```
 
-Open http://localhost:8501.
+Open the frontend URL shown by Next.js (default http://localhost:3000).
 
 > ⚠️ **Production checklist:** set `SECRET_KEY` (64+ random chars),
 > `ENVIRONMENT=production`, strong PostgreSQL password, Redis password, HTTPS

@@ -1,0 +1,80 @@
+[
+  {
+    "backend": "DirectShow",
+    "opened": true,
+    "duration_s": 15.33,
+    "actual": {
+      "width": 640,
+      "height": 480,
+      "reported_fps": 30.00003000003,
+      "backend_name": "DSHOW"
+    },
+    "frames": 223,
+    "failed_reads": 0,
+    "max_failed_streak": 0,
+    "freeze_events": 0,
+    "longest_gap_ms": 88.7,
+    "avg_fps": 14.54,
+    "read_ms": {
+      "p50": 64.2,
+      "p95": 80.1,
+      "max": 88.7,
+      "over_100ms": 0,
+      "over_200ms": 0,
+      "over_500ms": 0,
+      "samples": 213
+    }
+  },
+  {
+    "backend": "MediaFoundation",
+    "opened": true,
+    "duration_s": 15.34,
+    "actual": {
+      "width": 640,
+      "height": 480,
+      "reported_fps": 30.0,
+      "backend_name": "MSMF"
+    },
+    "frames": 440,
+    "failed_reads": 0,
+    "max_failed_streak": 0,
+    "freeze_events": 0,
+    "longest_gap_ms": 99.6,
+    "avg_fps": 28.68,
+    "read_ms": {
+      "p50": 31.5,
+      "p95": 78.2,
+      "max": 99.6,
+      "over_100ms": 0,
+      "over_200ms": 0,
+      "over_500ms": 0,
+      "samples": 430
+    }
+  },
+  {
+    "backend": "Default",
+    "opened": true,
+    "duration_s": 15.33,
+    "actual": {
+      "width": 640,
+      "height": 480,
+      "reported_fps": 30.0,
+      "backend_name": "MSMF"
+    },
+    "frames": 442,
+    "failed_reads": 0,
+    "max_failed_streak": 0,
+    "freeze_events": 0,
+    "longest_gap_ms": 81.7,
+    "avg_fps": 28.83,
+    "read_ms": {
+      "p50": 31.3,
+      "p95": 75.2,
+      "max": 81.7,
+      "over_100ms": 0,
+      "over_200ms": 0,
+      "over_500ms": 0,
+      "samples": 432
+    }
+  }
+]

@@ -35,7 +35,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from camera.fake import FakeCameraSource  # noqa: E402
-from dashboard.frame_buffer import frame_buffer  # noqa: E402
+from pipeline.frame_buffer import frame_buffer  # noqa: E402
 
 DISPLAY_CADENCE = 0.05  # matches 04_Live.py time.sleep(0.05) + st.rerun()
 

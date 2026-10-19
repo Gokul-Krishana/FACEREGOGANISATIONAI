@@ -33,8 +33,9 @@ attendance/*.csv
 *.log
 
 # Streamlit runtime logs
-streamlit_log.txt
-streamlit_err.txt
+# Streamlit (removed)
+# streamlit_log.txt
+# streamlit_err.txt
 
 # Frontend dev logs
 frontend-dev.err.log
@@ -60,11 +61,14 @@ models/liveness/
 backups/*
 !backups/README.md
 
-# Next.js frontend (Streamlit is primary)
-frontend/
+# Next.js frontend ( tracked separately via its own build/dev flow )
+# Do not ignore the whole frontend/ tree by default anymore.
+frontend/.next/
+frontend/out/
 
 # Node modules
 node_modules/
+frontend/node_modules/
 
 # Benchmark outputs
 outputs/

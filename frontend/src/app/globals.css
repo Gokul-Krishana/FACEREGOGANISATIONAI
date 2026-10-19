@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07111f;
+  --foreground: #ecf3ff;
+  --muted: #8fa2bf;
+  --card: rgba(11, 20, 36, 0.72);
+  --card-border: rgba(150, 180, 255, 0.16);
+  --accent: #77a8ff;
+  --accent-strong: #4f83ff;
+  --success: #36d399;
+  --danger: #fb7185;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(119, 168, 255, 0.20), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(54, 211, 153, 0.10), transparent 30%),
+    linear-gradient(180deg, #07111f 0%, #091427 45%, #050b14 100%);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(119, 168, 255, 0.28);
+  color: #fff;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+.glass-panel {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(22px);
+}
+
+.grid-fade {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at center, black 25%, transparent 100%);
+}
+
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}

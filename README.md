@@ -6,13 +6,13 @@
       <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python">
     </a>
     <a href="https://github.com/Gokul-Krishana/FACEREGOGANISATIONAI/actions">
-      <img src="https://img.shields.io/badge/Tests-484%20passing-22c55e?logo=pytest" alt="Tests">
+      <img src="https://img.shields.io/badge/Tests-486%20passing-22c55e?logo=pytest" alt="Tests">
     </a>
     <a href="https://github.com/Gokul-Krishana/FACEREGOGANISATIONAI/blob/master/LICENSE">
       <img src="https://img.shields.io/badge/License-MIT-22c55e" alt="License">
     </a>
-    <a href="https://streamlit.io">
-      <img src="https://img.shields.io/badge/Streamlit-1.59-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
+    <a href="https://nextjs.org">
+      <img src="https://img.shields.io/badge/Frontend-Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js">
     </a>
     <a href="https://ultralytics.com/yolo">
       <img src="https://img.shields.io/badge/AI-YOLO11%20%7C%20ArcFace%20%7C%20FAISS-ff6f00" alt="AI Stack">
@@ -51,7 +51,7 @@
 
 ## 📖 Overview
 
-**Face Recognition AI** is a real-time face recognition and automatic attendance system that runs entirely **offline** — no cloud services required. Built with a modern AI stack, it combines a powerful recognition pipeline with an intuitive Streamlit dashboard. The system is **ready for pilot deployment** in a college environment; full campus rollout is achieved through the phased plan in [`docs/PILOT_DEPLOYMENT_PLAN.md`](docs/PILOT_DEPLOYMENT_PLAN.md).
+**Face Recognition AI** is a real-time face recognition and automatic attendance system that runs entirely **offline** — no cloud services required. Built with a modern AI stack, it combines a powerful recognition pipeline with a modern Next.js dashboard. The system is **ready for pilot deployment** in a college environment; full campus rollout is achieved through the phased plan in [`docs/PILOT_DEPLOYMENT_PLAN.md`](docs/PILOT_DEPLOYMENT_PLAN.md).
 
 ### 🎯 Key Capabilities
 
@@ -143,9 +143,9 @@ Camera Frame → YOLO11 → Tracking → RetinaFace → Face Quality → Livenes
               ┌──────────────┴──────────────┐
               │                             │
     ┌─────────▼─────────┐       ┌───────────▼──────────┐
-    │  AttendanceService │       │  Dashboard (Streamlit)│
-    │     (PostgreSQL/   │       │  10 Pages • Live Feed│
-    │       SQLite)      │       │  • Charts • Settings │
+    │  AttendanceService │       │  Dashboard (Next.js) │
+    │     (PostgreSQL/   │       │  React + Tailwind UI │
+    │       SQLite)      │       │  Live MJPEG + WS     │
     └───────────────────┘       └──────────────────────┘
 </pre>
 
@@ -188,13 +188,23 @@ alembic upgrade head
 > - YOLO11 (`yolo11n.pt`, ~6 MB)
 > - InsightFace (`buffalo_l`, ~200 MB)
 
-### 2. Start the Dashboard
+### 2. Start the Backend
 
 ```bash
-streamlit run dashboard/app.py
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Then open **http://localhost:8501** 🎉
+Then open **http://localhost:8000/docs** to browse the API.
+
+### 3. Start the Frontend (Next.js)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open the frontend dev server URL shown in the terminal (default **http://localhost:3000**).
 
 ### 3. Run Startup Validation
 
@@ -222,27 +232,29 @@ python main.py --image photo.jpg
 
 ## 📊 Dashboard
 
-The Streamlit dashboard provides **10 fully functional pages**:
+The Next.js dashboard provides the primary operator UI:
 
-| Page | Icon | Purpose |
-|:-----|:----:|:--------|
-| **Dashboard** | 🏠 | Overview with stats, recognition status, recent attendance |
-| **Employees** | 👥 | CRUD management with search and attendance history |
-| **Enroll** | 📸 | Face enrollment from any camera source |
-| **Live Recognition** | 📹 | Real-time camera feed with AMFR overlays |
-| **Attendance** | 📋 | Attendance records with live camera view |
-| **Unknown Faces** | 🔴 | Gallery with review/convert/delete workflow |
-| **Analytics** | 📈 | Interactive Plotly charts (daily, hourly, weekly) |
-| **Settings** | ⚙️ | Full configuration editor + camera diagnostics |
-| **System Health** | 🩺 | Live component monitoring & quick-fix buttons |
-| **About** | ℹ️ | Version info, technology stack, credits |
+| Page | Purpose |
+|:-----|:--------|
+| **Dashboard** | Overview with stats, recent recognition events, and connection status |
+| **Live Monitor** | Live camera feed with camera selection and session controls |
+| **Cameras** | Camera inventory and per-camera live session controls |
+| **Students** | Student search, filtering, and pagination |
+| **Attendance** | Attendance records with date-range filters |
+| **Analytics** | Attendance trend summaries |
+| **System Health** | Backend health and readiness checks |
+| **Settings** | Account info, system info, and sign-out |
 
-### Live Recognition Workflow
+The frontend connects to the FastAPI backend for authentication, data, and the live video stream.
+
+### Live Video Workflow
 
 ```
-1. Select PC Camera (default) → 2. Click START → 3. Camera feed appears
-4. Person stands in front → 5. Green box + name + PRESENT
-6. Attendance auto-marked → 7. Check Today's Attendance table
+1. Start the backend and frontend
+2. Open Live Monitor or Cameras
+3. Start a camera session
+4. The MJPEG feed arrives in the browser; recognition events arrive over WebSocket
+5. Attendance is marked by the backend when a person is confidently recognized
 ```
 
 ---
@@ -391,23 +403,26 @@ FaceRecognitionAI/
 │   ├── selector.py         # Camera factory create_camera()
 │   └── discovery.py        # Network auto-discovery
 │
-├── dashboard/              # Streamlit web UI (10 pages)
-│   ├── app.py              # Main entry + navigation
-│   └── pages/
-│       ├── 01_Dashboard.py     # 🏠 Overview
-│       ├── 02_Employees.py     # 👥 Employee management
-│       ├── 03_Enroll.py        # 📸 Face enrollment
-│       ├── 04_Live.py          # 📹 Live recognition
-│       ├── 05_Attendance.py    # 📋 Attendance records
-│       ├── 06_Unknown.py       # 🔴 Unknown face gallery
-│       ├── 07_Analytics.py     # 📈 Charts & trends
-│       ├── 08_Settings.py      # ⚙️ Configuration editor
-│       ├── 09_Health.py        # 🩺 System health
-│       └── 10_About.py         # ℹ️ About & credits
+├── frontend/               # Enterprise Next.js 16 App Router UI (11 pages)
+│   ├── src/app/
+│   │   ├── dashboard/      # 🏠 Executive Dashboard (KPIs & Trends)
+│   │   ├── monitor/        # 📹 Dedicated CCTV Live Monitor (Zero-freeze isolated feed)
+│   │   ├── cameras/        # 🎥 CCTV / RTSP Camera Registration & Stream Health
+│   │   ├── students/       # 🎓 Enrolled Student Biometric Records
+│   │   ├── employees/      # 👥 Faculty & Employee Management
+│   │   ├── enrollment/     # 📸 Multi-Condition Biometric Enrollment Studio
+│   │   ├── attendance/     # 📋 Real-Time Attendance Ledger & Exports
+│   │   ├── unknown/        # 🔴 Unknown Face Review & Identity Assignment
+│   │   ├── analytics/      # 📈 Recharts Inflow Volume & Biometric Analytics
+│   │   ├── health/         # 🩺 Node Hardware, Memory & Inference Diagnostics
+│   │   ├── audit/          # 🛡️ Biometric Security & Audit Log Explorer
+│   │   └── settings/       # ⚙️ AMFR Cooldown, RTSP Transport & Thresholds
+│   └── src/lib/api.ts      # Typed REST & WebSocket client
 │
 ├── services/               # Business logic layer
 │   ├── recognition_service.py   # Pipeline orchestrator
-│   ├── attendance_service.py    # Attendance marking
+│   ├── live_camera_manager.py   # Bounded frame buffer & RTSP reconnection
+│   ├── attendance_service.py    # Attendance marking & AMFR deduplication
 │   ├── employee_service.py      # Employee CRUD
 │   ├── unknown_face_service.py  # Unknown face lifecycle
 │   ├── audit_service.py         # Audit trail
@@ -516,7 +531,7 @@ The system includes several key optimizations for real-time performance:
 | **Vector Search** | FAISS (HNSW/IVF/Flat) |
 | **Anti-Spoofing** | Deep Liveness CNN + 5-factor detection |
 | **Decision Engine** | AMFR (Adaptive Multi-Factor Recognition) |
-| **Dashboard** | Streamlit (10 pages) |
+| **Dashboard** | Next.js (frontend/) |
 | **API** | FastAPI |
 | **Database** | SQLite / PostgreSQL (Alembic migrations) |
 | **Cache** | Redis (optional, graceful fallback) |
@@ -539,7 +554,7 @@ You are free to use, modify, and distribute this software for personal or commer
     <a href="https://ultralytics.com/yolo">YOLO11</a> •
     <a href="https://github.com/deepinsight/insightface">InsightFace</a> •
     <a href="https://faiss.ai">FAISS</a> •
-    <a href="https://streamlit.io">Streamlit</a> •
+    <a href="https://nextjs.org">Next.js</a> •
     <a href="https://fastapi.tiangolo.com">FastAPI</a> •
     <a href="https://pytorch.org">PyTorch</a>
   </p>

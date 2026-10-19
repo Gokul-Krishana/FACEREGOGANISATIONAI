@@ -217,36 +217,36 @@ rm embeddings/faiss.index embeddings/metadata.json
 
 See `scripts/benchmarks/` for tuning scripts.
 
-## Streamlit Dashboard Issues
+## Frontend Issues
 
-### Page Shows White Screen
+### Dashboard Does Not Load
 
-**Symptom:** Dashboard loads but shows blank content
-
-**Solutions:**
-1. Hard refresh: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)
-2. Clear browser cache
-3. Check browser console (F12) for errors
-4. Restart Streamlit: Ctrl+C, then `streamlit run dashboard/app.py`
-
-### Dashboard Slow to Update
-
-**Symptom:** Recognition results lag behind real-time
+**Symptom:** The Next.js frontend fails to start or shows an error page.
 
 **Solutions:**
-- The dashboard updates at ~20 FPS (via `st.rerun()`)
-- Recognition runs in a background thread — UI never blocks
-- If results are lagging, the AI pipeline is bottlenecked on CPU
-- Increase `frame_skip` to reduce AI load
+1. Check that the backend is running on port 8000.
+2. Check the frontend dev server output for TypeScript/build errors.
+3. Confirm `NEXT_PUBLIC_API_URL` in `frontend/.env.local` points at the backend.
+4. Restart the frontend: `cd frontend && npm run dev`.
 
-### "Session State" Errors
+### Live Video Does Not Play
 
-**Symptom:** Streamlit errors about missing session state
+**Symptom:** The camera card shows the placeholder instead of a live feed.
 
 **Solutions:**
-1. Click **Rerun** in Streamlit toolbar
-2. If persists, restart Streamlit
-3. Clear browser cookies for localhost:8501
+1. Confirm the camera session was started successfully from the frontend.
+2. Confirm the backend MJPEG endpoint is reachable from the browser.
+3. Confirm the browser has access to the session token.
+4. If the camera is already in use by another process, stop it and restart the session.
+
+### Recognition Results Lag Behind Real-Time
+
+**Symptom:** Overlays or events appear stale.
+
+**Solutions:**
+- The video feed is delivered independently from recognition events.
+- If results are lagging, the AI pipeline is bottlenecked on CPU.
+- Increase `frame_skip` to reduce AI load.
 
 ## Known Limitations
 
@@ -274,4 +274,4 @@ See `scripts/benchmarks/` for tuning scripts.
 | `Database is locked` | Multiple instances | Kill other processes |
 | `Module not found` | Missing dependency | `pip install -r requirements.txt` |
 | `Permission denied` | Camera not accessible | Check OS permissions |
-| `Streamlit connection error` | Dashboard crashed | Restart dashboard |
+| `Frontend connection error` | Backend not reachable | Start the backend and check CORS / API URL |

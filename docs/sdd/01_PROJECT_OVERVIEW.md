@@ -105,7 +105,7 @@ A **self-hosted, offline-first, multi-factor face recognition system**:
 | ⚖️ AMFR Decision Engine | Weighted risk score → ACCEPT / BORDERLINE / LOW_CONFIDENCE / REJECT_SPOOF |
 | 📸 Multi-Camera Support | 7 source types + network auto-discovery (IP Webcam, DroidCam, EpocCam) |
 | 🗄️ Vector Database | FAISS with flat / HNSW / IVF index types (tuned parameters) |
-| 📊 Streamlit Dashboard | 10 pages: overview, employees, enroll, live, attendance, unknown, analytics, settings, health, about |
+| 📊 Next.js Dashboard | React + Tailwind frontend with dashboard, live monitor, cameras, students, attendance, analytics, health, settings, auth |
 | 🔐 Secure REST API | 46 endpoints, JWT + refresh rotation, RBAC (7 roles), MFA (TOTP), OIDC |
 | 📝 Audit Trail | Every action logged to `audit_logs` with actor, IP, severity |
 | 🚫 Brute Force Protection | Per-username lockout (5 attempts / 30 min), per-IP rate limiting |

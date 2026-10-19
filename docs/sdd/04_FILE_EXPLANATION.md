@@ -21,7 +21,7 @@ complexity, and interactions.
 | **Complexity** | O(n) frames; simple orchestration |
 | **Interactions** | Wraps the entire `app/` pipeline; uses `camera.selector.create_camera()` via `LiveDetection.open_camera()` |
 
-### `dashboard/app.py` — Streamlit Entry Point
+### `api/main.py` — FastAPI Entry Point
 | Attribute | Detail |
 |-----------|--------|
 | **Purpose** | Bootstrap the Streamlit dashboard, sidebar navigation, DB init, auto-cleanup |

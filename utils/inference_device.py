@@ -50,11 +50,23 @@ def _cuda_usable() -> bool:
     try:
         import torch
 
-        return bool(torch.cuda.is_available())
+        if not torch.cuda.is_available():
+            return False
     except Exception:
-        # onnxruntime says CUDA is available; torch may not be installed
-        # (e.g. minimal ONNX-only deployments) — trust onnxruntime.
-        return True
+        pass
+
+    # Verify that ONNX Runtime can actually load CUDA DLLs (e.g. cublasLt64_13.dll)
+    try:
+        from pathlib import Path
+        probe_path = Path(__file__).resolve().parent.parent / "models" / "liveness" / "MiniFASNetV2.onnx"
+        if probe_path.exists():
+            test_sess = ort.InferenceSession(str(probe_path), providers=["CUDAExecutionProvider"])
+            if "CUDAExecutionProvider" not in test_sess.get_providers():
+                return False
+    except Exception:
+        return False
+
+    return True
 
 
 def resolve(force: Optional[str] = None) -> Tuple[List[str], int]:

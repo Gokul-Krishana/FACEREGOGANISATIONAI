@@ -29,11 +29,8 @@ automatically.
 
 ## 2. Getting Started
 
-1. Start the dashboard:
-   ```bash
-   streamlit run dashboard/app.py
-   ```
-2. Open your browser → **http://localhost:8501**
+1. Start the backend and frontend (see `docs/DEPLOYMENT.md`).
+2. Open the frontend URL shown by Next.js (default http://localhost:3000)
 3. You will see the **Dashboard** (home page) with system overview.
 
 > 🎥 **First live session:** go to **📹 Live Recognition**, select your camera,

@@ -11,11 +11,14 @@ pip install -r requirements.txt
 # 2. Run startup validation
 python tools/validate_startup.py
 
-# 3. Start Streamlit dashboard
-streamlit run dashboard/app.py
+# 3. Start the backend
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# 4. Open in browser
-# http://localhost:8501
+# 4. Start the frontend (separate terminal)
+cd frontend && npm run dev
+
+# 5. Open in browser
+# http://localhost:3000 (or the URL shown by Next.js)
 ```
 
 ## Docker Deployment (Production)
@@ -46,9 +49,9 @@ docker compose logs -f dashboard
 │                   Docker Network                         │
 │                                                          │
 │  ┌──────────────┐      ┌──────────────┐                 │
-│  │   Streamlit   │      │   FastAPI    │                 │
-│  │  Dashboard    │      │   Backend    │                 │
-│  │  :8501        │      │  :8000       │                 │
+│  │   Next.js     │      │   FastAPI    │                 │
+│  │  Frontend     │      │   Backend    │                 │
+│  │  :3000        │      │  :8000       │                 │
 │  └──────┬───────┘      └──────┬───────┘                 │
 │         │                     │                          │
 │         └─────────┬───────────┘                          │
@@ -63,7 +66,7 @@ docker compose logs -f dashboard
 
 | Service | Port | Purpose |
 |:--------|:----:|:--------|
-| **Streamlit Dashboard** | 8501 | Operator UI (primary interface) |
+| **Next.js Frontend** | 3000 | Operator UI (primary interface) |
 | **FastAPI Backend** | 8000 | REST API + rate limiting |
 | **PostgreSQL** | 5432 | Persistent database |
 | **Redis** | 6379 | Cache & cooldowns (optional) |

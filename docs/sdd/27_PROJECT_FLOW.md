@@ -7,8 +7,12 @@ Nothing is left unexplained.
 ## 27.1 Startup Sequence
 
 ```
-streamlit run dashboard/app.py
-  └─ dashboard/app.py
+cd frontend && npm run dev
+  └─ frontend/src/app (Next.js)
+
+Backend (primary API/runtime):
+  └─ uvicorn api.main:app
+     └─ api/main.py
        ├─ set_page_config (wide)
        ├─ sidebar nav links to 10 pages
        ├─ init_db()  → database/database.py

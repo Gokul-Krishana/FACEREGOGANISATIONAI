@@ -46,7 +46,7 @@ A **thread-safe singleton** enforcing single camera ownership:
 - `acquire(camera, pipeline)` fails if not FREE.
 - `release()` — teardown runs **outside** the state lock so a slow
   `pipeline.stop()` (up to ~3 s join) never blocks concurrent acquire checks.
-- Survives Streamlit reruns (pipeline stored in `st.session_state`).
+- Survives application reruns and restarts through backend-managed sessions.
 
 ### Frame Buffer (`dashboard/frame_buffer.py`)
 `FrameBuffer(maxlen=1)` — **latest-frame-only**:

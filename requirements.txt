@@ -2,7 +2,6 @@
 # Install with:  pip install -r requirements.txt
 
 # – Core
-streamlit>=1.28.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 pandas>=2.0.0
@@ -38,5 +37,4 @@ psutil>=5.9.0                   # CPU/RAM monitoring on the Live page
 
 # – Production
 python-json-logger>=2.0.0        # Structured JSON logging
-gunicorn>=21.2.0                 # Production WSGI server (for Streamlit)
 hiredis>=2.3.0                   # Faster Redis parser (optional)

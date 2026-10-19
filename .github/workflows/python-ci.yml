@@ -18,7 +18,6 @@ on:
     branches: [master, main, develop]
     paths-ignore:
       - "frontend/**"
-      - "dashboard/**"
       - "*.md"
       - "*.bat"
       - "*.sh"
@@ -29,7 +28,6 @@ on:
     branches: [master, main]
     paths-ignore:
       - "frontend/**"
-      - "dashboard/**"
       - "*.md"
 
 concurrency:
@@ -168,8 +166,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
+          # NOTE: libgl1-mesa-glx was removed in Ubuntu 24.04 (current
+          # ubuntu-latest) and made this step — and every pytest job — fail
+          # before tests even ran. libgl1 is its successor and is available
+          # on both 22.04 and 24.04.
           sudo apt-get install -y --no-install-recommends \
-            libgl1-mesa-glx \
+            libgl1 \
             libglib2.0-0 \
             libmagic1 \
             libgomp1

@@ -2,13 +2,19 @@
 :: ============================================================
 :: run.bat — Face Recognition AI Launcher
 :: ============================================================
-:: Launches the Streamlit dashboard (default) or runs the CLI
+:: Launches the FastAPI backend + Next.js frontend (default), or runs the CLI
 :: with a specific camera source.
 ::
+:: Prerequisites:
+::   - Python backend (FastAPI):  pip install -r requirements.txt
+::   - Next.js frontend (optional): node/npm in PATH, then `npm install` in frontend/
+::
 :: Usage:
-::   run.bat                        Start Streamlit dashboard
+::   run.bat                        Start backend (& frontend note)
 ::   run.bat --no-cache             Skip cache clearing
 ::
+::   run.bat backend                Start the FastAPI backend only
+::   run.bat frontend               Print Next.js dev startup hint
 ::   run.bat cli                    Run laptop webcam (CLI)
 ::   run.bat cli --debug            Run diagnostic mode
 ::   run.bat cli webcam             Live with specific webcam
@@ -59,6 +65,14 @@ if /i "%1"=="--no-cache" (
 
 :: Parse the sub-command from the (possibly shifted) %1
 if not "%1"=="" (
+    if /i "%1"=="backend" (
+        set MODE=backend
+        goto :run_backend
+    )
+    if /i "%1"=="frontend" (
+        set MODE=frontend
+        goto :run_frontend
+    )
     if /i "%1"=="cli" (
         set MODE=cli
         set CLI_ARGS=--source-type webcam
@@ -131,15 +145,30 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: Start Streamlit
-echo  🚀 Starting Face Recognition AI Dashboard...
-echo  📍 URL: http://localhost:8501
+:: Default launcher: start the FastAPI backend, then print frontend hint.
+set MODE=backend
+:run_backend
+echo  🚀 Starting Face Recognition AI backend (FastAPI)...
+echo  📍 Backend URL: http://localhost:8000
+echo  📍 Frontend: run `npm run dev` inside the `frontend/` folder.
 echo  ⏹  Press Ctrl+C to stop
 echo.
 echo ─────────────────────────────────────────────────────
 echo.
 
-streamlit run dashboard/app.py --server.port 8501 --server.headless true
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+goto :end
+
+:run_frontend
+echo.
+echo  Frontend (Next.js) is in the `frontend/` directory.
+if not exist "frontend\node_modules" (
+    echo  Node modules not detected. Install them first:
+    echo    cd frontend && npm install
+)
+echo  Then start the dev server with:
+echo    cd frontend && npm run dev
+echo.
 goto :end
 
 :: ── CLI Mode ────────────────────────────────────────────────

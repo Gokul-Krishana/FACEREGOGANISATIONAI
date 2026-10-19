@@ -51,7 +51,7 @@ import cv2  # noqa: E402
 import config.config as cfg  # noqa: E402
 from camera.selector import create_camera  # noqa: E402
 from services.recognition_service import RecognitionService  # noqa: E402
-from dashboard.frame_buffer import frame_buffer, results_buffer  # noqa: E402
+from pipeline.frame_buffer import frame_buffer, results_buffer  # noqa: E402
 
 AI_PROCESS_SIZE = (320, 240)
 DISPLAY_CADENCE = 0.05  # matches 04_Live.py time.sleep(0.05) + st.rerun()

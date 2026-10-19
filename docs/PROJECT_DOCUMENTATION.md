@@ -150,7 +150,7 @@ A **self-hosted, offline-first, multi-factor face recognition system**:
 | ⚖️ AMFR Decision Engine | Weighted risk score → ACCEPT / BORDERLINE / LOW_CONFIDENCE / REJECT_SPOOF |
 | 📸 Multi-Camera Support | 7 source types + network auto-discovery (IP Webcam, DroidCam, EpocCam) |
 | 🗄️ Vector Database | FAISS with flat / HNSW / IVF index types (tuned parameters) |
-| 📊 Streamlit Dashboard | 10 pages: overview, employees, enroll, live, attendance, unknown, analytics, settings, health, about |
+| 📊 Next.js Dashboard | React + Tailwind frontend with dashboard, live monitor, cameras, students, attendance, analytics, health, settings, auth |
 | 🔐 Secure REST API | 46 endpoints, JWT + refresh rotation, RBAC (7 roles), MFA (TOTP), OIDC |
 | 📝 Audit Trail | Every action logged to `audit_logs` with actor, IP, severity |
 | 🚫 Brute Force Protection | Per-username lockout (5 attempts / 30 min), per-IP rate limiting |
@@ -220,7 +220,7 @@ Think of the system as a **conveyor belt with quality inspectors**:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CLIENT LAYER                                  │
 │  ┌─────────────────────┐        ┌───────────────────────────────────┐  │
-│  │  Streamlit Dashboard │        │  External Integrators (REST/WS)  │  │
+│  │  Next.js Frontend    │        │  External Integrators (REST/WS)  │  │
 │  │  (10 pages, 8501)    │        │  curl / scripts / mobile app     │  │
 │  └──────────┬───────────┘        └────────────────┬──────────────────┘  │
 │             │                                     │                     │
@@ -292,7 +292,7 @@ Camera
   ▼
 ATTENDANCE — attendance.py + AttendanceService → DB
   ▼
-DASHBOARD + REPORTS — Streamlit pages + API analytics
+DASHBOARD + REPORTS — Next.js pages + API analytics
 ```
 
 ## 2.4 Module-by-Module Explanation
@@ -301,7 +301,7 @@ DASHBOARD + REPORTS — Streamlit pages + API analytics
 - `base.py` — abstract `CameraSource` interface (open/read/release/info).
 - `webcam.py` — `WebcamSource` (DirectShow→MSMF fallback) and `USBAnySource` (auto-detect).
 - `phone.py` — `AndroidWiFiSource`, `AndroidUSBSource`, `iPhoneWiFiSource`, `iPhoneUSBSource`, `IPCameraSource`.
-- `selector.py` — `create_camera()` **factory** mapping slugs → classes; CLI + Streamlit selectors.
+- `selector.py` — `create_camera()` **factory** mapping slugs → classes; CLI + backend selectors.
 - `discovery.py` — scans the `/24` subnet for IP Webcam / DroidCam / EpocCam.
 - `fake.py` — synthetic camera for hardware-free testing/benchmarks.
 
@@ -362,7 +362,7 @@ CRUD (students, employees, cameras, attendance), unknown faces, analytics,
 WebSocket event stream, job queue, bulk operations, health/metrics.
 
 ### 2.4.13 Dashboard Layer (`dashboard/`)
-Streamlit app: `app.py` (sidebar nav) + 10 pages. Live page runs
+Streamlit app: `app.py` (sidebar nav) + 10 pages. Live stream runs
 `LiveRecognitionPipeline` with `SharedModelResources` (models loaded once),
 `CameraOwner` singleton, `FrameBuffer` (latest-frame-only), `LatencyLogger`.
 
@@ -374,14 +374,14 @@ Streamlit app: `app.py` (sidebar nav) + 10 pages. Live page runs
 | Isolated state | Per-pipeline frame counters, FPS, session tracking | Multi-camera independence |
 | Background threads | Capture loop + recognition worker + latency sampler (daemon) | UI never blocks |
 | Downscaled AI | AI runs on 320×240, display at 640×480 (bboxes rescaled) | ~4× faster inference |
-| Latest-frame buffer | `FrameBuffer(maxlen=1)` drops stale frames | No queue buildup on Streamlit reruns |
+| Latest-frame buffer | `FrameBuffer(maxlen=1)` drops stale frames | No queue buildup on live application reruns |
 | Offline first | All models local; no cloud APIs | Privacy + cost |
 | Single camera owner | `camera/webcam.py` owns `cv2.VideoCapture`; `CameraOwner` singleton enforces one active pipeline | No resource conflicts |
 
 ## 2.6 Runtime Process Topology
 
 ```
-Process 1: streamlit run dashboard/app.py      (port 8501)
+Process 1: uvicorn api.main:app                (port 8000)
    └─ Live page: LiveRecognitionPipeline
         ├─ Thread: capture loop      → frame_buffer
         ├─ Thread: recognition worker → AMFR pipeline → results_buffer
@@ -438,7 +438,7 @@ FaceRecognitionAI/
 │   ├── base.py                 #   CameraSource ABC
 │   ├── webcam.py               #   Webcam + USB auto-detect
 │   ├── phone.py                #   Android/iPhone + IP cameras
-│   ├── selector.py             #   Factory + CLI/Streamlit selectors
+│   ├── selector.py             #   Factory + CLI/backend selectors
 │   ├── discovery.py            #   Network camera discovery
 │   └── fake.py                 #   Synthetic camera for testing
 │
@@ -637,7 +637,7 @@ complexity, and interactions.
 | **Complexity** | O(n) frames; simple orchestration |
 | **Interactions** | Wraps the entire `app/` pipeline; uses `camera.selector.create_camera()` via `LiveDetection.open_camera()` |
 
-### `dashboard/app.py` — Streamlit Entry Point
+### `api/main.py` — FastAPI Entry Point
 | Attribute | Detail |
 |-----------|--------|
 | **Purpose** | Bootstrap the Streamlit dashboard, sidebar navigation, DB init, auto-cleanup |
@@ -1980,9 +1980,9 @@ On startup, if `ENVIRONMENT=production`, the app **raises** unless
 ---
 
 <!-- Section: 10_STREAMLIT_DASHBOARD.md -->
-# Section 10 — Streamlit Dashboard
+# Section 10 — Next.js Frontend
 
-**Run:** `streamlit run dashboard/app.py` → http://localhost:8501
+**Run:** `cd frontend && npm run dev` → usually http://localhost:3000
 **Layout:** wide, expanded sidebar. Sidebar contains navigation links, DB
 init status, auto-cleanup status, FAISS embedding count, recognition
 threshold, and camera source.
@@ -2150,8 +2150,8 @@ reruns via `st.session_state.pipeline`.
 
 ---
 
-*References: `dashboard/app.py`, `dashboard/pages/*`, `dashboard/frame_buffer.py`,
-`dashboard/camera_owner.py`, `dashboard/latency_logger.py`, `docs/USER_MANUAL.md`*
+*References: `frontend/`, `api/main.py`, `services/live_camera_manager.py`,
+`pipeline/frame_buffer.py`, `pipeline/camera_owner.py`, `pipeline/latency_logger.py`*
 
 ---
 
@@ -2506,7 +2506,7 @@ A **thread-safe singleton** enforcing single camera ownership:
 - `acquire(camera, pipeline)` fails if not FREE.
 - `release()` — teardown runs **outside** the state lock so a slow
   `pipeline.stop()` (up to ~3 s join) never blocks concurrent acquire checks.
-- Survives Streamlit reruns (pipeline stored in `st.session_state`).
+- Survives application restarts through backend-managed camera sessions.
 
 ### Frame Buffer (`dashboard/frame_buffer.py`)
 `FrameBuffer(maxlen=1)` — **latest-frame-only**:
@@ -2545,7 +2545,8 @@ A **thread-safe singleton** enforcing single camera ownership:
 ### Multi-Camera
 - Schema supports a `cameras` table (CRUD via API) and per-camera pipeline
   instances sharing models (`with_shared_models`).
-- Dashboard Live page runs **one active pipeline** at a time (CameraOwner);
+- DashboardLive stream runs
+ **one active pipeline** at a time (CameraOwner);
   multi-camera operation is achieved by running multiple pipeline instances
   (supported by the API/camera table) — the dashboard UI is single-camera.
 
@@ -2604,7 +2605,7 @@ Every stage is optimized to reduce wasted work while keeping the display fluid.
 | Job queue workers | `api/job_queue.py` | asyncio tasks (3 workers) | started/stopped by FastAPI lifespan |
 | WebSocket heartbeat | `api/websocket_manager.py` | ping + dead-client cleanup | asyncio task, 15 s |
 
-**Why background threads:** Streamlit reruns the script top-to-bottom; the
+**Why background threads:** the API and CLI can serve multiple consumers; the
 camera must survive reruns, so capture/AI run in daemon threads and the UI
 only reads the latest frames/results (non-blocking).
 
@@ -2623,7 +2624,7 @@ only reads the latest frames/results (non-blocking).
 
 - Camera thread can run at full capture rate while AI is still processing
   the previous frame.
-- Streamlit reruns always see the newest frame, so video never lags by an
+- Each consumer sees the newest frame, so video never lags by an
   accumulating queue.
 - `get_with_meta()` returns timestamps → precise E2E latency measurement.
 
@@ -2675,7 +2676,7 @@ only reads the latest frames/results (non-blocking).
 - Models in RAM: YOLO11n ~6 MB weights + runtime; buffalo_l ~200 MB;
   FAISS index grows with enrollments (512-D float32 = 2 KB/vector + graph
   overhead for HNSW); fallback CNN negligible.
-- Streamlit reruns are cheap because models are cached in `_cache`.
+- Model inference is shared by design, so repeated consumers do not reload models.
 - LatencyLogger window bounded (500 samples); WS event buffer bounded (100).
 
 ## 14.10 Measured Performance (references)
@@ -2989,7 +2990,8 @@ python main.py                      # live webcam
 python main.py --debug              # diagnostics
 
 # Dashboard
-streamlit run dashboard/app.py      # http://localhost:8501
+uvicorn api.main:app --host 0.0.0.0 --port 8000  # backend (port 8000)
+cd frontend && npm run dev                           # frontend (port 3000)
 
 # API (optional)
 uvicorn api.main:app --reload --port 8000   # http://localhost:8000/docs
@@ -3008,7 +3010,7 @@ uvicorn api.main:app --reload --port 8000   # http://localhost:8000/docs
 | 5. Secrets | `export SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")`; `ENVIRONMENT=production` |
 | 6. Redis | install + `REDIS_URL=redis://localhost:6379/0` |
 | 7. API service | systemd unit running `uvicorn api.main:app --host 0.0.0.0 --port 8000` (or gunicorn with uvicorn workers) |
-| 8. Dashboard service | systemd unit running `streamlit run dashboard/app.py --server.port 8501` |
+| 8. Frontend service | Next.js app serving the operator UI (dev or production build) |
 | 9. Reverse proxy (optional) | nginx/Caddy → TLS → HSTS (`ENABLE_HSTS=1`), trusted hosts configured |
 | 10. Health checks | `/health`, `/health/ready`, `/health/live`; Prometheus `/metrics` |
 

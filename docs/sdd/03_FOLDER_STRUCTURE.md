@@ -35,7 +35,7 @@ FaceRecognitionAI/
 │   ├── base.py                 #   CameraSource ABC
 │   ├── webcam.py               #   Webcam + USB auto-detect
 │   ├── phone.py                #   Android/iPhone + IP cameras
-│   ├── selector.py             #   Factory + CLI/Streamlit selectors
+│   ├── selector.py             #   Factory + CLI/backend selectors
 │   ├── discovery.py            #   Network camera discovery
 │   └── fake.py                 #   Synthetic camera for testing
 │

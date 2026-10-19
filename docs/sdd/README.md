@@ -33,7 +33,7 @@ explicitly marked as such.
 | 7 | Database | [`07_DATABASE.md`](07_DATABASE.md) | SQLite, PostgreSQL, Redis, ORM, Alembic, Repository pattern |
 | 8 | Complete Database Schema | [`08_DATABASE_SCHEMA.md`](08_DATABASE_SCHEMA.md) | Every table, columns, keys, indexes, ER diagram |
 | 9 | API Documentation | [`09_API_DOCUMENTATION.md`](09_API_DOCUMENTATION.md) | Every endpoint: request, response, auth, errors |
-| 10 | Streamlit Dashboard | [`10_STREAMLIT_DASHBOARD.md`](10_STREAMLIT_DASHBOARD.md) | All 10 pages, widgets, workflows |
+| 10 | Next.js Frontend | [`10_NEXTJS_FRONTEND.md`](10_NEXTJS_FRONTEND.md) | Frontend architecture, auth, pages, live video, API client |
 | 11 | Security | [`11_SECURITY.md`](11_SECURITY.md) | JWT, RBAC, OIDC, MFA, liveness, upload security, audit, rate limiting, brute force |
 | 12 | Attendance System | [`12_ATTENDANCE_SYSTEM.md`](12_ATTENDANCE_SYSTEM.md) | Complete attendance workflow |
 | 13 | Camera System | [`13_CAMERA_SYSTEM.md`](13_CAMERA_SYSTEM.md) | Camera manager, owner, frame buffer, threads, multi-camera |

@@ -25,7 +25,8 @@ python main.py                      # live webcam
 python main.py --debug              # diagnostics
 
 # Dashboard
-streamlit run dashboard/app.py      # http://localhost:8501
+cd frontend && npm run dev            # http://localhost:3000 (frontend)
+uvicorn api.main:app --host 0.0.0.0 --port 8000  # http://localhost:8000 (backend)
 
 # API (optional)
 uvicorn api.main:app --reload --port 8000   # http://localhost:8000/docs
@@ -44,7 +45,7 @@ uvicorn api.main:app --reload --port 8000   # http://localhost:8000/docs
 | 5. Secrets | `export SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")`; `ENVIRONMENT=production` |
 | 6. Redis | install + `REDIS_URL=redis://localhost:6379/0` |
 | 7. API service | systemd unit running `uvicorn api.main:app --host 0.0.0.0 --port 8000` (or gunicorn with uvicorn workers) |
-| 8. Dashboard service | systemd unit running `streamlit run dashboard/app.py --server.port 8501` |
+| 8. Frontend service | Next.js dev server or production build serving the operator UI |
 | 9. Reverse proxy (optional) | nginx/Caddy → TLS → HSTS (`ENABLE_HSTS=1`), trusted hosts configured |
 | 10. Health checks | `/health`, `/health/ready`, `/health/live`; Prometheus `/metrics` |
 

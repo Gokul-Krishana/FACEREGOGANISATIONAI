@@ -25,8 +25,8 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dashboard.frame_buffer import FrameBuffer  # noqa: E402
-from dashboard.latency_logger import LatencyLogger  # noqa: E402
+from pipeline.frame_buffer import FrameBuffer  # noqa: E402
+from pipeline.latency_logger import LatencyLogger  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════

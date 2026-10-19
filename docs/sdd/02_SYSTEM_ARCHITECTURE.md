@@ -20,7 +20,7 @@ Think of the system as a **conveyor belt with quality inspectors**:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CLIENT LAYER                                  │
 │  ┌─────────────────────┐        ┌───────────────────────────────────┐  │
-│  │  Streamlit Dashboard │        │  External Integrators (REST/WS)  │  │
+│  │  Next.js Frontend    │        │  External Integrators (REST/WS)  │  │
 │  │  (10 pages, 8501)    │        │  curl / scripts / mobile app     │  │
 │  └──────────┬───────────┘        └────────────────┬──────────────────┘  │
 │             │                                     │                     │

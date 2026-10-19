@@ -29,7 +29,7 @@ CameraSource (unified abstraction via create_camera())
            ↓
     AttendanceService → PostgreSQL / SQLite
            ↓
-    Streamlit Dashboard (live UI @ :8501)
+    Next.js Frontend (operator UI @ :3000)
 ```
 
 ## Key Design Decisions
@@ -96,7 +96,7 @@ For performance, the AI pipeline (YOLO, ArcFace, FAISS) runs on a **320×240 dow
 | Recognition Service | `services/recognition_service.py` | Pipeline orchestrator |
 | Attendance Service | `services/attendance_service.py` | Attendance CRUD |
 | Employee Service | `services/employee_service.py` | Employee management |
-| Dashboard | `dashboard/` | Streamlit UI (10 pages) |
+| Dashboard | `frontend/` | Next.js frontend (App Router, React, TypeScript) |
 | Database | `database/` | SQLAlchemy + Alembic |
 | API | `api/main.py` | FastAPI REST layer |
 | Utils | `utils/` | Image processing, upload security |
@@ -116,8 +116,7 @@ Frame (640×480)
                   → AMFR — composite risk score
                     → Result dict with bbox + decision
   → Scale bbox back to 640×480 coordinates
-  → Draw overlays on original 640×480 frame
-  → Display in Streamlit
+  → Draw overlays on original 640×480 frame   → Display in Next.js
   → If ACCEPT: mark attendance in database
 ```
 

@@ -1,70 +1,82 @@
-"""
-Verify the Attendance page renders correctly.
+"""Attendance-page verification for the current stack.
 
-The page calls ``webrtc_streamer(...)`` (from streamlit_webrtc) when the
-default "Browser Webcam" mode is active. Inside AppTest the Streamlit
-runtime is a Mock, so streamlit_webrtc raises
-``Mock object has no attribute '_session_mgr'`` — this is an AppTest-only
-limitation, not a page bug (in a real browser the websocket client provides
-a real session manager).
+The old Streamlit Attendance page no longer exists. The current backend exposes
+attendance data through REST and can export it as CSV:
 
-This script neutralizes the webrtc call (the same path the page takes when
-``streamlit-webrtc`` is not installed), strips the auto-refresh tail
-(``time.sleep(5); st.rerun()`` loops forever inside AppTest's headless
-runner), and proves the rest of the page — attendance table, stats,
-history, export — renders without exceptions.
+    GET  /attendance?limit=N&skip=N&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    GET  /bulk/attendance/export?date_from=...&date_to=...
+
+This script validates those endpoints directly (backend must be running).
 """
 
 from __future__ import annotations
 
 import sys
-import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from streamlit.testing.v1 import AppTest  # noqa: E402  (needs sys.path setup above)
 
-PAGE = Path(_project_root) / "dashboard" / "pages" / "05_Attendance.py"
+def _api_url(path: str, port: int = 8000) -> str:
+    return f"http://localhost:{port}{path}"
 
 
-def run_page_with_webrtc_neutralized() -> None:
-    src = PAGE.read_text(encoding="utf-8")
+def main() -> int:
+    failures = 0
+    base = _api_url("/attendance")
+    params = urllib.parse.urlencode({"limit": "1", "skip": "0"})
+    url = f"{base}?{params}"
 
-    # Neutralize the webrtc call by replacing it with a no-op that still
-    # leaves webrtc_ctx defined with the attributes the page reads.
-    src = src.replace(
-        "webrtc_ctx = webrtc_streamer(",
-        "webrtc_ctx = type('Ctx', (), {'state': type('S', (), {'playing': False})})()\n                if False: webrtc_ctx = webrtc_streamer(",
-        1,
-    )
+    print("Backend attendance endpoint verification")
+    print("-" * 60)
 
-    # Strip the auto-refresh tail (same pattern as verify_health_page.py) —
-    # inside AppTest, `time.sleep(5); st.rerun()` reruns forever until the
-    # 180s AppTest timeout, which looks like a hang/failure.
-    _AUTO_REFRESH_MARKER = "# ─── Auto-refresh ───"
-    if _AUTO_REFRESH_MARKER in src:
-        src = src.split(_AUTO_REFRESH_MARKER)[0]
-        src += "\n# [auto-refresh tail stripped for headless verification]\n"
-
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
-        f.write(src)
-        tmp_path = f.name
     try:
-        at = AppTest.from_file(tmp_path, default_timeout=180)
-        at.run()
-        errors = [str(e) for e in at.exception]
-        if errors:
-            print(f"ATTENDANCE PAGE FAIL ({len(errors)} exception(s)):")
-            for e in errors[:3]:
-                print("  ", e)
-        else:
-            print("ATTENDANCE PAGE RENDERS CLEAN (webrtc call neutralized)")
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.status
+            body = resp.read().decode("utf-8", "replace")
+        print(f"[{status}] GET /attendance?limit=1&skip=0")
+        print(f"   {body[:400]}")
+    except urllib.error.HTTPError as exc:
+        print(f"[HTTP {exc.code}] GET /attendance - {exc.reason}")
+        failures += 1
+    except Exception as exc:
+        print(f"[ERROR] GET /attendance: {exc}")
+        failures += 1
+
+    export_url = _api_url("/bulk/attendance/export")
+    try:
+        req = urllib.request.Request(export_url, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.status
+            body = resp.read().decode("utf-8", "replace")
+        print()
+        print(f"[{status}] GET /bulk/attendance/export")
+        print(f"   {body[:200]!r}")
+        if not body.strip():
+            print("   (empty export is OK when there is no attendance data)")
+    except urllib.error.HTTPError as exc:
+        print()
+        print(f"[HTTP {exc.code}] GET /bulk/attendance/export - {exc.reason}")
+        failures += 1
+    except Exception as exc:
+        print()
+        print(f"[ERROR] GET /bulk/attendance/export: {exc}")
+        failures += 1
+
+    print()
+    if failures:
+        print("Attendance endpoint check failed.")
+    else:
+        print("Attendance endpoints are reachable (backend must be running on port 8000).")
+
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    run_page_with_webrtc_neutralized()
+    sys.exit(main())

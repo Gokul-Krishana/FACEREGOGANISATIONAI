@@ -1,8 +1,13 @@
 # ─────────────────────────────────────────────────────────────────────
 # Face Recognition AI — Multi-Stage Dockerfile
 # ─────────────────────────────────────────────────────────────────────
-# Build:      docker build -t face-recognition-ai .
-# Run API:    docker run --gpus all -p 8000:8000 face-recognition-ai
+# Build (backend):  docker build -t face-recognition-ai .
+# Run API:          docker run --gpus all -p 8000:8000 face-recognition-ai
+#
+# Frontend (optional):
+#   The Next.js dashboard lives in ./frontend and is built separately.
+#   To containerize it, add ./frontend/Dockerfile and an optional compose
+#   service that serves the production build on port 3000.
 # ─────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base Python image with system deps ────────────────────

@@ -19,7 +19,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any, Iterator, List, Optional
 
 import sys
 
@@ -34,7 +34,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, Response  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from enum import Enum  # noqa: E402
-from pydantic import BaseModel, EmailStr, Field, field_validator  # noqa: E402
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
 from slowapi.middleware import SlowAPIMiddleware  # noqa: E402
@@ -73,6 +73,18 @@ from services.employee_service import EmployeeService  # noqa: E402
 from utils.upload_security import UploadSecurityError, validate_image_upload  # noqa: E402
 from services.brute_force_protection import BruteForceProtection  # noqa: E402
 
+# ── Database dependency ───────────────────────────────────────────
+# ``get_session`` in ``database.database`` is a ``contextlib.contextmanager``,
+# which FastAPI does not treat as a yield-dependency. Wrap it in a plain
+# generator function so ``Depends(get_db)`` works correctly.
+
+
+def get_db() -> Iterator[Session]:
+    """FastAPI dependency that yields a SQLAlchemy session."""
+    with get_session() as session:
+        yield session
+
+
 # ── Security setup ─────────────────────────────────────────────────
 security = HTTPBearer(auto_error=False)
 
@@ -96,6 +108,9 @@ class Settings(BaseModel):
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
     max_upload_size_mb: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "5"))
     environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development"))
+    disable_auth: bool = Field(
+        default_factory=lambda: os.getenv("DISABLE_AUTH", "false").lower() == "true"
+    )
     max_failed_login_attempts: int = int(os.getenv("MAX_FAILED_LOGIN_ATTEMPTS", "5"))
     lockout_duration_minutes: int = int(os.getenv("LOCKOUT_DURATION_MINUTES", "30"))
     password_min_length: int = int(os.getenv("PASSWORD_MIN_LENGTH", "12"))
@@ -131,9 +146,22 @@ async def lifespan(app: FastAPI):
     init_db()
     register_default_handlers()
     await job_queue.start()
+
+    # Live camera sessions publish recognition events to WebSocket clients
+    # from their AI worker threads — bridge thread -> event loop here.
+    from services.live_camera_manager import live_camera_manager
+
+    _loop = asyncio.get_running_loop()
+
+    def _camera_event_sink(event: dict) -> None:
+        asyncio.run_coroutine_threadsafe(ws_manager.broadcast_event(event), _loop)
+
+    live_camera_manager.event_sink = _camera_event_sink
+
     logger = logging.getLogger(__name__)
     logger.info("Face Recognition AI API started (v2.0.0)")
     yield
+    live_camera_manager.stop_all()  # release cameras + join worker threads
     await job_queue.stop()
     logger.info("Face Recognition AI API shutting down")
 
@@ -178,10 +206,18 @@ app.add_middleware(
 )
 
 # 3. Trusted hosts (prevent Host header attacks)
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"] if os.getenv("ENVIRONMENT") == "development" else None,
+# ALLOWED_HOSTS is a comma-separated list; defaults to permissive "*" in
+# development only. Passing None (the previous behaviour) crashes Starlette,
+# which is why this middleware had been commented out.
+_allowed_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()] or (
+    ["*"] if os.getenv("ENVIRONMENT") == "development" else []
 )
+if _allowed_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
+else:
+    logging.getLogger(__name__).warning(
+        "TrustedHostMiddleware disabled: set ALLOWED_HOSTS (comma-separated) in production"
+    )
 
 
 # ── Safe Error Handlers (no stack traces leaked to clients) ────────
@@ -190,14 +226,19 @@ app.add_middleware(
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Return consistent JSON error responses without stack traces."""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": exc.detail,
-            "code": exc.status_code,
-        },
-        headers=exc.headers,
-    )
+    try:
+        response_headers = dict(exc.headers) if exc.headers else {}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": exc.detail,
+                "code": exc.status_code,
+            },
+            headers=response_headers,
+        )
+    except Exception as e:
+        logger.error("Error in http_exception_handler: %s", e, exc_info=True)
+        raise
 
 
 @app.exception_handler(Exception)
@@ -243,20 +284,6 @@ async def add_security_headers(request: Request, call_next) -> Response:
     return response
 
 
-# ── Request ID middleware ───────────────────────────────────────────
-
-import uuid  # noqa: E402
-
-
-@app.middleware("http")
-async def add_request_id(request: Request, call_next) -> Response:
-    """Ensure every request has a traceable ID."""
-    request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    return response
-
-
 # ── Request Body Size Limiter ───────────────────────────────────────
 
 MAX_BODY_SIZE = int(os.getenv("MAX_BODY_SIZE_BYTES", str(10 * 1024 * 1024)))  # 10 MB default
@@ -287,9 +314,28 @@ async def limit_request_body_size(request: Request, call_next) -> Response:
 
 async def get_current_user(
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
-    session: Session = Depends(get_session),
 ) -> User:
     """Validate JWT token and return current user."""
+    if settings.disable_auth:
+        # Development-only convenience mode. It still resolves a real database
+        # user so permission and audit dependencies continue to work normally.
+        with get_session() as session:
+            from sqlalchemy.orm import selectinload
+
+            user = (
+                session.query(User)
+                .options(selectinload(User.roles))
+                .filter(User.is_active.is_(True))
+                .order_by(User.id)
+                .first()
+            )
+            if user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Auth bypass is enabled, but no active user exists. Run scripts/seed_admin.py first.",
+                )
+            return user
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -302,13 +348,14 @@ async def get_current_user(
         from jose import jwt
 
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        raw_sub = payload.get("sub")
+        if raw_sub is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        user_id = int(raw_sub)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -316,15 +363,26 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = session.get(User, user_id)
-    if user is None or not user.is_active:
+    # MFA-pending tokens may ONLY be used at /auth/mfa/verify — never on
+    # other protected endpoints (prevents MFA bypass with a challenge token).
+    if payload.get("mfa_pending"):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MFA verification pending — complete /auth/mfa/verify first",
         )
 
-    return user
+    # Get session and query user with eager-loaded roles
+    with get_session() as session:
+        from sqlalchemy.orm import selectinload
+
+        user = session.query(User).options(selectinload(User.roles)).filter(User.id == user_id).first()
+        if user is None or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or inactive",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return user
 
 
 def require_permission(resource: str, action: ActionType):
@@ -332,7 +390,7 @@ def require_permission(resource: str, action: ActionType):
 
     def permission_checker(
         current_user: Annotated[User, Depends(get_current_user)],
-        session: Session = Depends(get_session),
+        session: Session = Depends(get_db),
     ) -> User:
         user_permissions = (
             session.query(Permission)
@@ -373,7 +431,7 @@ def require_role(*roles: RoleName):
 
     def role_checker(
         current_user: Annotated[User, Depends(get_current_user)],
-        session: Session = Depends(get_session),
+        session: Session = Depends(get_db),
     ) -> User:
         user_roles_query = (
             session.query(Role)
@@ -402,7 +460,7 @@ async def log_audit(
     description: Optional[str] = None,
     details: Optional[dict] = None,
     severity: str = "INFO",
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ) -> None:
     """Log audit event."""
     audit = AuditLog(
@@ -523,6 +581,8 @@ class StudentCreate(BaseModel):
 
 
 class StudentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     student_id: str
     name: str
@@ -552,6 +612,8 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     employee_id: str
     name: str
@@ -576,6 +638,8 @@ class CameraCreate(BaseModel):
 
 
 class CameraResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     camera_id: str
@@ -619,14 +683,6 @@ class PaginatedResponse(BaseModel):
     skip: int
     limit: int
     has_more: bool
-
-
-class HealthResponse(BaseModel):
-    status: str
-    version: str
-    timestamp: datetime
-    database: str
-    redis: str
 
 
 class EnrollmentImageResponse(BaseModel):
@@ -718,6 +774,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     )
     to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    # python-jose requires the JWT ``sub`` claim to be a string (RFC 7519).
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
@@ -764,7 +823,7 @@ def _create_refresh_token(session: Session, user: User, request: Request) -> str
 async def login(
     request: Request,
     form_data: LoginRequest,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Authenticate and receive tokens.
 
@@ -899,7 +958,7 @@ async def login(
 async def logout(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Log out the current user."""
     await log_audit(
@@ -914,7 +973,6 @@ async def logout(
 
 
 @app.get("/auth/me", response_model=UserResponse)
-@limiter.limit("30/minute")
 async def get_current_user_info(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -930,13 +988,49 @@ async def get_current_user_info(
     )
 
 
+# ── Password Change Schema ────────────────────────────────────────
+
+
+class PasswordChangeRequest(BaseModel):
+    """Password change request."""
+
+    current_password: str = Field(..., min_length=8, description="Current password for verification")
+    new_password: str = Field(..., min_length=8, max_length=128, description="New password")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Enforce strong password policy for new password."""
+        import re
+
+        min_length = settings.password_min_length
+        if len(v) < min_length:
+            raise ValueError(f"Password must be at least {min_length} characters long")
+
+        if settings.password_require_uppercase and not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+
+        if settings.password_require_lowercase and not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter")
+
+        if settings.password_require_digit and not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+
+        if settings.password_require_special:
+            special_chars = r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]"
+            if not re.search(special_chars, v):
+                raise ValueError("Password must contain at least one special character")
+
+        return v
+
+
 @app.post("/auth/change-password")
 @limiter.limit("5/minute")
 async def change_password(
     request: Request,
     body: PasswordChangeRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Change the current user's password.
 
@@ -1010,7 +1104,7 @@ async def change_password(
 async def revoke_all_sessions(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Revoke all refresh tokens for the current user.
 
@@ -1081,7 +1175,7 @@ async def verify_mfa(
     request: Request,
     body: MFAVerifyRequest,
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Verify an MFA code and receive a full access token.
 
@@ -1108,9 +1202,10 @@ async def verify_mfa(
                 status_code=403,
                 detail="This endpoint requires an MFA-pending token. Use the login endpoint first.",
             )
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        raw_sub = payload.get("sub")
+        if raw_sub is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+        user_id = int(raw_sub)
     except HTTPException:
         raise
     except Exception:
@@ -1186,7 +1281,7 @@ async def mfa_status(
 async def disable_mfa(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("mfa", ActionType.UPDATE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Disable MFA for the current user."""
     from services.mfa_service import MFAService
@@ -1248,7 +1343,7 @@ async def oidc_callback(
     request: Request,
     code: str = Query(...),
     state: str = Query(...),
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Handle the OIDC callback after SSO login.
 
@@ -1325,42 +1420,6 @@ async def oidc_callback(
     )
 
 
-# ── Password Change Schema ────────────────────────────────────────
-
-
-class PasswordChangeRequest(BaseModel):
-    """Password change request."""
-
-    current_password: str = Field(..., min_length=8, description="Current password for verification")
-    new_password: str = Field(..., min_length=8, max_length=128, description="New password")
-
-    @field_validator("new_password")
-    @classmethod
-    def validate_password_strength(cls, v: str) -> str:
-        """Enforce strong password policy for new password."""
-        import re
-
-        min_length = settings.password_min_length
-        if len(v) < min_length:
-            raise ValueError(f"Password must be at least {min_length} characters long")
-
-        if settings.password_require_uppercase and not any(c.isupper() for c in v):
-            raise ValueError("Password must contain at least one uppercase letter")
-
-        if settings.password_require_lowercase and not any(c.islower() for c in v):
-            raise ValueError("Password must contain at least one lowercase letter")
-
-        if settings.password_require_digit and not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one digit")
-
-        if settings.password_require_special:
-            special_chars = r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]"
-            if not re.search(special_chars, v):
-                raise ValueError("Password must contain at least one special character")
-
-        return v
-
-
 # ── Refresh Token Schemas ────────────────────────────────────────
 
 
@@ -1378,7 +1437,7 @@ class RefreshTokenRequest(BaseModel):
 async def refresh_token(
     request: Request,
     body: RefreshTokenRequest,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Exchange a refresh token for a new access token.
 
@@ -1442,19 +1501,6 @@ async def refresh_token(
 # ── Health & Monitoring ──────────────────────────────────────────────
 
 
-@app.get("/health", response_model=HealthResponse)
-@limiter.exempt
-async def health_check(request: Request):
-    """Health check endpoint (not rate-limited)."""
-    return HealthResponse(
-        status="healthy",
-        version="2.0.0",
-        timestamp=_utcnow(),
-        database="connected",
-        redis="connected",
-    )
-
-
 @app.get("/metrics")
 @limiter.exempt
 async def metrics(request: Request):
@@ -1471,20 +1517,11 @@ async def metrics(request: Request):
 @limiter.limit(os.getenv("ENROLL_RATE_LIMIT", "5/minute"))
 async def upload_enrollment_image(
     request: Request,
+    current_user: Annotated[User, Depends(require_permission("enrollment", ActionType.CREATE))],
     file: UploadFile = File(...),
-    current_user: Annotated[User, Depends(require_permission("enrollment", ActionType.CREATE))] = None,
 ):
-    """Upload an enrollment photo with security validation.
+    """Upload an enrollment photo with security validation."""
 
-    Validates:
-        - File size (max 5 MB)
-        - Actual content type (magic bytes, not just extension)
-        - Image validity (not corrupt)
-        - Dimensions within limits
-
-    Returns a server-generated filename — the original filename
-    is never used for storage.
-    """
     file_data = await file.read()
     try:
         safe_filename, validated_data = validate_image_upload(
@@ -1495,9 +1532,9 @@ async def upload_enrollment_image(
     except UploadSecurityError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # Save to the uploads directory
     upload_dir = cfg.ROOT_DIR / "uploads" / "enrollment"
     upload_dir.mkdir(parents=True, exist_ok=True)
+
     save_path = upload_dir / safe_filename
     save_path.write_bytes(validated_data)
 
@@ -1517,7 +1554,7 @@ async def create_student(
     request: Request,
     student: StudentCreate,
     current_user: Annotated[User, Depends(require_permission("students", ActionType.CREATE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Create a new student."""
     db_student = Student(**student.model_dump())
@@ -1543,7 +1580,7 @@ async def create_student(
 async def list_students(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("students", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     q: Optional[str] = Query(None, description="Search by student name or student ID"),
     department_id: Optional[int] = Query(None, gt=0),
     is_active: Optional[bool] = None,
@@ -1584,7 +1621,7 @@ async def get_student(
     request: Request,
     student_id: int,
     current_user: Annotated[User, Depends(require_permission("students", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Get a specific student."""
     student = session.get(Student, student_id)
@@ -1602,7 +1639,7 @@ async def create_employee(
     request: Request,
     employee: EmployeeCreate,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.CREATE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Create a new employee."""
     # Check for duplicate employee_id
@@ -1636,7 +1673,7 @@ async def create_employee(
 async def list_employees(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     q: Optional[str] = Query(None, description="Search by employee name, ID, or department"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -1659,7 +1696,7 @@ async def get_employee(
     request: Request,
     employee_id: int,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Get a specific employee by database ID."""
     employee = session.get(Employee, employee_id)
@@ -1675,7 +1712,7 @@ async def update_employee(
     request: Request,
     body: EmployeeUpdate,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.UPDATE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Update an existing employee."""
     employee = session.get(Employee, employee_id)
@@ -1709,7 +1746,7 @@ async def delete_employee(
     employee_id: int,
     request: Request,
     current_user: Annotated[User, Depends(require_permission("employees", ActionType.DELETE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Delete an employee by database ID.
 
@@ -1754,7 +1791,7 @@ async def create_camera(
     request: Request,
     camera: CameraCreate,
     current_user: Annotated[User, Depends(require_role(RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Create a new camera."""
     db_camera = Camera(**camera.model_dump())
@@ -1781,7 +1818,7 @@ async def create_camera(
 async def list_cameras(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("cameras", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     q: Optional[str] = Query(None, description="Search by camera name, location, building, or room"),
     is_active: Optional[bool] = None,
     status: Optional[str] = Query(None, description="Filter by ONLINE/OFFLINE status"),
@@ -1828,13 +1865,22 @@ async def get_camera(
     request: Request,
     camera_id: int,
     current_user: Annotated[User, Depends(require_permission("cameras", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Get camera details."""
     camera = session.get(Camera, camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
     return CameraResponse.model_validate(camera)
+
+
+# ── Camera Status Update Schema ─────────────────────────────────
+
+
+class CameraStatusUpdate(BaseModel):
+    """Request body for updating camera status."""
+
+    is_active: bool = Field(..., description="Whether the camera should be active")
 
 
 @app.patch("/cameras/{camera_id}/status")
@@ -1844,7 +1890,7 @@ async def update_camera_status(
     request: Request,
     body: CameraStatusUpdate,
     current_user: Annotated[User, Depends(require_role(RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Update camera status.
 
@@ -1885,7 +1931,7 @@ async def mark_attendance(
     request: Request,
     attendance: AttendanceCreate,
     current_user: Annotated[User, Depends(require_permission("attendance", ActionType.CREATE))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Mark attendance for a student."""
     # Validate student exists
@@ -1948,7 +1994,7 @@ async def mark_attendance(
 async def get_attendance(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("attendance", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     student_id: Optional[int] = None,
     section_id: Optional[int] = None,
     course_id: Optional[int] = None,
@@ -2027,13 +2073,9 @@ class ReviewAction(str, Enum):
     DELETE = "delete"
 
 
-class CameraStatusUpdate(BaseModel):
-    """Request body for updating camera status."""
-
-    is_active: bool = Field(..., description="Whether the camera should be active")
-
-
 class UnknownFaceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     image_path: str
     camera_id: Optional[int] = None
@@ -2050,7 +2092,7 @@ async def list_unknown_faces(
     current_user: Annotated[
         User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))
     ],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     reviewed: Optional[bool] = None,
     camera_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
@@ -2086,7 +2128,7 @@ async def review_unknown_face(
     ],
     action: ReviewAction = Query(...),
     employee_id: Optional[int] = None,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Review an unknown face.
 
@@ -2123,6 +2165,58 @@ async def review_unknown_face(
     return {"message": f"Face {action}ed successfully"}
 
 
+# ── Audit Logs Endpoints ─────────────────────────────────────────────
+
+
+@app.get("/audit-logs", response_model=PaginatedResponse)
+@limiter.limit("60/minute")
+async def list_audit_logs(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    action: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    session: Session = Depends(get_db),
+):
+    """Retrieve paginated audit logs for security, compliance, and attendance inspection."""
+    stmt = select(AuditLog)
+    if action:
+        stmt = stmt.where(AuditLog.action.ilike(f"%{action}%"))
+    if severity:
+        stmt = stmt.where(AuditLog.severity == severity.upper())
+
+    total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit)
+    rows = session.scalars(stmt).all()
+
+    items = [
+        {
+            "id": r.id,
+            "action": r.action,
+            "actor": r.actor,
+            "actor_type": r.actor_type or "USER",
+            "actor_id": r.actor_id,
+            "timestamp": r.timestamp.isoformat() if r.timestamp else "",
+            "resource_type": r.resource_type,
+            "resource_id": r.resource_id,
+            "description": r.description,
+            "ip_address": r.ip_address,
+            "severity": r.severity or "INFO",
+            "details": r.details if isinstance(r.details, dict) else {},
+        }
+        for r in rows
+    ]
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=(skip + len(items)) < total,
+    )
+
+
 # ── Analytics Endpoints ──────────────────────────────────────────────
 
 
@@ -2131,7 +2225,7 @@ async def review_unknown_face(
 async def attendance_summary(
     request: Request,
     current_user: Annotated[User, Depends(require_permission("analytics", ActionType.READ))],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     date_from: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15)"),
     date_to: Optional[str] = Query(None, description="ISO date string (e.g. 2024-01-15)"),
 ):
@@ -2175,7 +2269,7 @@ async def camera_status(
     current_user: Annotated[
         User, Depends(require_role(RoleName.SECURITY, RoleName.COLLEGE_ADMIN, RoleName.SUPER_ADMIN))
     ],
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ):
     """Get camera status overview."""
     cameras = session.query(Camera).all()
@@ -2228,7 +2322,8 @@ async def websocket_live_events(
         from jose import jwt as jose_jwt
 
         payload = jose_jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id = payload.get("sub")
+        raw_sub = payload.get("sub")
+        user_id = int(raw_sub) if raw_sub is not None else None
         username = payload.get("username", "unknown")
         roles = payload.get("roles", [])
     except Exception:
@@ -2565,10 +2660,133 @@ async def system_status(
     }
 
 
-# ── Lifespan: Start/stop background services ────────────────────
-# Note: This overrides the lifespan defined above.
-# We need to merge it properly.
-# The job queue and WS manager are started on first use.
+# ─────────────────────────────────────────────────────────────────────
+#  Live Video Sessions — MJPEG streaming + camera lifecycle
+# ─────────────────────────────────────────────────────────────────────
+# One authoritative owner per camera inside the API process. Capture and
+# AI inference run in background threads (services/live_camera_manager);
+# the browser consumes an MJPEG stream of the newest frame and receives
+# recognition events over /ws/live — video never waits for inference.
+
+from services.live_camera_manager import live_camera_manager as _live_cameras  # noqa: E402
+
+
+class VideoStartRequest(BaseModel):
+    """Request body for starting a live camera session."""
+
+    camera_id: Optional[int] = Field(None, description="Registered camera row to start")
+    source_type: Optional[str] = Field(
+        None,
+        description="Override source type (webcam|usb_auto|android_wifi|ip_camera...)",
+    )
+    device_id: Optional[int] = Field(None, ge=0, description="OpenCV device index")
+    url: Optional[str] = Field(None, max_length=500, description="Stream URL (rtsp/http)")
+
+
+def _decode_ws_style_token(token: str) -> tuple[Optional[int], str, list]:
+    """Decode a JWT access token (shared with /ws/live semantics)."""
+    from jose import jwt as jose_jwt
+
+    payload = jose_jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    raw_sub = payload.get("sub")
+    user_id = int(raw_sub) if raw_sub is not None else None
+    return user_id, payload.get("username", "unknown"), payload.get("roles", [])
+
+
+def _resolve_session_key_and_source(payload: VideoStartRequest, session: Session) -> tuple[str, str, dict]:
+    """Map a start request to (session_key, source_type, camera_kwargs)."""
+    if payload.camera_id is not None:
+        camera = session.get(Camera, payload.camera_id)
+        if camera is None:
+            raise HTTPException(status_code=404, detail="Camera not found")
+        key = f"cam-{camera.id}"
+        url = payload.url or camera.stream_url
+        if url and (url.startswith("rtsp://") or url.startswith("http")):
+            return key, "ip_camera", {"url": url}
+        idx = payload.device_id if payload.device_id is not None else (camera.camera_index or 0)
+        return key, "webcam", {"device_id": idx}
+    source_type = payload.source_type or "webcam"
+    if payload.url:
+        return f"{source_type}-{payload.url[:40]}", source_type, {"url": payload.url}
+    device_id = payload.device_id if payload.device_id is not None else 0
+    return f"{source_type}-{device_id}", source_type, {"device_id": device_id}
+
+
+@app.post("/video/sessions/start")
+async def start_video_session(
+    payload: VideoStartRequest,
+    current_user: Annotated[User, Depends(require_permission("cameras", ActionType.UPDATE))],
+    session: Session = Depends(get_db),
+):
+    """Start (or reuse) a live camera session.
+
+    The API process becomes the single owner of the physical camera;
+    repeated START calls for the same session are idempotent.
+    """
+    key, source_type, kwargs = _resolve_session_key_and_source(payload, session)
+    cam_session = _live_cameras.start(key, source_type=source_type, camera_kwargs=kwargs)
+    status = cam_session.status_payload()
+    if cam_session.status == "ERROR":
+        raise HTTPException(status_code=503, detail=status["error"] or "Could not start camera")
+    return status
+
+
+@app.post("/video/sessions/{session_key}/stop")
+async def stop_video_session(
+    session_key: str,
+    current_user: Annotated[User, Depends(require_permission("cameras", ActionType.UPDATE))],
+):
+    """Stop a live camera session and release the device."""
+    stopped = _live_cameras.stop(session_key)
+    if not stopped:
+        raise HTTPException(status_code=404, detail="No such video session")
+    return {"key": session_key, "status": "STOPPED"}
+
+
+@app.get("/video/sessions")
+async def list_video_sessions(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """List active live camera sessions with capture/AI stats."""
+    return {"sessions": _live_cameras.list_sessions()}
+
+
+@app.get("/video/sessions/{session_key}/status")
+async def video_session_status(
+    session_key: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Status of one live camera session."""
+    cam_session = _live_cameras.get(session_key)
+    if cam_session is None:
+        raise HTTPException(status_code=404, detail="No such video session")
+    return cam_session.status_payload()
+
+
+@app.get("/video/sessions/{session_key}/mjpeg")
+@limiter.exempt
+async def video_session_mjpeg(
+    request: Request,
+    session_key: str,
+    token: str = Query(..., description="JWT access token (browsers cannot set headers on <img>)"),
+    annotate: bool = Query(True, description="Draw recognition overlays"),
+    fps: int = Query(15, ge=1, le=30),
+):
+    """MJPEG stream of the newest frame (multipart/x-mixed-replace).
+
+    Video is delivered out-of-band from REST traffic; each frame is the
+    latest captured frame, so AI latency never delays display.
+    """
+    try:
+        _decode_ws_style_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if _live_cameras.get(session_key) is None:
+        raise HTTPException(status_code=404, detail="No such video session")
+    return StreamingResponse(
+        _live_cameras.mjpeg(session_key, fps=fps, annotate=annotate),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 if __name__ == "__main__":

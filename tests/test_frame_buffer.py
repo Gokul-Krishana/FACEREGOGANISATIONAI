@@ -22,7 +22,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from dashboard.frame_buffer import FrameBuffer, ResultsBuffer, frame_buffer, results_buffer  # noqa: E402
+from pipeline.frame_buffer import FrameBuffer, ResultsBuffer, frame_buffer, results_buffer  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -257,7 +257,7 @@ class TestSingletons:
         assert isinstance(results_buffer, ResultsBuffer)
 
     def test_singleton_identity(self):
-        from dashboard import frame_buffer as fb_mod
+        from pipeline import frame_buffer as fb_mod
 
         assert fb_mod.frame_buffer is frame_buffer
         assert fb_mod.results_buffer is results_buffer
