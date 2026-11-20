@@ -34,7 +34,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, Response  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from enum import Enum  # noqa: E402
-from pydantic import BaseModel, EmailStr, Field, field_validator  # noqa: E402
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
 from slowapi.middleware import SlowAPIMiddleware  # noqa: E402
@@ -540,6 +540,7 @@ class StudentCreate(BaseModel):
 
 
 class StudentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     student_id: str
     name: str
@@ -569,6 +570,7 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     employee_id: str
     name: str
@@ -593,6 +595,7 @@ class CameraCreate(BaseModel):
 
 
 class CameraResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     camera_id: str
@@ -618,6 +621,7 @@ class AttendanceCreate(BaseModel):
 
 
 class AttendanceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     student_id: Optional[int] = None
     student_name: str
@@ -2053,6 +2057,7 @@ class CameraStatusUpdate(BaseModel):
 
 
 class UnknownFaceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     image_path: str
     camera_id: Optional[int] = None
