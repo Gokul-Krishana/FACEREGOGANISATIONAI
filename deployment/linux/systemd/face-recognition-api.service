@@ -1,0 +1,16 @@
+[Unit]
+Description=Face Recognition Attendance System - FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=attendance
+WorkingDirectory=/opt/FACEREGOGANISATIONAI
+ExecStart=/opt/FACEREGOGANISATIONAI/.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
+Restart=always
+RestartSec=5
+Environment=ENVIRONMENT=production
+Environment=LOG_LEVEL=INFO
+
+[Install]
+WantedBy=multi-user.target

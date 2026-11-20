@@ -1,0 +1,15 @@
+[Unit]
+Description=Face Recognition Attendance System - Streamlit Dashboard
+After=network.target face-recognition-api.service
+
+[Service]
+Type=simple
+User=attendance
+WorkingDirectory=/opt/FACEREGOGANISATIONAI
+ExecStart=/opt/FACEREGOGANISATIONAI/.venv/bin/streamlit run dashboard/app.py --server.port 8501 --server.headless true --server.address 0.0.0.0
+Restart=always
+RestartSec=5
+Environment=ENVIRONMENT=production
+
+[Install]
+WantedBy=multi-user.target
