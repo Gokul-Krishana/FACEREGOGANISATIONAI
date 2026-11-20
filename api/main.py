@@ -153,6 +153,15 @@ app = FastAPI(
 )
 
 
+def _fastapi_db_session():
+    """Generator-based database session adapter for FastAPI dependency injection."""
+    with get_session() as s:
+        yield s
+
+
+app.dependency_overrides[get_session] = _fastapi_db_session
+
+
 # ── Middleware Stack ────────────────────────────────────────────────
 
 
@@ -307,13 +316,16 @@ async def get_current_user(
         from jose import jwt
 
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        user_id_raw = payload.get("sub")
+        if user_id_raw is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        user_id = int(user_id_raw)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -719,6 +731,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         Encoded JWT string.
     """
     to_encode = data.copy()
+    if "sub" in to_encode and to_encode["sub"] is not None:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     )

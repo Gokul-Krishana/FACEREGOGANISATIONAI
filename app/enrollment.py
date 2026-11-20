@@ -104,7 +104,13 @@ class FaceEnrollment:
 
     # ── Public API ────────────────────────────────────────────
 
-    def enroll(self, name: str, embedding: np.ndarray, employee_id: Optional[str] = None) -> bool:
+    def enroll(
+        self,
+        name: str,
+        embedding: np.ndarray,
+        employee_id: Optional[str] = None,
+        employee_db_id: Optional[int] = None,
+    ) -> bool:
         """Add a new face to the database.
 
         Args:
@@ -114,6 +120,7 @@ class FaceEnrollment:
                 Stored alongside ``name`` so two people with the same
                 display name remain distinguishable and renames never
                 break identity resolution.
+            employee_db_id: Immutable database primary key (``Employee.id``).
 
         Returns:
             ``True`` on success.
@@ -123,13 +130,19 @@ class FaceEnrollment:
         self.index.add(emb)
         entry: Dict = {"name": name, "id": person_id}
         if employee_id:
-            entry["employee_id"] = employee_id
+            entry["employee_id"] = str(employee_id)
+        if employee_db_id is not None:
+            entry["employee_db_id"] = int(employee_db_id)
         self.metadata.append(entry)
         self._save()
         return True
 
     def search(
-        self, embedding: np.ndarray, k: int = 1, threshold: float = cfg.RECOGNITION_THRESHOLD
+        self,
+        embedding: np.ndarray,
+        k: int = 1,
+        threshold: float = cfg.RECOGNITION_THRESHOLD,
+        ambiguity_margin: float = 0.15,
     ) -> List[Dict]:
         """Find the *k* nearest neighbours in the embedding space.
 
@@ -138,22 +151,24 @@ class FaceEnrollment:
             k: Number of neighbours to retrieve.
             threshold: Maximum L2 distance for a valid match
                        (lower = stricter, higher = more tolerant).
+            ambiguity_margin: Minimum L2 distance separation required between
+                              top-1 and top-2 distinct candidates before flagging
+                              as ambiguous.
 
         Returns:
-            List of match dicts sorted by distance (ascending)::
-
-                [
-                    {"name": "...", "confidence": 0.92, "distance": 0.48},
-                    ...
-                ]
-
-            Empty list if the index is empty or no match passes the threshold.
+            List of match dicts sorted by distance (ascending).
+            When multiple candidates are returned, the top match includes
+            ``is_ambiguous`` indicating whether a competing distinct identity
+            matches with a close score within ``ambiguity_margin``.
         """
         if self.index.ntotal == 0:
             return []
 
+        # If k=1 requested, retrieve at least 2 internally to evaluate ambiguity margin
+        search_k = max(2, k) if self.index.ntotal >= 2 else 1
+
         query = embedding.reshape(1, -1).astype(np.float32)
-        distances, indices = self.index.search(query, k)
+        distances, indices = self.index.search(query, search_k)
 
         results: List[Dict] = []
         for dist, idx in zip(distances[0], indices[0]):
@@ -167,15 +182,6 @@ class FaceEnrollment:
             if dist > threshold:
                 continue
 
-            # Convert L2 distance to a [0, 1] confidence score.
-            # Uses a non-linear mapping (1/(1+d²)) that gives intuitive percentages:
-            #   dist=0.0  → 100%  (identical)
-            #   dist=0.3  →  92%  (very close)
-            #   dist=0.5  →  80%  (good match)
-            #   dist=0.7  →  67%  (decent)
-            #   dist=1.0  →  50%  (borderline)
-            #   dist=1.5  →  31%  (probably different)
-            #   dist=2.0  →  20%  (different person)
             confidence = 1.0 / (1.0 + dist * dist)
             match: Dict = {
                 "name": name,
@@ -185,9 +191,43 @@ class FaceEnrollment:
             }
             if entry.get("employee_id"):
                 match["employee_id"] = entry["employee_id"]
+            if entry.get("employee_db_id") is not None:
+                match["employee_db_id"] = entry["employee_db_id"]
             results.append(match)
 
-        return results
+        # ── Ambiguity Check between top-1 and top-2 candidates ───────
+        if len(results) >= 2:
+            top1 = results[0]
+            top2 = results[1]
+            # Compare whether top1 and top2 are distinct identities
+            is_different_person = False
+            if top1.get("employee_db_id") is not None and top2.get("employee_db_id") is not None:
+                is_different_person = top1["employee_db_id"] != top2["employee_db_id"]
+            elif top1.get("employee_id") and top2.get("employee_id"):
+                is_different_person = top1["employee_id"] != top2["employee_id"]
+            else:
+                is_different_person = top1["name"] != top2["name"]
+
+            if is_different_person:
+                dist_margin = top2["distance"] - top1["distance"]
+                conf_margin = top1["confidence"] - top2["confidence"]
+                if dist_margin < ambiguity_margin or conf_margin < 0.08:
+                    top1["is_ambiguous"] = True
+                    top1["ambiguity_margin"] = round(dist_margin, 4)
+                    top1["competing_name"] = top2["name"]
+                    top1["competing_employee_id"] = top2.get("employee_id")
+                else:
+                    top1["is_ambiguous"] = False
+            else:
+                top1["is_ambiguous"] = False
+        elif len(results) == 1:
+            results[0]["is_ambiguous"] = False
+
+        # If user originally asked for k=1, trim back to k results
+        if k == 1 and len(results) > 1:
+            return results[:1]
+
+        return results[:k]
 
     def remove(self, name: str) -> bool:
         """Remove all entries for a given name.
@@ -271,11 +311,9 @@ class FaceEnrollment:
         return True
 
     def rename(self, old_name: str, new_name: str) -> bool:
-        """Rename all embeddings for a person in the FAISS index.
+        """Rename all embeddings for a person in the FAISS metadata.
 
-        Since FAISS does not support selective mutation, the index is
-        rebuilt from scratch keeping every vector but rewriting the
-        metadata label (same O(N) machinery as ``remove_by_name``).
+        Preserves all vectors intact without clearing or altering the FAISS index.
 
         Args:
             old_name: Current name stored in the metadata.
@@ -289,46 +327,54 @@ class FaceEnrollment:
             return False
         new_name = new_name.strip()
 
-        before = sum(1 for m in self.metadata if m["name"] == old_name)
-        if before == 0:
-            return False
+        renamed_count = 0
+        for m in self.metadata:
+            if m.get("name") == old_name:
+                m["name"] = new_name
+                renamed_count += 1
 
-        if self.index.ntotal == 0:
-            # Nothing to rebuild — just rewrite metadata labels
-            for m in self.metadata:
-                if m["name"] == old_name:
-                    m["name"] = new_name
-            for i, m in enumerate(self.metadata):
-                m["id"] = i
+        if renamed_count > 0:
+            self._save()
+            logger = logging.getLogger(__name__)
+            logger.info("Renamed %d embedding(s) '%s' → '%s' in metadata", renamed_count, old_name, new_name)
+            return True
+        return False
+
+    def rename_by_employee_id(self, employee_id: str, new_name: str) -> bool:
+        """Rename all embeddings for a specific employee identified by unique ``employee_id``."""
+        if not new_name or not new_name.strip():
+            return False
+        new_name = new_name.strip()
+
+        renamed_count = 0
+        for m in self.metadata:
+            if str(m.get("employee_id")) == str(employee_id):
+                m["name"] = new_name
+                renamed_count += 1
+
+        if renamed_count > 0:
+            self._save()
+            logger = logging.getLogger(__name__)
+            logger.info("Renamed employee_id '%s' → name '%s' in metadata (%d records)", employee_id, new_name, renamed_count)
+            return True
+        return False
+
+    def update_employee_id(self, old_emp_id: str, new_emp_id: str) -> bool:
+        """Safely update an employee's identifier in FAISS metadata."""
+        if not new_emp_id or not new_emp_id.strip():
+            return False
+        new_emp_id = new_emp_id.strip()
+
+        updated_count = 0
+        for m in self.metadata:
+            if str(m.get("employee_id")) == str(old_emp_id):
+                m["employee_id"] = new_emp_id
+                updated_count += 1
+
+        if updated_count > 0:
             self._save()
             return True
-
-        # Rebuild the index with all vectors, renamed metadata
-        new_index = self._create_index()
-        if hasattr(self.index, "reconstruct"):
-            for i in range(self.index.ntotal):
-                vec = self.index.reconstruct(i)
-                new_index.add(vec.reshape(1, -1))
-            self.index = new_index
-        else:
-            logger = __import__("logging").getLogger(__name__)
-            logger.warning(
-                "FAISS index type %s does not support reconstruction. Clearing all embeddings during rename.",
-                type(self.index).__name__,
-            )
-            self.index = self._create_index()
-
-        # Rewrite names in metadata
-        for m in self.metadata:
-            if m["name"] == old_name:
-                m["name"] = new_name
-        for i, m in enumerate(self.metadata):
-            m["id"] = i
-
-        self._save()
-        logger = __import__("logging").getLogger(__name__)
-        logger.info("Renamed %d embedding(s) '%s' → '%s' in FAISS", before, old_name, new_name)
-        return True
+        return False
 
     def clear(self) -> None:
         """Remove **all** enrolled faces."""

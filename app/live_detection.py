@@ -171,7 +171,7 @@ class LiveDetection:
 
             # Step 4 — FAISS similarity search
             if embedding is not None:
-                matches = self.enrollment.search(embedding, k=1, threshold=self.recog_threshold)
+                matches = self.enrollment.search(embedding, k=2, threshold=self.recog_threshold)
                 faiss_results.append(matches)
             else:
                 faiss_results.append([])

@@ -419,7 +419,8 @@ class DeepLivenessDetector:
             Aligned BGR face crop.
         """
         h, w = face_img.shape[:2]
-        if h < 16 or w < 16 or landmarks.shape != (5, 2):
+        lm = np.asarray(landmarks, dtype=np.float32)
+        if h < 16 or w < 16 or lm.shape != (5, 2):
             return face_img
 
         # Canonical landmark positions (normalised to image size)
@@ -436,7 +437,7 @@ class DeepLivenessDetector:
 
         # Estimate similarity transform
         try:
-            tform, _ = cv2.estimateAffinePartial2D(landmarks, canonical)
+            tform, _ = cv2.estimateAffinePartial2D(lm, canonical)
             if tform is not None:
                 aligned = cv2.warpAffine(  # type: ignore[call-overload]
                     face_img,

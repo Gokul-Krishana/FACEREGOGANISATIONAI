@@ -270,12 +270,14 @@ class AMFREngine:
         arcface_distance = 999.0
         matched_employee_id = None
         matched_faiss_id = None
+        is_ambiguous = False
         if faiss:
             name = faiss[0]["name"]
             confidence = faiss[0]["confidence"]
             arcface_distance = faiss[0].get("distance", 999.0)
             matched_employee_id = faiss[0].get("employee_id")
             matched_faiss_id = faiss[0].get("faiss_id")
+            is_ambiguous = bool(faiss[0].get("is_ambiguous", False))
 
         # ── Step 4: Liveness Detection (per-track instance) ──
         liveness_result = None
@@ -311,6 +313,7 @@ class AMFREngine:
             quality_score=quality_score,
             is_live=is_live,
             faiss_confidence=confidence,
+            is_ambiguous=is_ambiguous,
         )
 
         # ── Build result ─────────────────────────────────────
@@ -377,6 +380,7 @@ class AMFREngine:
         quality_score: float,
         is_live: bool,
         faiss_confidence: float,
+        is_ambiguous: bool = False,
     ) -> Tuple[AMFRDecision, float, Dict]:
         """Core AMFR risk-aware decision.
 
@@ -426,8 +430,14 @@ class AMFREngine:
         risk_score = float(np.clip(risk_score, 0.0, 1.0))
         details["risk_score"] = round(risk_score, 4)
 
-        # ── 5. Decision ──────────────────────────────────────
-        if liveness_score < cfg.LIVENESS_SPOOF_THRESHOLD:
+        # ── 5. Ambiguity Check (Top-1 vs Top-2 Margin) ───────
+        if is_ambiguous:
+            details["ambiguity_gate"] = "AMBIGUOUS"
+            details["ambiguity_reason"] = "Top-1 and top-2 candidates have close similarity"
+            # Never accept an ambiguous match — require disambiguation
+            decision = AMFRDecision.BORDERLINE
+        # ── 6. Decision ──────────────────────────────────────
+        elif liveness_score < cfg.LIVENESS_SPOOF_THRESHOLD:
             decision = AMFRDecision.REJECT_SPOOF
         elif risk_score >= cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD:
             decision = AMFRDecision.ACCEPT

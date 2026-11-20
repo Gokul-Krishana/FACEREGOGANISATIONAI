@@ -116,6 +116,26 @@ def create_camera(source_type: str, **kwargs) -> Optional[CameraSource]:
     return cls(**kwargs)
 
 
+def create_resilient_camera(source_type: str, **kwargs) -> Optional[CameraSource]:
+    """Create a camera wrapped in a fault-tolerant ResilientCameraSource.
+
+    Handles automatic reconnection, frozen frame detection, and thread-safe locking.
+    """
+    from camera.resilient import ResilientCameraSource
+
+    def factory() -> CameraSource:
+        cam = create_camera(source_type, **kwargs)
+        if cam is None:
+            raise RuntimeError(f"Failed to create camera source of type '{source_type}'")
+        return cam
+
+    camera_name = kwargs.get("name", f"{source_type}_{kwargs.get('device_id', 0)}")
+    return ResilientCameraSource(
+        source_factory=factory,
+        camera_name=str(camera_name),
+    )
+
+
 # ── CLI Selector ───────────────────────────────────────────────
 
 

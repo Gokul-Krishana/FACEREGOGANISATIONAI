@@ -408,9 +408,10 @@ class LivenessDetector:
             Approximate EAR (higher = more open). Typically >0.25 when open.
         """
         h, w = img_shape
-        left_eye = landmarks[0]
-        right_eye = landmarks[1]
-        nose = landmarks[2]
+        lm = np.asarray(landmarks, dtype=np.float32)
+        left_eye = lm[0]
+        right_eye = lm[1]
+        nose = lm[2]
 
         # Inter-eye distance
         eye_dist = np.linalg.norm(left_eye - right_eye)
