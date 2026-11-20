@@ -1,0 +1,45 @@
+# Face Recognition AI -- College Deployment Dependencies
+# Install with:  pip install -r requirements.txt
+
+# – Core
+streamlit>=1.28.0
+streamlit-webrtc>=0.47.0  # Browser webcam capture for Streamlit
+opencv-python>=4.8.0
+numpy>=1.24.0
+pandas>=2.0.0
+Pillow>=10.0.0
+
+# – AI Models
+# NOTE: torch 2.4.0 is broken on Windows (fbgemm.dll WinError 126 on import) and
+# is explicitly excluded by ultralytics on win32. Pin to a known-good version.
+torch>=2.0.0,!=2.4.0
+ultralytics>=8.0.0          # YOLO11 person detection
+insightface>=0.7.3          # RetinaFace + ArcFace
+faiss-cpu>=1.7.0            # FAISS vector search (CPU)
+psycopg2-binary>=2.9.0      # PostgreSQL adapter
+redis>=4.4.0                 # Redis cache
+onnxruntime>=1.15.0          # ONNX Runtime for deep-learning liveness inference
+
+# – Security/Infrastructure
+fastapi>=0.100.0
+alembic>=1.13.0              # Database migration support
+uvicorn[standard]>=0.21.5
+python-multipart>=0.0.6         # File upload parsing
+python-magic>=0.4.27            # Magic bytes file type detection
+slowapi>=0.1.9                  # Rate limiting
+secure>=0.3.0                   # Security headers
+python-dotenv>=1.0.0
+ruamel.yaml>=0.18.0           # Comment-preserving YAML configuration support
+httpx>=0.27.0                   # HTTP client for OIDC
+pyotp>=2.9.0                   # TOTP for MFA
+
+# – Additional
+plotly>=5.18.0
+prometheus-client>=0.19.0
+ydata-profiling>=2.0.0          # Data profiling (renamed from pandas-profiling)
+psutil>=5.9.0                   # CPU/RAM monitoring on the Live page
+
+# – Production
+python-json-logger>=2.0.0        # Structured JSON logging
+gunicorn>=21.2.0                 # Production WSGI server (for Streamlit)
+hiredis>=2.3.0                   # Faster Redis parser (optional)
