@@ -135,7 +135,7 @@ class JobQueue:
     async def enqueue(
         self,
         job_type: str,
-        params: Dict[str, Any] = None,
+        params: Optional[Dict[str, Any]] = None,
         created_by: Optional[str] = None,
     ) -> str:
         """
@@ -233,7 +233,7 @@ class JobQueue:
 
     def stats(self) -> dict:
         """Return queue statistics."""
-        status_counts = {}
+        status_counts: Dict[str, int] = {}
         for job in self._jobs.values():
             status_counts[job.status.value] = status_counts.get(job.status.value, 0) + 1
         return {

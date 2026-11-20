@@ -40,7 +40,7 @@ import time
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import ClassVar, Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -99,11 +99,12 @@ class SharedModelResources:
     """Container for heavy deep-learning models loaded once and shared."""
 
     service: RecognitionService
+    _cache: ClassVar[Optional[SharedModelResources]] = None
 
     @staticmethod
     def load() -> SharedModelResources:
         """Load (or retrieve cached) recognition models once."""
-        if not hasattr(SharedModelResources, "_cache"):
+        if SharedModelResources._cache is None:
             logger.info("Loading shared AI models (YOLO, InsightFace, FAISS, AMFR)...")
             service = RecognitionService()
             SharedModelResources._cache = SharedModelResources(service=service)
@@ -174,7 +175,9 @@ class LiveRecognitionPipeline:
             self._cam.set_resolution(640, 480)
             # Cap camera FPS at 15 to reduce USB bandwidth
             try:
-                self._cam.set(cv2.CAP_PROP_FPS, 15)
+                raw_cap = getattr(self._cam, "_cap", None)
+                if raw_cap is not None:
+                    raw_cap.set(cv2.CAP_PROP_FPS, 15)
             except Exception:
                 pass
         except Exception as e:
@@ -300,7 +303,9 @@ class LiveRecognitionPipeline:
                     self._cam.open()
                     self._cam.set_resolution(640, 480)
                     try:
-                        self._cam.set(cv2.CAP_PROP_FPS, 15)
+                        raw_cap = getattr(self._cam, "_cap", None)
+                        if raw_cap is not None:
+                            raw_cap.set(cv2.CAP_PROP_FPS, 15)
                     except Exception:
                         pass
                     if self._cam.is_opened():
@@ -633,25 +638,31 @@ class LiveRecognitionPipeline:
 
 def scan_local_cameras(max_devices: int = 5) -> List[Dict]:
     """Detect available local PC/USB cameras by probing indices 0-4."""
+    from camera.webcam import get_preferred_backends
+
     available = []
+    backends = get_preferred_backends()
     for idx in range(max_devices):
-        try:
-            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-            if cap.isOpened():
-                # Try reading a test frame
-                ret, _ = cap.read()
-                backend = cap.getBackendName()
-                available.append(
-                    {
-                        "index": idx,
-                        "label": f"Camera {idx} ({backend})",
-                        "type": "webcam",
-                        "has_frame": ret,
-                    }
-                )
+        for backend, _ in backends:
+            try:
+                cap = cv2.VideoCapture(idx) if backend is None else cv2.VideoCapture(idx, backend)
+                if cap.isOpened():
+                    # Try reading a test frame
+                    ret, _ = cap.read()
+                    backend_name = cap.getBackendName()
+                    available.append(
+                        {
+                            "index": idx,
+                            "label": f"Camera {idx} ({backend_name})",
+                            "type": "webcam",
+                            "has_frame": ret,
+                        }
+                    )
+                    cap.release()
+                    break
                 cap.release()
-        except Exception:
-            pass
+            except Exception:
+                pass
     return available
 
 
@@ -871,7 +882,7 @@ def _start_recognition() -> None:
     pipeline = LiveRecognitionPipeline(source_type=effective_source, **kwargs)
 
     with st.spinner("Starting camera..."):
-        if pipeline.start():
+        if pipeline.start() and pipeline._cam is not None:
             # Acquire camera ownership
             if camera_owner.acquire(pipeline._cam, pipeline):
                 st.session_state.pipeline = pipeline
@@ -917,432 +928,442 @@ def _stop_recognition(quiet: bool = False) -> None:
 #  MAIN PAGE UI
 # ═══════════════════════════════════════════════════════════════
 
-# ── Session state initialization ──────────────────────────────
-if "pipeline" not in st.session_state:
-    st.session_state.pipeline = None
-if "camera_type" not in st.session_state:
-    st.session_state.camera_type = "webcam"
-if "camera_config" not in st.session_state:
-    st.session_state.camera_config = {}
-if "pc_cameras_cache" not in st.session_state:
-    st.session_state.pc_cameras_cache = scan_local_cameras()
-if "camera_settings_expanded" not in st.session_state:
-    st.session_state.camera_settings_expanded = False
-if "camera_manager_active" not in st.session_state:
-    st.session_state.camera_manager_active = False
+from dashboard.auth import OPERATOR_ROLES, require_auth  # noqa: E402
 
 
-# ═══════════════════════════════════════════════════════════════
-#  TITLE
-# ═══════════════════════════════════════════════════════════════
+def _render_page() -> None:
+    # ── Session state initialization ──────────────────────────────
+    if "pipeline" not in st.session_state:
+        st.session_state.pipeline = None
+    if "camera_type" not in st.session_state:
+        st.session_state.camera_type = "webcam"
+    if "camera_config" not in st.session_state:
+        st.session_state.camera_config = {}
+    if "pc_cameras_cache" not in st.session_state:
+        st.session_state.pc_cameras_cache = scan_local_cameras()
+    if "camera_settings_expanded" not in st.session_state:
+        st.session_state.camera_settings_expanded = False
+    if "camera_manager_active" not in st.session_state:
+        st.session_state.camera_manager_active = False
 
-st.markdown(
-    "<h1 style='margin-bottom:0'>\U0001f4f9 Live Recognition</h1>",
-    unsafe_allow_html=True,
-)
+    # ═══════════════════════════════════════════════════════════════
+    #  TITLE
+    # ═══════════════════════════════════════════════════════════════
 
-pipeline = st.session_state.pipeline
-is_running = pipeline is not None and pipeline.is_running
-
-# ═══════════════════════════════════════════════════════════════
-#  CONTROL BAR
-# ═══════════════════════════════════════════════════════════════
-
-st.markdown("---")
-
-# ── Row 1: Camera select + buttons ──────────────────────────
-row1 = st.columns([2.5, 1.5, 1, 1, 1.5])
-
-with row1[0]:
-    selected_camera_label = st.selectbox(
-        "Camera",
-        options=list(CAMERA_OPTIONS.keys()),
-        index=0,  # PC Camera is DEFAULT
-        key="camera_select",
-        disabled=is_running,
+    st.markdown(
+        "<h1 style='margin-bottom:0'>\U0001f4f9 Live Recognition</h1>",
+        unsafe_allow_html=True,
     )
-    selected_source = CAMERA_OPTIONS[selected_camera_label]
-    st.session_state.camera_type = selected_source
 
-    # Render camera-type-specific config below the selector
-    config = _render_camera_config(selected_source)
-    st.session_state.camera_config = config
+    pipeline = st.session_state.pipeline
+    is_running = pipeline is not None and pipeline.is_running
 
-with row1[1]:
-    st.markdown("##### &nbsp;")
-    if st.button(
-        "\U0001f50d Scan Cameras",
-        use_container_width=True,
-        disabled=is_running,
-    ):
-        with st.spinner("Scanning..."):
-            local = scan_local_cameras()
-            st.session_state.pc_cameras_cache = local
-            try:
-                network = scan_network(timeout=1.0)
-                st.session_state["scan_results"] = {"local": local, "network": network}
-            except Exception:
-                st.session_state["scan_results"] = {"local": local, "network": []}
-            st.rerun()
+    # ═══════════════════════════════════════════════════════════════
+    #  CONTROL BAR
+    # ═══════════════════════════════════════════════════════════════
 
-    # Show discovery results
-    if "scan_results" in st.session_state:
-        sr = st.session_state["scan_results"]
-        local = sr.get("local", [])
-        network = sr.get("network", [])
-        if local:
-            for c in local:
-                st.caption(f"\u2713 {c['label']}")
-        if network:
-            for d in network:
-                st.caption(f"\u2713 {d.display_name}")
+    st.markdown("---")
 
-with row1[2]:
-    st.markdown("##### &nbsp;")
-    if st.button(
-        "\u25b6 START",
-        type="primary",
-        use_container_width=True,
-        disabled=is_running,
-    ):
-        _start_recognition()
+    # ── Row 1: Camera select + buttons ──────────────────────────
+    row1 = st.columns([2.5, 1.5, 1, 1, 1.5])
 
-with row1[3]:
-    st.markdown("##### &nbsp;")
-    if st.button(
-        "\u23f9 STOP",
-        use_container_width=True,
-        disabled=not is_running,
-    ):
-        _stop_recognition()
+    with row1[0]:
+        selected_camera_label = st.selectbox(
+            "Camera",
+            options=list(CAMERA_OPTIONS.keys()),
+            index=0,  # PC Camera is DEFAULT
+            key="camera_select",
+            disabled=is_running,
+        )
+        selected_source = CAMERA_OPTIONS[selected_camera_label]
+        st.session_state.camera_type = selected_source
 
-with row1[4]:
-    st.markdown("##### Status")
+        # Render camera-type-specific config below the selector
+        config = _render_camera_config(selected_source)
+        st.session_state.camera_config = config
+
+    with row1[1]:
+        st.markdown("##### &nbsp;")
+        if st.button(
+            "\U0001f50d Scan Cameras",
+            use_container_width=True,
+            disabled=is_running,
+        ):
+            with st.spinner("Scanning..."):
+                local = scan_local_cameras()
+                st.session_state.pc_cameras_cache = local
+                try:
+                    network = scan_network(timeout=1.0)
+                    st.session_state["scan_results"] = {"local": local, "network": network}
+                except Exception:
+                    st.session_state["scan_results"] = {"local": local, "network": []}
+                st.rerun()
+
+        # Show discovery results
+        if "scan_results" in st.session_state:
+            sr = st.session_state["scan_results"]
+            local = sr.get("local", [])
+            network = sr.get("network", [])
+            if local:
+                for c in local:
+                    st.caption(f"\u2713 {c['label']}")
+            if network:
+                for d in network:
+                    st.caption(f"\u2713 {d.display_name}")
+
+    with row1[2]:
+        st.markdown("##### &nbsp;")
+        if st.button(
+            "\u25b6 START",
+            type="primary",
+            use_container_width=True,
+            disabled=is_running,
+        ):
+            _start_recognition()
+
+    with row1[3]:
+        st.markdown("##### &nbsp;")
+        if st.button(
+            "\u23f9 STOP",
+            use_container_width=True,
+            disabled=not is_running,
+        ):
+            _stop_recognition()
+
+    with row1[4]:
+        st.markdown("##### Status")
+        if is_running:
+            ps = pipeline.status
+            if ps == "LIVE":
+                st.markdown(":green[**\u25cf LIVE**]")
+            elif ps == "CONNECTING":
+                st.markdown(":orange[**\u25cb CONNECTING**]")
+            elif ps == "RECONNECTING":
+                st.markdown(":orange[**\u25cb RECONNECTING...**]")
+                st.caption("Attempting to reconnect...")
+            elif ps in ("ERROR", "DISCONNECTED"):
+                st.markdown(":red[**\u25cf DISCONNECTED**]")
+            else:
+                st.markdown(f":gray[**\u25cf {ps}**]")
+        else:
+            st.markdown(":green[**\u25cf READY**]")
+
+    st.markdown("---")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  MAIN VIDEO AREA
+    # ═══════════════════════════════════════════════════════════════
+
     if is_running:
-        ps = pipeline.status
-        if ps == "LIVE":
-            st.markdown(":green[**\u25cf LIVE**]")
-        elif ps == "CONNECTING":
-            st.markdown(":orange[**\u25cb CONNECTING**]")
-        elif ps == "RECONNECTING":
-            st.markdown(":orange[**\u25cb RECONNECTING...**]")
-            st.caption("Attempting to reconnect...")
-        elif ps in ("ERROR", "DISCONNECTED"):
-            st.markdown(":red[**\u25cf DISCONNECTED**]")
+        # Latest RAW frame + latest recognition results. Overlays are drawn at
+        # DISPLAY time (on the most recent frame) so the video stays fluid at
+        # capture rate while recognition overlays refresh at the AI cadence.
+        #
+        # IMPORTANT: check has_frame() BEFORE get() — get() clears the
+        # available flag, so has_frame() would always return False after get().
+        _has_frame = frame_buffer.has_frame()
+        raw_frame = frame_buffer.get()
+        results = results_buffer.get()
+
+        if results is None:
+            results = []
+        frame = pipeline._draw_overlays(raw_frame, results) if raw_frame is not None else None
+        last_result = results[0] if results else None
+
+        # Display FPS — measured at the rerun cadence (capture + recognition FPS
+        # are shown separately in the status bar).
+        _now = time.time()
+        _prev = st.session_state.get("_live_display_ts", _now)
+        st.session_state["_live_display_ts"] = _now
+        _display_fps = 1.0 / (_now - _prev) if _now > _prev else 0.0
+
+        # Main layout: video + sidebar
+        video_col, info_col = st.columns([3, 1])
+
+        with video_col:
+            if frame is not None:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                st.image(rgb_frame, channels="RGB", use_container_width=True)
+            else:
+                # Dark placeholder
+                placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
+                placeholder[:] = (25, 25, 25)
+                cv2.putText(
+                    placeholder,
+                    "Waiting for camera...",
+                    (180, 240),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (180, 180, 180),
+                    2,
+                )
+                st.image(placeholder, channels="BGR", use_container_width=True)
+
+        with info_col:
+            # Camera info summary
+            camera_label_display = selected_camera_label
+            st.markdown(f"**Camera:** {camera_label_display}")
+            st.markdown(f"**FPS:** {pipeline.fps:.1f}")
+            st.markdown(f"**Display FPS:** {_display_fps:.1f}")
+            st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
+            st.markdown(f"**People:** {pipeline.people_count}")
+
+            _e2e = pipeline.latency_stats()
+            if _e2e.get("count", 0):
+                st.markdown(f"**E2E Latency:** {_e2e['p50_ms']:.1f} / {_e2e['p95_ms']:.1f} ms (P50/P95)")
+            else:
+                st.markdown("**E2E Latency:** measuring…")
+
+            # Queue size (latest-frame-only buffer: 0=empty, 1=ready)
+            # Uses _has_frame captured before get() to avoid always reading 0.
+            _q = 1 if _has_frame else 0
+            st.markdown(f"**Queue:** {_q}/1")
+
+            # Camera Health
+            _health_color = (
+                "green"
+                if pipeline.status == "LIVE"
+                else ("orange" if pipeline.status in ("CONNECTING", "RECONNECTING") else "red")
+            )
+            st.markdown(
+                f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}"
+            )
+
+            # CPU / RAM (psutil optional)
+            if _PSUTIL_AVAILABLE:
+                _cpu = psutil.cpu_percent(interval=None)
+                _ram = psutil.virtual_memory().percent
+                st.markdown(f"**CPU:** {_cpu:.0f}% · **RAM:** {_ram:.0f}%")
+
+            if pipeline.error:
+                st.error(f"Error: {pipeline.error}")
+
+            # ── Last Recognition ──────────────────────────────────
+            if last_result:
+                st.markdown("---")
+                st.markdown("**Last Recognition**")
+                decision = last_result.get("amfr_decision", "")
+                name = last_result.get("emp_name") or last_result.get("name", "?")
+
+                if decision == AMFRDecision.ACCEPT.value:
+                    st.markdown(f"\u2705 **{name}**")
+                    emp_id_str = last_result.get("name", "")
+                    if emp_id_str:
+                        st.caption(f"ID: {emp_id_str}")
+                    st.success("PRESENT")
+                elif decision == AMFRDecision.REJECT_SPOOF.value:
+                    st.markdown("\U0001f6ab **SPOOF DETECTED**")
+                    st.error("Attendance Rejected")
+                elif decision == AMFRDecision.BORDERLINE.value:
+                    st.markdown(f"\u23f3 **{name}?**")
+                    st.info("Collecting more frames...")
+                else:
+                    st.markdown(f"\u2753 **{name}**")
+                    st.info("Not Enrolled")
+
+        # ── Today's Attendance ────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### \U0001f4cb Today's Attendance")
+        today_df = _get_today_attendance_df()
+        if today_df.empty:
+            st.info("No attendance records yet. Stand in front of the camera to be recognized.")
         else:
-            st.markdown(f":gray[**\u25cf {ps}**]")
+            st.dataframe(
+                today_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "time": "Time",
+                    "name": "Name",
+                    "id": "ID",
+                    "status": "Status",
+                },
+            )
+
+        # ── Expandable Sections ──────────────────────────────────
+
+        # Recognition Details
+        with st.expander("\U0001f52c Recognition Details"):
+            if results:
+                for i, r in enumerate(results):
+                    display_name = r.get("emp_name") or r.get("name", "?")
+                    if r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
+                        check = "\u2705 "
+                    elif r.get("amfr_decision") == AMFRDecision.REJECT_SPOOF.value:
+                        check = "\U0001f6ab "
+                    else:
+                        check = "\u2753 "
+
+                    st.markdown(f"**Person {i + 1}:** {check}{display_name}")
+                    cols = st.columns(4)
+                    with cols[0]:
+                        conf = r.get("risk_score", r.get("confidence", 0))
+                        st.metric("AMFR Confidence", f"{float(conf):.1%}" if conf else "\u2014")
+                    with cols[1]:
+                        qual = r.get("quality_score", 0)
+                        st.metric("Face Quality", f"{float(qual):.1%}" if qual else "\u2014")
+                    with cols[2]:
+                        live = r.get("liveness_score", 0)
+                        liveness_label = (
+                            "LIVE" if float(live) > cfg.LIVENESS_MIN_SCORE else f"{float(live):.1%}"
+                        )
+                        st.metric("Liveness", liveness_label)
+                    with cols[3]:
+                        if r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
+                            st.metric("Attendance", "\u2705 PRESENT")
+                        elif r.get("amfr_decision") == AMFRDecision.REJECT_SPOOF.value:
+                            st.metric("Attendance", "\U0001f6ab REJECTED")
+                        elif r.get("attendance_marked"):
+                            st.metric("Attendance", "\u2705 PRESENT")
+                        else:
+                            st.metric("Attendance", "\u2014")
+
+                    st.caption(
+                        f"AMFR Score: {r.get('risk_score', 0):.3f} | "
+                        f"Decision: {r.get('amfr_decision', '—')} | "
+                        f"Track: {r.get('track_id', '—')[:10] if r.get('track_id') else '—'}"
+                    )
+                    st.divider()
+            else:
+                st.info("No recognition results yet")
+
+        # Camera Details
+        with st.expander("\U0001f4f7 Camera Details"):
+            st.markdown(f"**Source:** {camera_label_display}")
+            st.markdown(f"**Type:** {selected_source}")
+            st.markdown(f"**FPS:** {pipeline.fps:.1f}")
+            st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
+            st.markdown(f"**Resolution:** {pipeline.resolution}")
+            st.markdown(f"**People detected:** {pipeline.people_count}")
+            st.markdown(f"**Frames processed:** {pipeline.frame_count}")
+            if pipeline.worker_errors:
+                st.warning(f"\u26a0\ufe0f Worker errors (transient): {pipeline.worker_errors}")
+            if _PSUTIL_AVAILABLE:
+                st.markdown(
+                    f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
+                    f"**RAM:** {psutil.virtual_memory().percent:.0f}%"
+                )
+            _e2e = pipeline.latency_stats()
+            if _e2e.get("count", 0):
+                st.markdown(
+                    f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
+                    f"{_e2e['p95_ms']:.1f} ms ({_e2e['count']:.0f} samples)"
+                )
+            else:
+                st.markdown("**E2E Latency (P50/P95):** measuring…")
+            st.markdown(f"**Status:** {pipeline.status}")
+            if pipeline.error:
+                st.error(f"Error: {pipeline.error}")
+
+        # Advanced Settings
+        with st.expander("\u2699\ufe0f Advanced Settings"):
+            st.markdown("**Recognition Thresholds**")
+            st.markdown(f"- FAISS distance threshold: {cfg.RECOGNITION_THRESHOLD}")
+            st.markdown(f"- Face quality min: {cfg.FACE_QUALITY_MIN_SCORE}")
+            st.markdown(f"- Liveness min: {cfg.LIVENESS_MIN_SCORE}")
+            st.markdown(f"- AMFR high confidence: {cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD}")
+            st.markdown(f"- AMFR borderline: {cfg.AMFR_BORDERLINE_THRESHOLD}")
+            st.markdown(f"- Frame skip: {getattr(cfg, 'FRAME_SKIP', 2)}")
+            st.markdown(f"- Cooldown: {cfg.COOLDOWN_SECONDS}s")
+            st.markdown(
+                f"- FAISS: {cfg.FAISS_INDEX_TYPE} M={cfg.FAISS_HNSW_M}, {cfg.FAISS_HNSW_EF_SEARCH} efSearch"
+            )
+
+            st.markdown("**Model Status**")
+            try:
+                res = SharedModelResources.load()
+                enrolled = res.service.enrollment.count()
+                unique = res.service.enrollment.unique_count()
+                st.success(f"\u2705 YOLO11 + InsightFace + FAISS ({enrolled} emb, {unique} persons) + AMFR")
+            except Exception as e:
+                st.error(f"\u274c Model error: {e}")
+
+        # Auto-refresh for live feed
+        time.sleep(0.05)
+        st.rerun()
+
     else:
-        st.markdown(":green[**\u25cf READY**]")
+        # ══════════════════════════════════════════════════════════
+        #  INACTIVE STATE — show placeholder and system info
+        # ══════════════════════════════════════════════════════════
 
+        video_col, info_col = st.columns([3, 1])
 
-st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════
-#  MAIN VIDEO AREA
-# ═══════════════════════════════════════════════════════════════
-
-if is_running:
-    # Latest RAW frame + latest recognition results. Overlays are drawn at
-    # DISPLAY time (on the most recent frame) so the video stays fluid at
-    # capture rate while recognition overlays refresh at the AI cadence.
-    #
-    # IMPORTANT: check has_frame() BEFORE get() — get() clears the
-    # available flag, so has_frame() would always return False after get().
-    _has_frame = frame_buffer.has_frame()
-    raw_frame = frame_buffer.get()
-    results = results_buffer.get()
-
-    if results is None:
-        results = []
-    frame = pipeline._draw_overlays(raw_frame, results) if raw_frame is not None else None
-    last_result = results[0] if results else None
-
-    # Display FPS — measured at the rerun cadence (capture + recognition FPS
-    # are shown separately in the status bar).
-    _now = time.time()
-    _prev = st.session_state.get("_live_display_ts", _now)
-    st.session_state["_live_display_ts"] = _now
-    _display_fps = 1.0 / (_now - _prev) if _now > _prev else 0.0
-
-    # Main layout: video + sidebar
-    video_col, info_col = st.columns([3, 1])
-
-    with video_col:
-        if frame is not None:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            st.image(rgb_frame, channels="RGB", use_container_width=True)
-        else:
+        with video_col:
             # Dark placeholder
             placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
-            placeholder[:] = (25, 25, 25)
+            placeholder[:] = (18, 18, 18)
             cv2.putText(
                 placeholder,
-                "Waiting for camera...",
-                (180, 240),
+                "Camera Stopped",
+                (180, 220),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (180, 180, 180),
+                0.9,
+                (140, 140, 140),
                 2,
+            )
+            cv2.putText(
+                placeholder,
+                "Select camera and press START",
+                (140, 260),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (90, 90, 90),
+                1,
             )
             st.image(placeholder, channels="BGR", use_container_width=True)
 
-    with info_col:
-        # Camera info summary
-        camera_label_display = selected_camera_label
-        st.markdown(f"**Camera:** {camera_label_display}")
-        st.markdown(f"**FPS:** {pipeline.fps:.1f}")
-        st.markdown(f"**Display FPS:** {_display_fps:.1f}")
-        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
-        st.markdown(f"**People:** {pipeline.people_count}")
+        with info_col:
+            st.markdown("**Camera:** \u2014")
+            st.markdown("**FPS:** \u2014")
+            st.markdown("**People:** \u2014")
+            st.info("\U0001f448\ufe0f Configure camera on the left, then click START")
 
-        _e2e = pipeline.latency_stats()
-        if _e2e.get("count", 0):
-            st.markdown(f"**E2E Latency:** {_e2e['p50_ms']:.1f} / {_e2e['p95_ms']:.1f} ms (P50/P95)")
-        else:
-            st.markdown("**E2E Latency:** measuring…")
+        # Show scan results
+        if "scan_results" in st.session_state:
+            sr = st.session_state["scan_results"]
+            local = sr.get("local", [])
+            network = sr.get("network", [])
+            if local or network:
+                st.markdown("---")
+                st.markdown("### \U0001f4e1 Discovered Devices")
+                if local:
+                    st.markdown("**Local Cameras**")
+                    for c in local:
+                        st.markdown(f"\u2705 {c['label']}")
+                if network:
+                    st.markdown("**Network Cameras**")
+                    for d in network:
+                        st.markdown(f"\U0001f4f1 {d.display_name} \u2014 `{d.stream_url}`")
 
-        # Queue size (latest-frame-only buffer: 0=empty, 1=ready)
-        # Uses _has_frame captured before get() to avoid always reading 0.
-        _q = 1 if _has_frame else 0
-        st.markdown(f"**Queue:** {_q}/1")
-
-        # Camera Health
-        _health_color = (
-            "green"
-            if pipeline.status == "LIVE"
-            else ("orange" if pipeline.status in ("CONNECTING", "RECONNECTING") else "red")
-        )
-        st.markdown(
-            f"**Health:** :{_health_color}[{pipeline.status}]{'' if not pipeline.worker_errors else f' ⚠️ {pipeline.worker_errors} errors'}"
-        )
-
-        # CPU / RAM (psutil optional)
-        if _PSUTIL_AVAILABLE:
-            _cpu = psutil.cpu_percent(interval=None)
-            _ram = psutil.virtual_memory().percent
-            st.markdown(f"**CPU:** {_cpu:.0f}% · **RAM:** {_ram:.0f}%")
-
-        if pipeline.error:
-            st.error(f"Error: {pipeline.error}")
-
-        # ── Last Recognition ──────────────────────────────────
-        if last_result:
-            st.markdown("---")
-            st.markdown("**Last Recognition**")
-            decision = last_result.get("amfr_decision", "")
-            name = last_result.get("emp_name") or last_result.get("name", "?")
-
-            if decision == AMFRDecision.ACCEPT.value:
-                st.markdown(f"\u2705 **{name}**")
-                emp_id_str = last_result.get("name", "")
-                if emp_id_str:
-                    st.caption(f"ID: {emp_id_str}")
-                st.success("PRESENT")
-            elif decision == AMFRDecision.REJECT_SPOOF.value:
-                st.markdown("\U0001f6ab **SPOOF DETECTED**")
-                st.error("Attendance Rejected")
-            elif decision == AMFRDecision.BORDERLINE.value:
-                st.markdown(f"\u23f3 **{name}?**")
-                st.info("Collecting more frames...")
-            else:
-                st.markdown(f"\u2753 **{name}**")
-                st.info("Not Enrolled")
-
-    # ── Today's Attendance ────────────────────────────────────
-    st.markdown("---")
-    st.markdown("### \U0001f4cb Today's Attendance")
-    today_df = _get_today_attendance_df()
-    if today_df.empty:
-        st.info("No attendance records yet. Stand in front of the camera to be recognized.")
-    else:
-        st.dataframe(
-            today_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "time": "Time",
-                "name": "Name",
-                "id": "ID",
-                "status": "Status",
-            },
-        )
-
-    # ── Expandable Sections ──────────────────────────────────
-
-    # Recognition Details
-    with st.expander("\U0001f52c Recognition Details"):
-        if results:
-            for i, r in enumerate(results):
-                display_name = r.get("emp_name") or r.get("name", "?")
-                if r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
-                    check = "\u2705 "
-                elif r.get("amfr_decision") == AMFRDecision.REJECT_SPOOF.value:
-                    check = "\U0001f6ab "
-                else:
-                    check = "\u2753 "
-
-                st.markdown(f"**Person {i + 1}:** {check}{display_name}")
-                cols = st.columns(4)
-                with cols[0]:
-                    conf = r.get("risk_score", r.get("confidence", 0))
-                    st.metric("AMFR Confidence", f"{float(conf):.1%}" if conf else "\u2014")
-                with cols[1]:
-                    qual = r.get("quality_score", 0)
-                    st.metric("Face Quality", f"{float(qual):.1%}" if qual else "\u2014")
-                with cols[2]:
-                    live = r.get("liveness_score", 0)
-                    liveness_label = "LIVE" if float(live) > cfg.LIVENESS_MIN_SCORE else f"{float(live):.1%}"
-                    st.metric("Liveness", liveness_label)
-                with cols[3]:
-                    if r.get("amfr_decision") == AMFRDecision.ACCEPT.value:
-                        st.metric("Attendance", "\u2705 PRESENT")
-                    elif r.get("amfr_decision") == AMFRDecision.REJECT_SPOOF.value:
-                        st.metric("Attendance", "\U0001f6ab REJECTED")
-                    elif r.get("attendance_marked"):
-                        st.metric("Attendance", "\u2705 PRESENT")
-                    else:
-                        st.metric("Attendance", "\u2014")
-
-                st.caption(
-                    f"AMFR Score: {r.get('risk_score', 0):.3f} | "
-                    f"Decision: {r.get('amfr_decision', '—')} | "
-                    f"Track: {r.get('track_id', '—')[:10] if r.get('track_id') else '—'}"
-                )
-                st.divider()
-        else:
-            st.info("No recognition results yet")
-
-    # Camera Details
-    with st.expander("\U0001f4f7 Camera Details"):
-        st.markdown(f"**Source:** {camera_label_display}")
-        st.markdown(f"**Type:** {selected_source}")
-        st.markdown(f"**FPS:** {pipeline.fps:.1f}")
-        st.markdown(f"**AI FPS:** {pipeline.ai_fps:.1f}")
-        st.markdown(f"**Resolution:** {pipeline.resolution}")
-        st.markdown(f"**People detected:** {pipeline.people_count}")
-        st.markdown(f"**Frames processed:** {pipeline.frame_count}")
-        if pipeline.worker_errors:
-            st.warning(f"\u26a0\ufe0f Worker errors (transient): {pipeline.worker_errors}")
-        if _PSUTIL_AVAILABLE:
-            st.markdown(
-                f"**CPU:** {psutil.cpu_percent(interval=None):.0f}% · "
-                f"**RAM:** {psutil.virtual_memory().percent:.0f}%"
-            )
-        _e2e = pipeline.latency_stats()
-        if _e2e.get("count", 0):
-            st.markdown(
-                f"**E2E Latency (P50/P95):** {_e2e['p50_ms']:.1f} / "
-                f"{_e2e['p95_ms']:.1f} ms ({_e2e['count']:.0f} samples)"
-            )
-        else:
-            st.markdown("**E2E Latency (P50/P95):** measuring…")
-        st.markdown(f"**Status:** {pipeline.status}")
-        if pipeline.error:
-            st.error(f"Error: {pipeline.error}")
-
-    # Advanced Settings
-    with st.expander("\u2699\ufe0f Advanced Settings"):
-        st.markdown("**Recognition Thresholds**")
-        st.markdown(f"- FAISS distance threshold: {cfg.RECOGNITION_THRESHOLD}")
-        st.markdown(f"- Face quality min: {cfg.FACE_QUALITY_MIN_SCORE}")
-        st.markdown(f"- Liveness min: {cfg.LIVENESS_MIN_SCORE}")
-        st.markdown(f"- AMFR high confidence: {cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD}")
-        st.markdown(f"- AMFR borderline: {cfg.AMFR_BORDERLINE_THRESHOLD}")
-        st.markdown(f"- Frame skip: {getattr(cfg, 'FRAME_SKIP', 2)}")
-        st.markdown(f"- Cooldown: {cfg.COOLDOWN_SECONDS}s")
-        st.markdown(
-            f"- FAISS: {cfg.FAISS_INDEX_TYPE} M={cfg.FAISS_HNSW_M}, {cfg.FAISS_HNSW_EF_SEARCH} efSearch"
-        )
-
-        st.markdown("**Model Status**")
+        # System health status
+        st.markdown("---")
+        st.markdown("### \U0001f9e0 System Status")
         try:
             res = SharedModelResources.load()
-            enrolled = res.service.enrollment.count()
-            unique = res.service.enrollment.unique_count()
-            st.success(f"\u2705 YOLO11 + InsightFace + FAISS ({enrolled} emb, {unique} persons) + AMFR")
+            model_cols = st.columns(4)
+            model_cols[0].success("\u2705 **YOLO11** \u2014 Detection")
+            model_cols[1].success("\u2705 **InsightFace** \u2014 Recognition")
+            model_cols[2].success(f"\u2705 **FAISS** \u2014 {res.service.enrollment.count()} emb.")
+            model_cols[3].success("\u2705 **AMFR** \u2014 Active")
+
+            # Database status
+            from database.database import DATABASE_URL
+
+            masked_url = str(DATABASE_URL or "")
+            if "sqlite" in masked_url:
+                masked_url = "SQLite (development)"
+            elif "postgresql" in masked_url:
+                from urllib.parse import urlparse
+
+                parsed = urlparse(masked_url)
+                masked_url = f"PostgreSQL @ {parsed.hostname}:{parsed.port}/{parsed.path.split('/')[-1]}"
+            st.info(f"**Database:** {masked_url}")
         except Exception as e:
-            st.error(f"\u274c Model error: {e}")
+            st.error(f"\u274c System error: {e}")
 
-    # Auto-refresh for live feed
-    time.sleep(0.05)
-    st.rerun()
 
+if not require_auth(allowed_roles=OPERATOR_ROLES):
+    st.stop()
 else:
-    # ══════════════════════════════════════════════════════════
-    #  INACTIVE STATE — show placeholder and system info
-    # ══════════════════════════════════════════════════════════
-
-    video_col, info_col = st.columns([3, 1])
-
-    with video_col:
-        # Dark placeholder
-        placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
-        placeholder[:] = (18, 18, 18)
-        cv2.putText(
-            placeholder,
-            "Camera Stopped",
-            (180, 220),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.9,
-            (140, 140, 140),
-            2,
-        )
-        cv2.putText(
-            placeholder,
-            "Select camera and press START",
-            (140, 260),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (90, 90, 90),
-            1,
-        )
-        st.image(placeholder, channels="BGR", use_container_width=True)
-
-    with info_col:
-        st.markdown("**Camera:** \u2014")
-        st.markdown("**FPS:** \u2014")
-        st.markdown("**People:** \u2014")
-        st.info("\U0001f448\ufe0f Configure camera on the left, then click START")
-
-    # Show scan results
-    if "scan_results" in st.session_state:
-        sr = st.session_state["scan_results"]
-        local = sr.get("local", [])
-        network = sr.get("network", [])
-        if local or network:
-            st.markdown("---")
-            st.markdown("### \U0001f4e1 Discovered Devices")
-            if local:
-                st.markdown("**Local Cameras**")
-                for c in local:
-                    st.markdown(f"\u2705 {c['label']}")
-            if network:
-                st.markdown("**Network Cameras**")
-                for d in network:
-                    st.markdown(f"\U0001f4f1 {d.display_name} \u2014 `{d.stream_url}`")
-
-    # System health status
-    st.markdown("---")
-    st.markdown("### \U0001f9e0 System Status")
-    try:
-        res = SharedModelResources.load()
-        model_cols = st.columns(4)
-        model_cols[0].success("\u2705 **YOLO11** \u2014 Detection")
-        model_cols[1].success("\u2705 **InsightFace** \u2014 Recognition")
-        model_cols[2].success(f"\u2705 **FAISS** \u2014 {res.service.enrollment.count()} emb.")
-        model_cols[3].success("\u2705 **AMFR** \u2014 Active")
-
-        # Database status
-        from database.database import DATABASE_URL
-
-        masked_url = DATABASE_URL
-        if "sqlite" in masked_url:
-            masked_url = "SQLite (development)"
-        elif "postgresql" in masked_url:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(DATABASE_URL)
-            masked_url = f"PostgreSQL @ {parsed.hostname}:{parsed.port}/{parsed.path.split('/')[-1]}"
-        st.info(f"**Database:** {masked_url}")
-    except Exception as e:
-        st.error(f"\u274c System error: {e}")
+    _render_page()

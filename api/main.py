@@ -19,7 +19,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any, List, Optional, cast
 
 import sys
 
@@ -155,9 +155,14 @@ app = FastAPI(
 
 # ── Middleware Stack ────────────────────────────────────────────────
 
+
+async def _rate_limit_handler(request: Request, exc: Exception) -> Response:
+    return _rate_limit_exceeded_handler(request, cast(RateLimitExceeded, exc))
+
+
 # 1. Rate limiting
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 
@@ -602,7 +607,7 @@ class AttendanceCreate(BaseModel):
 
 class AttendanceResponse(BaseModel):
     id: int
-    student_id: int
+    student_id: Optional[int] = None
     student_name: str
     timestamp: datetime
     confidence: float
@@ -1173,7 +1178,7 @@ async def mfa_status(
     """Get the MFA status for the current user."""
     from services.mfa_service import MFAService
 
-    backup_codes = current_user.mfa_backup_codes or []
+    backup_codes: list[Any] = current_user.mfa_backup_codes or []
     return MFAStatusResponse(
         enabled=current_user.is_mfa_enabled,
         backup_codes_remaining=len(backup_codes),
@@ -1471,8 +1476,8 @@ async def metrics(request: Request):
 @limiter.limit(os.getenv("ENROLL_RATE_LIMIT", "5/minute"))
 async def upload_enrollment_image(
     request: Request,
-    file: UploadFile = File(...),
-    current_user: Annotated[User, Depends(require_permission("enrollment", ActionType.CREATE))] = None,
+    file: Annotated[UploadFile, File(...)],
+    current_user: Annotated[User, Depends(require_permission("enrollment", ActionType.CREATE))],
 ):
     """Upload an enrollment photo with security validation.
 

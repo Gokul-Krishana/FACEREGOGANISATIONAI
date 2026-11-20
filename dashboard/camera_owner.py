@@ -25,14 +25,12 @@ import threading
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from importlib import import_module
+    from typing import Any
     from camera.base import CameraSource
 
     # NOTE: "04_Live" is not a valid Python module identifier (starts with a
     # digit), so it cannot be used in a plain ``from ... import`` statement.
-    # Load it via importlib for static type checkers only (never runs).
-    _live_page = import_module("dashboard.pages.04_Live")
-    LiveRecognitionPipeline = _live_page.LiveRecognitionPipeline
+    LiveRecognitionPipeline = Any
 
 
 class CameraOwner:

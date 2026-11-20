@@ -56,20 +56,22 @@ def check_database() -> dict:
 @st.cache_resource(ttl=10)
 def check_camera() -> dict:
     """Check if a camera device is available (cached to avoid repeated open/close)."""
-    import cv2
+    from camera.webcam import get_preferred_backends, open_video_capture
 
     try:
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        if cap.isOpened():
-            ret, frame = cap.read()
+        for backend, _ in get_preferred_backends():
+            cap = open_video_capture(0, backend)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                cap.release()
+                if ret and frame is not None:
+                    return {
+                        "status": "ok",
+                        "device": "Device #0",
+                        "resolution": f"{frame.shape[1]}x{frame.shape[0]}",
+                    }
+                return {"status": "warning", "device": "Device #0", "message": "Opened but no frame"}
             cap.release()
-            if ret and frame is not None:
-                return {
-                    "status": "ok",
-                    "device": "Device #0",
-                    "resolution": f"{frame.shape[1]}x{frame.shape[0]}",
-                }
-            return {"status": "warning", "device": "Device #0", "message": "Opened but no frame"}
         return {"status": "error", "message": "No camera found on index 0"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -188,7 +190,8 @@ def check_redis() -> dict:
         url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         client = redis_lib.Redis.from_url(url, socket_timeout=2, socket_connect_timeout=2)
         pong = client.ping()
-        server_version = client.info("server").get("redis_version", "?")
+        server_info = client.info("server")
+        server_version = server_info.get("redis_version", "?") if isinstance(server_info, dict) else "?"
         client.close()
         if pong:
             return {"status": "ok", "version": server_version}
@@ -306,334 +309,346 @@ def render_status(status: str, label: str, detail: str = "", help_text: str = ""
     )
 
 
-# ── Page Header ────────────────────────────────────────────────
+from dashboard.auth import OPERATOR_ROLES, require_auth  # noqa: E402
 
-st.title("🩺 System Health")
-st.markdown("Real-time health monitoring for all Face Recognition AI components.")
 
-# ── Auto-refresh toggle ────────────────────────────────────────
-auto_refresh = st.checkbox("🔄 Auto-refresh (every 10s)", value=True)
-if auto_refresh:
-    st.caption(f"Last checked: {time.strftime('%I:%M:%S %p')}")
+def _render_page() -> None:
+    # ── Page Header ────────────────────────────────────────────────
 
-refresh_col1, refresh_col2 = st.columns([1, 5])
-with refresh_col1:
-    if st.button("🔄 Refresh Now", type="primary", use_container_width=True):
-        st.cache_resource.clear()
-        st.rerun()
+    st.title("🩺 System Health")
+    st.markdown("Real-time health monitoring for all Face Recognition AI components.")
 
-# ── Run all health checks (each wrapped individually to prevent one failure from blocking others) ──
-_status_placeholder = st.empty()
-_status_placeholder.caption("Running diagnostics...")
-_checks = [
-    ("Database", check_database),
-    ("Camera", check_camera),
-    ("YOLO", check_yolo),
-    ("ArcFace", check_arcface),
-    ("FAISS", check_faiss),
-    ("Pipeline", check_recognition_pipeline),
-    ("Disk", check_disk_space),
-    ("Redis", check_redis),
-    ("GPU", check_gpu),
-    ("Spoof", check_spoof_attempts),
-]
-db_health = {}
-cam_health = {}
-yolo_health = {}
-arcface_health = {}
-faiss_health = {}
-pipeline_health = {}
-disk_health = {}
-redis_health = {}
-gpu_health = {}
-spoof_health = {}
+    # ── Auto-refresh toggle ────────────────────────────────────────
+    auto_refresh = st.checkbox("🔄 Auto-refresh (every 10s)", value=True)
+    if auto_refresh:
+        st.caption(f"Last checked: {time.strftime('%I:%M:%S %p')}")
 
-for _name, _fn in _checks:
-    try:
-        _result = _fn()
-    except Exception as _exc:
-        _result = {"status": "error", "message": f"{_name} check crashed: {_exc}"}
-    if _name == "Database":
-        db_health = _result
-    elif _name == "Camera":
-        cam_health = _result
-    elif _name == "YOLO":
-        yolo_health = _result
-    elif _name == "ArcFace":
-        arcface_health = _result
-    elif _name == "FAISS":
-        faiss_health = _result
-    elif _name == "Pipeline":
-        pipeline_health = _result
-    elif _name == "Disk":
-        disk_health = _result
-    elif _name == "Redis":
-        redis_health = _result
-    elif _name == "GPU":
-        gpu_health = _result
-    elif _name == "Spoof":
-        spoof_health = _result
-
-# Clear the "Running diagnostics..." placeholder now that checks are done
-_status_placeholder.empty()
-
-# ── Best-effort operational alerts (throttled; never block/raise) ──
-try:
-    from services.alert_service import send_operational_alert
-
-    if db_health.get("status") == "error":
-        send_operational_alert(
-            "db_down",
-            f"Database health check FAILED: {db_health.get('message', 'unknown error')}",
-            severity="CRITICAL",
-        )
-    if disk_health.get("status") == "warning":
-        send_operational_alert(
-            "low_disk",
-            f"Low disk space: {disk_health.get('free_gb', '?')} GB free on {cfg.ROOT_DIR}",
-            severity="WARNING",
-        )
-    if cam_health.get("status") == "error":
-        send_operational_alert(
-            "camera_offline",
-            f"Camera check FAILED: {cam_health.get('message', 'unknown error')}",
-            severity="ERROR",
-            throttle_key="camera_offline:health_page",
-        )
-except Exception:
-    pass  # Alert dispatch is best-effort — never break the health page
-
-# ── Overall Status Banner ──────────────────────────────────────
-all_ok = all(
-    h.get("status") == "ok"
-    for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
-)
-if all_ok:
-    st.success("✅ **All systems operational** — every component is running normally.")
-else:
-    warnings = sum(
-        1
-        for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
-        if h.get("status") == "warning"
-    )
-    errors = sum(
-        1
-        for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
-        if h.get("status") == "error"
-    )
-    st.warning(f"⚠️ **{errors} error(s), {warnings} warning(s)** — some components need attention.")
-
-st.divider()
-
-# ── Health Grid ────────────────────────────────────────────────
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("### 🗄️ Database")
-    db_detail = f"{db_health.get('employees', '?')} employees" if db_health["status"] == "ok" else ""
-    db_error = db_health.get("message", "") if db_health["status"] != "ok" else ""
-    render_status(db_health["status"], "SQLite Database", db_detail, db_error)
-
-    st.markdown("### 📷 Camera")
-    cam_detail = (
-        cam_health.get("resolution", "") if cam_health["status"] == "ok" else cam_health.get("message", "")
-    )
-    cam_error = cam_health.get("message", "") if cam_health["status"] == "error" else ""
-    render_status(cam_health["status"], "Camera Device", cam_detail, cam_error)
-
-with col2:
-    st.markdown("### 🧠 YOLO")
-    yolo_detail = f"Model: {yolo_health.get('model', '?')}" if yolo_health["status"] == "ok" else ""
-    yolo_error = yolo_health.get("message", "") if yolo_health["status"] != "ok" else ""
-    render_status(yolo_health["status"], "Person Detection (YOLO11)", yolo_detail, yolo_error)
-
-    st.markdown("### 👤 ArcFace")
-    arcface_detail = (
-        f"Dim: {arcface_health.get('embedding_dim', '?')}" if arcface_health["status"] == "ok" else ""
-    )
-    arcface_error = arcface_health.get("message", "") if arcface_health["status"] != "ok" else ""
-    render_status(arcface_health["status"], "Face Recognition (ArcFace)", arcface_detail, arcface_error)
-
-with col3:
-    st.markdown("### 🔍 FAISS")
-    faiss_detail = (
-        f"{faiss_health.get('embeddings', '?')} embeddings" if faiss_health["status"] == "ok" else ""
-    )
-    faiss_error = faiss_health.get("message", "") if faiss_health["status"] != "ok" else ""
-    render_status(faiss_health["status"], "Vector Search (FAISS)", faiss_detail, faiss_error)
-
-    st.markdown("### 💾 Disk")
-    disk_detail = (
-        f"{disk_health.get('free_gb', '?')} GB free" if disk_health["status"] in ("ok", "warning") else ""
-    )
-    disk_error = "Low disk space" if disk_health["status"] == "warning" else ""
-    render_status(disk_health["status"], "Disk Space", disk_detail, disk_error)
-
-# ── Extended health grid: Redis, GPU, Live Recognition ────────
-col4, col5, col6 = st.columns(3)
-
-with col4:
-    st.markdown("### 🔄 Redis")
-    redis_detail = f"v{redis_health.get('version', '?')}" if redis_health["status"] == "ok" else ""
-    redis_error = redis_health.get("message", "") if redis_health["status"] != "ok" else ""
-    render_status(redis_health["status"], "Cache / Job Queue", redis_detail, redis_error)
-
-with col5:
-    st.markdown("### 🎮 GPU")
-    gpu_detail = gpu_health.get("device", "") if gpu_health["status"] in ("ok", "warning") else ""
-    gpu_error = (
-        gpu_health.get("message", "")
-        if gpu_health["status"] not in ("ok", "warning")
-        else gpu_health.get("message", "")
-    )
-    render_status(gpu_health["status"], "Inference Accelerator", gpu_detail, gpu_error)
-
-with col6:
-    st.markdown("### 📹 Live Recognition")
-    live_health = get_live_pipeline_status()
-    if live_health["status"] == "idle":
-        render_status("unknown", "No Active Session", "Start it from the Live Recognition page")
-    elif live_health["status"] == "error":
-        render_status("error", "Pipeline Unavailable", live_health.get("message", ""))
-    else:
-        _live_color = (
-            "ok"
-            if live_health["status"] == "LIVE"
-            else ("warning" if live_health["status"] in ("CONNECTING", "RECONNECTING") else "error")
-        )
-        render_status(
-            _live_color,
-            f"Camera {live_health['status']}",
-            f"{live_health.get('fps', 0)} FPS · AI {live_health.get('ai_fps', 0)} FPS · "
-            f"{live_health.get('people', 0)} people · P50 {live_health.get('latency_p50', 0)} ms",
-        )
-
-st.divider()
-
-# ── End-to-End Pipeline Test ───────────────────────────────────
-st.markdown("### 🔄 Pipeline Integration Test")
-pipeline_status = pipeline_health["status"]
-if pipeline_status == "ok":
-    st.success("✅ Full pipeline test passed — all subsystems respond correctly.")
-else:
-    st.error(f"❌ Pipeline test failed: {pipeline_health.get('message', 'Unknown error')}")
-    if st.button("🔄 Retry Pipeline Test", use_container_width=False):
-        st.cache_resource.clear()
-        st.rerun()
-
-# ── Quick Actions ──────────────────────────────────────────────
-st.divider()
-st.markdown("### ⚡ Quick Actions")
-
-action_col1, action_col2, action_col3, action_col4 = st.columns(4)
-with action_col1:
-    if st.button("🔄 Reset All Caches", use_container_width=True):
-        st.cache_data.clear()
-        st.cache_resource.clear()
-        st.success("✅ All caches cleared!")
-
-with action_col2:
-    if db_health["status"] != "ok":
-        if st.button("🔄 Retry DB Connection", use_container_width=True):
+    refresh_col1, refresh_col2 = st.columns([1, 5])
+    with refresh_col1:
+        if st.button("🔄 Refresh Now", type="primary", use_container_width=True):
+            st.cache_resource.clear()
             st.rerun()
-    else:
-        st.button("✅ DB Connected", disabled=True, use_container_width=True)
 
-with action_col3:
-    if cam_health["status"] != "ok":
-        if st.button("📷 Retry Camera", use_container_width=True):
-            st.rerun()
-    else:
-        st.button("✅ Camera OK", disabled=True, use_container_width=True)
+    # ── Run all health checks (each wrapped individually to prevent one failure from blocking others) ──
+    _status_placeholder = st.empty()
+    _status_placeholder.caption("Running diagnostics...")
+    _checks = [
+        ("Database", check_database),
+        ("Camera", check_camera),
+        ("YOLO", check_yolo),
+        ("ArcFace", check_arcface),
+        ("FAISS", check_faiss),
+        ("Pipeline", check_recognition_pipeline),
+        ("Disk", check_disk_space),
+        ("Redis", check_redis),
+        ("GPU", check_gpu),
+        ("Spoof", check_spoof_attempts),
+    ]
+    db_health = {}
+    cam_health = {}
+    yolo_health = {}
+    arcface_health = {}
+    faiss_health = {}
+    pipeline_health = {}
+    disk_health = {}
+    redis_health = {}
+    gpu_health = {}
+    spoof_health = {}
 
-with action_col4:
-    if st.button("🗑️ Clear Unknown Faces Cache", use_container_width=True):
-        st.rerun()
+    for _name, _fn in _checks:
+        try:
+            _result = _fn()
+        except Exception as _exc:
+            _result = {"status": "error", "message": f"{_name} check crashed: {_exc}"}
+        if _name == "Database":
+            db_health = _result
+        elif _name == "Camera":
+            cam_health = _result
+        elif _name == "YOLO":
+            yolo_health = _result
+        elif _name == "ArcFace":
+            arcface_health = _result
+        elif _name == "FAISS":
+            faiss_health = _result
+        elif _name == "Pipeline":
+            pipeline_health = _result
+        elif _name == "Disk":
+            disk_health = _result
+        elif _name == "Redis":
+            redis_health = _result
+        elif _name == "GPU":
+            gpu_health = _result
+        elif _name == "Spoof":
+            spoof_health = _result
 
-# ── System Details (expandable) ────────────────────────────────
-st.divider()
-with st.expander("📋 Detailed System Information"):
-    sys_col1, sys_col2 = st.columns(2)
+    # Clear the "Running diagnostics..." placeholder now that checks are done
+    _status_placeholder.empty()
 
-    with sys_col1:
-        st.markdown("**Configuration**")
-        st.code(f"""
-Python:      {sys.version.split()[0]}
-Streamlit:   {st.__version__ if hasattr(st, "__version__") else "?"}
-Config File: {cfg.SETTINGS_PATH}
-Models Dir:  {cfg.MODELS_DIR}
-DB Path:     {cfg.ROOT_DIR / "data" / "app.db"}
-FAISS Index: {cfg.FAISS_INDEX_PATH}
-        """)
-
-    with sys_col2:
-        st.markdown("**Recognition Settings**")
-        st.code(f"""
-YOLO Confidence:    {cfg.YOLO_CONFIDENCE}
-Recognition Threshold: {cfg.RECOGNITION_THRESHOLD}
-Frame Skip:         {cfg.FRAME_SKIP}
-Cooldown:           {cfg.COOLDOWN_SECONDS}s
-Camera Source:      {cfg.CAMERA_SOURCE_TYPE}
-Camera ID:          {cfg.CAMERA_ID}
-Retention Days:     {cfg.UNKNOWN_FACE_RETENTION_DAYS}
-        """)
-
-# ── Health Log ─────────────────────────────────────────────────
-with st.expander("📊 Service Statistics"):
-    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
-
-    with stat_col1:
-        stats = AttendanceService.get_statistics()
-        daily = stats.get("today_count", 0)
-        st.metric("Today's Marks", daily)
-
-    with stat_col2:
-        with get_session() as s:
-            pending = UnknownFaceRepo.count_unreviewed(s)
-        st.metric("Pending Review", pending)
-
-    with stat_col3:
-        total_emps = EmployeeService.count()
-        st.metric("Registered Employees", total_emps)
-
-    with stat_col4:
-        spoof_today = spoof_health.get("today", 0) if spoof_health.get("status") == "ok" else "?"
-        st.metric("Spoof Attempts (Today)", spoof_today)
-
-# ── Troubleshooting Guide ─────────────────────────────────────
-with st.expander("🔧 Troubleshooting Guide"):
-    st.markdown("""
-    ### Common Issues & Fixes
-
-    **❌ Database Error**
-    - Ensure `data/` directory exists and is writable
-    - Run `alembic upgrade head` to apply migrations
-    - Check if another process has the database locked
-
-    **❌ Camera Not Found**
-    - Make sure no other app (Zoom, Teams) is using the camera
-    - Try different device indices (0, 1, 2...)
-    - For phone cameras, install DroidCam or EpocCam first
-
-    **❌ YOLO Model Failed to Load**
-    - Ensure `models/yolo11n.pt` exists (download it manually if missing)
-    - Check disk space — model is ~6 MB
-
-    **❌ InsightFace Failed to Load**
-    - The model downloads automatically on first use
-    - Ensure `models/.insightface/` directory exists
-    - Check internet connection for first-time download
-
-    **❌ FAISS Index Error**
-    - If corrupted, delete `embeddings/faiss.index` and re-enroll employees
-    - Ensure `embeddings/` directory exists and is writable
-    """)
-
-# ── Auto-refresh logic ─────────────────────────────────────────
-if auto_refresh:
-    time.sleep(10)
+    # ── Best-effort operational alerts (throttled; never block/raise) ──
     try:
-        st.rerun()
+        from services.alert_service import send_operational_alert
+
+        if db_health.get("status") == "error":
+            send_operational_alert(
+                "db_down",
+                f"Database health check FAILED: {db_health.get('message', 'unknown error')}",
+                severity="CRITICAL",
+            )
+        if disk_health.get("status") == "warning":
+            send_operational_alert(
+                "low_disk",
+                f"Low disk space: {disk_health.get('free_gb', '?')} GB free on {cfg.ROOT_DIR}",
+                severity="WARNING",
+            )
+        if cam_health.get("status") == "error":
+            send_operational_alert(
+                "camera_offline",
+                f"Camera check FAILED: {cam_health.get('message', 'unknown error')}",
+                severity="ERROR",
+                throttle_key="camera_offline:health_page",
+            )
     except Exception:
-        # Silently ignore rerun errors (e.g. when navigating away during refresh)
-        pass
+        pass  # Alert dispatch is best-effort — never break the health page
+
+    # ── Overall Status Banner ──────────────────────────────────────
+    all_ok = all(
+        h.get("status") == "ok"
+        for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
+    )
+    if all_ok:
+        st.success("✅ **All systems operational** — every component is running normally.")
+    else:
+        warnings = sum(
+            1
+            for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
+            if h.get("status") == "warning"
+        )
+        errors = sum(
+            1
+            for h in [db_health, cam_health, yolo_health, arcface_health, faiss_health, disk_health]
+            if h.get("status") == "error"
+        )
+        st.warning(f"⚠️ **{errors} error(s), {warnings} warning(s)** — some components need attention.")
+
+    st.divider()
+
+    # ── Health Grid ────────────────────────────────────────────────
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("### 🗄️ Database")
+        db_detail = f"{db_health.get('employees', '?')} employees" if db_health["status"] == "ok" else ""
+        db_error = db_health.get("message", "") if db_health["status"] != "ok" else ""
+        render_status(db_health["status"], "SQLite Database", db_detail, db_error)
+
+        st.markdown("### 📷 Camera")
+        cam_detail = (
+            cam_health.get("resolution", "")
+            if cam_health["status"] == "ok"
+            else cam_health.get("message", "")
+        )
+        cam_error = cam_health.get("message", "") if cam_health["status"] == "error" else ""
+        render_status(cam_health["status"], "Camera Device", cam_detail, cam_error)
+
+    with col2:
+        st.markdown("### 🧠 YOLO")
+        yolo_detail = f"Model: {yolo_health.get('model', '?')}" if yolo_health["status"] == "ok" else ""
+        yolo_error = yolo_health.get("message", "") if yolo_health["status"] != "ok" else ""
+        render_status(yolo_health["status"], "Person Detection (YOLO11)", yolo_detail, yolo_error)
+
+        st.markdown("### 👤 ArcFace")
+        arcface_detail = (
+            f"Dim: {arcface_health.get('embedding_dim', '?')}" if arcface_health["status"] == "ok" else ""
+        )
+        arcface_error = arcface_health.get("message", "") if arcface_health["status"] != "ok" else ""
+        render_status(arcface_health["status"], "Face Recognition (ArcFace)", arcface_detail, arcface_error)
+
+    with col3:
+        st.markdown("### 🔍 FAISS")
+        faiss_detail = (
+            f"{faiss_health.get('embeddings', '?')} embeddings" if faiss_health["status"] == "ok" else ""
+        )
+        faiss_error = faiss_health.get("message", "") if faiss_health["status"] != "ok" else ""
+        render_status(faiss_health["status"], "Vector Search (FAISS)", faiss_detail, faiss_error)
+
+        st.markdown("### 💾 Disk")
+        disk_detail = (
+            f"{disk_health.get('free_gb', '?')} GB free" if disk_health["status"] in ("ok", "warning") else ""
+        )
+        disk_error = "Low disk space" if disk_health["status"] == "warning" else ""
+        render_status(disk_health["status"], "Disk Space", disk_detail, disk_error)
+
+    # ── Extended health grid: Redis, GPU, Live Recognition ────────
+    col4, col5, col6 = st.columns(3)
+
+    with col4:
+        st.markdown("### 🔄 Redis")
+        redis_detail = f"v{redis_health.get('version', '?')}" if redis_health["status"] == "ok" else ""
+        redis_error = redis_health.get("message", "") if redis_health["status"] != "ok" else ""
+        render_status(redis_health["status"], "Cache / Job Queue", redis_detail, redis_error)
+
+    with col5:
+        st.markdown("### 🎮 GPU")
+        gpu_detail = gpu_health.get("device", "") if gpu_health["status"] in ("ok", "warning") else ""
+        gpu_error = (
+            gpu_health.get("message", "")
+            if gpu_health["status"] not in ("ok", "warning")
+            else gpu_health.get("message", "")
+        )
+        render_status(gpu_health["status"], "Inference Accelerator", gpu_detail, gpu_error)
+
+    with col6:
+        st.markdown("### 📹 Live Recognition")
+        live_health = get_live_pipeline_status()
+        if live_health["status"] == "idle":
+            render_status("unknown", "No Active Session", "Start it from the Live Recognition page")
+        elif live_health["status"] == "error":
+            render_status("error", "Pipeline Unavailable", live_health.get("message", ""))
+        else:
+            _live_color = (
+                "ok"
+                if live_health["status"] == "LIVE"
+                else ("warning" if live_health["status"] in ("CONNECTING", "RECONNECTING") else "error")
+            )
+            render_status(
+                _live_color,
+                f"Camera {live_health['status']}",
+                f"{live_health.get('fps', 0)} FPS · AI {live_health.get('ai_fps', 0)} FPS · "
+                f"{live_health.get('people', 0)} people · P50 {live_health.get('latency_p50', 0)} ms",
+            )
+
+    st.divider()
+
+    # ── End-to-End Pipeline Test ───────────────────────────────────
+    st.markdown("### 🔄 Pipeline Integration Test")
+    pipeline_status = pipeline_health["status"]
+    if pipeline_status == "ok":
+        st.success("✅ Full pipeline test passed — all subsystems respond correctly.")
+    else:
+        st.error(f"❌ Pipeline test failed: {pipeline_health.get('message', 'Unknown error')}")
+        if st.button("🔄 Retry Pipeline Test", use_container_width=False):
+            st.cache_resource.clear()
+            st.rerun()
+
+    # ── Quick Actions ──────────────────────────────────────────────
+    st.divider()
+    st.markdown("### ⚡ Quick Actions")
+
+    action_col1, action_col2, action_col3, action_col4 = st.columns(4)
+    with action_col1:
+        if st.button("🔄 Reset All Caches", use_container_width=True):
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.success("✅ All caches cleared!")
+
+    with action_col2:
+        if db_health["status"] != "ok":
+            if st.button("🔄 Retry DB Connection", use_container_width=True):
+                st.rerun()
+        else:
+            st.button("✅ DB Connected", disabled=True, use_container_width=True)
+
+    with action_col3:
+        if cam_health["status"] != "ok":
+            if st.button("📷 Retry Camera", use_container_width=True):
+                st.rerun()
+        else:
+            st.button("✅ Camera OK", disabled=True, use_container_width=True)
+
+    with action_col4:
+        if st.button("🗑️ Clear Unknown Faces Cache", use_container_width=True):
+            st.rerun()
+
+    # ── System Details (expandable) ────────────────────────────────
+    st.divider()
+    with st.expander("📋 Detailed System Information"):
+        sys_col1, sys_col2 = st.columns(2)
+
+        with sys_col1:
+            st.markdown("**Configuration**")
+            st.code(f"""
+    Python:      {sys.version.split()[0]}
+    Streamlit:   {st.__version__ if hasattr(st, "__version__") else "?"}
+    Config File: {cfg.SETTINGS_PATH}
+    Models Dir:  {cfg.MODELS_DIR}
+    DB Path:     {cfg.ROOT_DIR / "data" / "app.db"}
+    FAISS Index: {cfg.FAISS_INDEX_PATH}
+            """)
+
+        with sys_col2:
+            st.markdown("**Recognition Settings**")
+            st.code(f"""
+    YOLO Confidence:    {cfg.YOLO_CONFIDENCE}
+    Recognition Threshold: {cfg.RECOGNITION_THRESHOLD}
+    Frame Skip:         {cfg.FRAME_SKIP}
+    Cooldown:           {cfg.COOLDOWN_SECONDS}s
+    Camera Source:      {cfg.CAMERA_SOURCE_TYPE}
+    Camera ID:          {cfg.CAMERA_ID}
+    Retention Days:     {cfg.UNKNOWN_FACE_RETENTION_DAYS}
+            """)
+
+    # ── Health Log ─────────────────────────────────────────────────
+    with st.expander("📊 Service Statistics"):
+        stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+
+        with stat_col1:
+            stats = AttendanceService.get_statistics()
+            daily = stats.get("today_count", 0)
+            st.metric("Today's Marks", daily)
+
+        with stat_col2:
+            with get_session() as s:
+                pending = UnknownFaceRepo.count_unreviewed(s)
+            st.metric("Pending Review", pending)
+
+        with stat_col3:
+            total_emps = EmployeeService.count()
+            st.metric("Registered Employees", total_emps)
+
+        with stat_col4:
+            spoof_today = spoof_health.get("today", 0) if spoof_health.get("status") == "ok" else "?"
+            st.metric("Spoof Attempts (Today)", spoof_today)
+
+    # ── Troubleshooting Guide ─────────────────────────────────────
+    with st.expander("🔧 Troubleshooting Guide"):
+        st.markdown("""
+        ### Common Issues & Fixes
+
+        **❌ Database Error**
+        - Ensure `data/` directory exists and is writable
+        - Run `alembic upgrade head` to apply migrations
+        - Check if another process has the database locked
+
+        **❌ Camera Not Found**
+        - Make sure no other app (Zoom, Teams) is using the camera
+        - Try different device indices (0, 1, 2...)
+        - For phone cameras, install DroidCam or EpocCam first
+
+        **❌ YOLO Model Failed to Load**
+        - Ensure `models/yolo11n.pt` exists (download it manually if missing)
+        - Check disk space — model is ~6 MB
+
+        **❌ InsightFace Failed to Load**
+        - The model downloads automatically on first use
+        - Ensure `models/.insightface/` directory exists
+        - Check internet connection for first-time download
+
+        **❌ FAISS Index Error**
+        - If corrupted, delete `embeddings/faiss.index` and re-enroll employees
+        - Ensure `embeddings/` directory exists and is writable
+        """)
+
+    # ── Auto-refresh logic ─────────────────────────────────────────
+    if auto_refresh:
+        time.sleep(10)
+        try:
+            st.rerun()
+        except Exception:
+            # Silently ignore rerun errors (e.g. when navigating away during refresh)
+            pass
+
+
+if not require_auth(allowed_roles=OPERATOR_ROLES):
+    st.stop()
+else:
+    _render_page()

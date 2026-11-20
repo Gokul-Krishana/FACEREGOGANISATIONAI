@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Papers for Face Recognition Attendance Project</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 32px;
+      background: #f7f8fb;
+      color: #1d2433;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      background: white;
+      padding: 36px 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+    h1, h2, h3 {
+      color: #123a5b;
+      margin-top: 0;
+    }
+    h1 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 12px;
+    }
+    h2 {
+      font-size: 24px;
+      margin-top: 28px;
+      border-bottom: 2px solid #dfe7f1;
+      padding-bottom: 8px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 16px;
+      color: #4b5b70;
+      margin-bottom: 30px;
+    }
+    .paper {
+      margin-bottom: 24px;
+      padding: 14px 16px;
+      border-left: 5px solid #2d7ff9;
+      background: #f8fbff;
+      border-radius: 8px;
+    }
+    .paper h3 {
+      margin: 0 0 6px;
+      font-size: 22px;
+    }
+    .link {
+      color: #0d5bd7;
+      word-break: break-word;
+      font-weight: 600;
+    }
+    ul {
+      margin: 10px 0 0 22px;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    .comparison {
+      background: #f4f8f3;
+      border-left: 5px solid #2ca86e;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .note {
+      background: #fff9ea;
+      border-left: 5px solid #f0b429;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 18px;
+    }
+    .final-summary {
+      margin-top: 28px;
+      background: #eef4ff;
+      border-left: 5px solid #2d7ff9;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .container { box-shadow: none; border-radius: 0; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Research Papers Relevant to Face Recognition Attendance Project</h1>
+    <div class="subtitle">Prepared for college presentation and academic explanation</div>
+
+    <h2>1. RetinaFace: Single-stage Dense Face Localisation in the Wild</h2>
+    <div class="paper">
+      <h3>Why it matches the project</h3>
+      <div class="link">https://arxiv.org/abs/1905.00641</div>
+      <ul>
+        <li>This paper is highly relevant because the first crucial step in any face recognition system is accurate face detection.</li>
+        <li>It focuses on detecting faces under difficult real-world conditions such as varying pose, scale, illumination, blur, and partial occlusion.</li>
+        <li>In our attendance system, the camera captures live frames and the system must detect the face correctly before extracting identity features.</li>
+      </ul>
+      <p><strong>Comparison with our project:</strong> RetinaFace is focused on detection accuracy, while our project extends this detection stage into a complete real-time attendance system that adds recognition, liveness checks, quality analysis, and database logging.</p>
+    </div>
+
+    <h2>2. FaceNet: A Unified Embedding for Face Recognition and Clustering</h2>
+    <div class="paper">
+      <h3>Why it matches the project</h3>
+      <div class="link">https://arxiv.org/abs/1503.03832</div>
+      <ul>
+        <li>FaceNet is one of the foundational papers in face recognition.</li>
+        <li>It shows how face images can be transformed into compact embedding vectors, making recognition and comparison easier and more accurate.</li>
+        <li>This is directly aligned with our project, since the system recognizes students by comparing feature embeddings, not just raw images.</li>
+      </ul>
+      <p><strong>Presentation angle:</strong> “Our project uses deep feature representation for identity matching, following the core idea introduced by FaceNet.”</p>
+    </div>
+
+    <h2>3. ArcFace: Additive Angular Margin Loss for Deep Face Recognition</h2>
+    <div class="paper">
+      <h3>Why it matches the project</h3>
+      <div class="link">https://arxiv.org/abs/1801.07698</div>
+      <ul>
+        <li>ArcFace is one of the most widely used face recognition losses in modern biometric systems.</li>
+        <li>It improves feature separation so different faces are farther apart and similar faces are closer together in embedding space.</li>
+        <li>This aligns with our recognition model because identity matching depends on robust feature representation.</li>
+      </ul>
+      <p><strong>Presentation angle:</strong> “ArcFace improves the discrimination power of the embedding space, making the attendance system more accurate and reliable.”</p>
+    </div>
+
+    <h2>4. You Only Look Once: Unified, Real-Time Object Detection</h2>
+    <div class="paper">
+      <h3>Why it matches the project</h3>
+      <div class="link">https://arxiv.org/abs/1506.02640</div>
+      <ul>
+        <li>YOLO is a classic real-time object detection model and remains highly relevant to computer vision projects.</li>
+        <li>It is important for systems that need to process live video streams with limited latency.</li>
+        <li>This is relevant to our attendance system because the system must detect and process people quickly in real time.</li>
+      </ul>
+      <p><strong>Presentation angle:</strong> “YOLO demonstrates the importance of real-time detection, which is essential for classroom attendance tracking.”</p>
+    </div>
+
+    <h2>5. Billion-scale similarity search with GPUs</h2>
+    <div class="paper">
+      <h3>Why it matches the project</h3>
+      <div class="link">https://arxiv.org/abs/1702.08734</div>
+      <ul>
+        <li>This paper is directly connected to FAISS, which is used for fast similarity search in large embedding databases.</li>
+        <li>After generating face embeddings, the system needs to find the nearest match quickly among many enrolled student faces.</li>
+        <li>FAISS enables efficient matching in high-dimensional vector space, which is central to attendance verification.</li>
+      </ul>
+      <p><strong>Presentation angle:</strong> “Our project uses vector search to compare live faces against a stored database of student embeddings efficiently and at scale.”</p>
+    </div>
+
+    <div class="comparison">
+      <h3>Professor-friendly comparison summary</h3>
+      <p><strong>RetinaFace</strong> provides the face detection foundation. It ensures the system locates the face correctly in real-world conditions.</p>
+      <p><strong>FaceNet and ArcFace</strong> provide the recognition foundation. They convert faces into robust high-quality embeddings and improve identity discrimination.</p>
+      <p><strong>YOLO</strong> represents the real-time detection philosophy that supports live monitoring and quick frame-to-frame processing.</p>
+      <p><strong>FAISS</strong> supports efficient matching against large student datasets.</p>
+      <p>Our project combines all of these ideas into a single practical system: camera input → face detection → face quality/liveness validation → embedding generation → similarity search → attendance logging.</p>
+    </div>
+
+    <div class="note">
+      <h3>Best paper to emphasize in the presentation</h3>
+      <p>If you want the strongest paper to explain in detail to your professor, use <strong>RetinaFace</strong> as the third key paper. It aligns most directly with your project because real-time attendance recognition depends critically on reliable face detection as the first step in the pipeline.</p>
+    </div>
+
+    <div class="final-summary">
+      <h3>Final Summary</h3>
+      <p>Our project follows a standard deep face-recognition pipeline: detect the face, verify quality, generate a deep embedding, compare it with stored identities, and mark attendance automatically. This approach is strongly supported by research in face detection (RetinaFace), embedding-based recognition (FaceNet), discriminative learning (ArcFace), real-time vision (YOLO), and vector search (FAISS).</p>
+    </div>
+  </div>
+</body>
+</html>

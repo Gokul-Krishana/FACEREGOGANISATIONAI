@@ -21,7 +21,7 @@ import cv2
 import config.config as cfg
 from database.database import get_session
 from database.models import UnknownFace
-from database.repository import UnknownFaceRepo
+from database.repository import EmployeeRepo, UnknownFaceRepo
 from services.employee_service import EmployeeService
 from services.audit_service import AuditService
 
@@ -174,8 +174,10 @@ class UnknownFaceService:
         # Step 5 — Add to FAISS index (after DB success)
         try:
             enrollment = FaceEnrollment()
-            enrollment.enroll(name, embedding)
+            enrollment.enroll(name, embedding, employee_id=employee_id)
             _faiss_id = enrollment.count() - 1  # 0-based index of the new entry
+            with get_session() as session:
+                EmployeeRepo.update(session, _emp_db_id, faiss_id=_faiss_id)  # type: ignore[arg-type]
         except Exception as exc:
             logger.error("Failed to add to FAISS: %s", exc)
             # Clean up the employee record since FAISS failed

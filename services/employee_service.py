@@ -91,6 +91,18 @@ class EmployeeService:
             return EmployeeRepo.get_by_name(session, name)
 
     @staticmethod
+    def get_all_by_name(name: str) -> List[Employee]:
+        """Return all employees matching a display name."""
+        with get_session() as session:
+            return EmployeeRepo.get_all_by_name(session, name)
+
+    @staticmethod
+    def get_by_faiss_id(faiss_id: int) -> Optional[Employee]:
+        """Look up an employee by FAISS index ID."""
+        with get_session() as session:
+            return EmployeeRepo.get_by_faiss_id(session, faiss_id)
+
+    @staticmethod
     def update(
         employee_id: str,
         name: Optional[str] = None,
@@ -134,13 +146,17 @@ class EmployeeService:
 
         if updated is not None and name is not None and name != old_name:
             # Keep FAISS in sync so recognition keeps matching after a rename.
-            # The pipeline resolves employees by the FAISS enrollment name, so
-            # a DB-only rename would silently break recognition/attendance.
+            # When metadata includes unique employee_id, scope the rename to
+            # that employee_id so same-name colleagues are never affected.
             try:
                 from app.enrollment import FaceEnrollment
 
                 enrollment = FaceEnrollment()
-                enrollment.rename(old_name, name)  # type: ignore[arg-type]
+                meta = getattr(enrollment, "metadata", None)
+                if isinstance(meta, list) and any(m.get("employee_id") == employee_id for m in meta):
+                    enrollment.rename_by_employee_id(employee_id, name)
+                else:
+                    enrollment.rename(old_name, name)  # type: ignore[arg-type]
             except Exception as exc:
                 import logging
 
@@ -203,22 +219,18 @@ class EmployeeService:
     def remove_faiss_embedding(name: str, fallback: Optional[str] = None) -> bool:
         """Remove an employee's embedding(s) from the FAISS index.
 
-        FAISS stores the display name, so ``name`` is tried first; if no
-        entry matches, ``fallback`` (typically the ``employee_id``) is tried.
-        Never raises — FAISS failures are logged and do not block the caller
-        (the DB row is already gone by the time this is invoked).
-
-        Args:
-            name: Display name stored in the FAISS metadata.
-            fallback: Alternate name to try if ``name`` is not found.
-
-        Returns:
-            ``True`` if any embeddings were removed, ``False`` otherwise.
+        When the FAISS metadata includes ``employee_id`` matching ``fallback``,
+        removal is scoped strictly to that ``employee_id`` so same-name
+        employees are never affected. Otherwise falls back to ``remove_by_name``.
+        Never raises — FAISS failures are logged and do not block the caller.
         """
         try:
             from app.enrollment import FaceEnrollment
 
             enrollment = FaceEnrollment()
+            meta = getattr(enrollment, "metadata", None)
+            if fallback and isinstance(meta, list) and any(m.get("employee_id") == fallback for m in meta):
+                return enrollment.remove_by_employee_id(fallback)
             removed = enrollment.remove_by_name(name)
             if not removed and fallback:
                 removed = enrollment.remove_by_name(fallback)

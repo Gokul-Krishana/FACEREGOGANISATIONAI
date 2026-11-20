@@ -18,7 +18,7 @@ import io
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 from database.database import get_session
@@ -40,7 +40,7 @@ class BulkResult:
     success: int = 0
     failed: int = 0
     skipped: int = 0
-    errors: List[Dict[str, str]] = field(default_factory=list)
+    errors: List[Dict[str, Any]] = field(default_factory=list)
     created_ids: List[int] = field(default_factory=list)
     elapsed_ms: float = 0.0
 

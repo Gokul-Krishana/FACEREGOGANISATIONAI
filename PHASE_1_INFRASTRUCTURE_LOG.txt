@@ -1,0 +1,136 @@
+=== STEP 3A: START ISOLATED POSTGRESQL 17 ===
+postgres.exe pid=29060 ready=True
+=== STEP 3B: START REAL REDIS 8.0.5 IN WSL UBUNTU ===
+wsl redis-server pid=10772 port=56379 ready=True
+Auth rejection check (expected nonzero): rc=2
+psql: error: connection to server at "127.0.0.1", port 55432 failed: FATAL:  password authentication failed for user "faceai"
+PostgreSQL version & extensions (rc=0):
+version                                 
+-------------------------------------------------------------------------
+ PostgreSQL 17.6 on x86_64-windows, compiled by msvc-19.44.35213, 64-bit
+(1 row)
+
+ current_user | session_user 
+--------------+--------------
+ faceai       | faceai
+(1 row)
+
+ extname | extversion 
+---------+------------
+ plpgsql | 1.0
+(1 row)
+Create database face_recognition (rc=0): DROP DATABASE
+CREATE DATABASE
+Create database face_recognition_alembic (rc=0): DROP DATABASE
+CREATE DATABASE
+Redis version=8.0.5, mode=standalone, os=Linux 6.18.33.2-microsoft-standard-WSL2 x86_64
+Empty-password URL (redis://:@127.0.0.1:56379/0) ping=True
+api.redis_client.RedisClient operations against Redis 8.0.5: PASSED
+Redis downtime detected as expected: ConnectionError
+Redis restart & RedisClient reconnection: PASSED
+
+=== STEP 4: ALEMBIC MIGRATION VALIDATION ON POSTGRESQL 17 ===
+alembic upgrade head (rc=0):
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 1bf6aa4e001c, initial_schema
+INFO  [alembic.runtime.migration] Running upgrade 1bf6aa4e001c -> 2a7c9e4f1b3d, add failed login attempts table
+INFO  [alembic.runtime.migration] Running upgrade 2a7c9e4f1b3d -> 9c4d2f6a7b11, add scalability indexes
+INFO  [alembic.runtime.migration] Running upgrade 9c4d2f6a7b11 -> b4e8c1d2f3a0, add attendance idempotency key
+Tables created (23): ['alembic_version', 'attendance', 'audit_logs', 'cameras', 'classrooms', 'courses', 'departments', 'employees', 'enrollments', 'failed_login_attempts', 'institutions', 'permissions', 'recognition_log', 'refresh_tokens', 'role_permissions', 'roles', 'sections', 'staff', 'students', 'timetables', 'unknown_faces', 'user_roles', 'users']
+attendance columns: {'id': 'INTEGER', 'student_id': 'INTEGER', 'employee_id': 'INTEGER', 'section_id': 'INTEGER', 'course_id': 'INTEGER', 'classroom_id': 'INTEGER', 'instructor_id': 'INTEGER', 'camera_id': 'INTEGER', 'timestamp': 'TIMESTAMP', 'recognized_at': 'TIMESTAMP', 'confidence': 'DOUBLE PRECISION', 'method': 'VARCHAR(50)', 'status': 'VARCHAR(20)', 'marked_by_user_id': 'INTEGER', 'marked_manually': 'BOOLEAN', 'manual_notes': 'TEXT', 'idempotency_key': 'VARCHAR(128)'}
+attendance indexes: ['idx_attendance_camera_timestamp', 'idx_attendance_course_date', 'idx_attendance_student_section', 'idx_attendance_student_timestamp', 'idx_attendance_timestamp', 'ix_attendance_timestamp', 'uq_attendance_idempotency_key']
+attendance foreign keys count: 8
+PostgreSQL alembic_version row: b4e8c1d2f3a0
+Alembic downgrade -1 -> upgrade head round-trip on PostgreSQL 17: PASSED
+
+=== STEP 5: EXECUTE tests/test_integration.py (ALL 17 TESTS: PG 17 + REDIS 8) ===
+tests/test_integration.py (rc=0):
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\gokul krishana\Downloads\Face Recognition AI 2.O\Face Recognition AI\FACEREGOGANISATIONAI
+configfile: pytest.ini
+plugins: anyio-4.14.1, cov-7.1.0, typeguard-4.6.0
+collecting ... collected 17 items
+
+tests/test_integration.py::TestPostgresConnection::test_connection PASSED [  5%]
+tests/test_integration.py::TestPostgresConnection::test_tables_exist PASSED [ 11%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_write PASSED [ 17%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_read_today PASSED [ 23%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_pagination PASSED [ 29%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_statistics PASSED [ 35%]
+tests/test_integration.py::TestPostgresRecognition::test_recognition_write PASSED [ 41%]
+tests/test_integration.py::TestPostgresRecognition::test_recognition_recent PASSED [ 47%]
+tests/test_integration.py::TestPostgresMigrations::test_migration_revision PASSED [ 52%]
+tests/test_integration.py::TestPostgresReconnect::test_pool_pre_ping PASSED [ 58%]
+tests/test_integration.py::TestRedisConnection::test_connection PASSED   [ 64%]
+tests/test_integration.py::TestRedisConnection::test_set_get PASSED      [ 70%]
+tests/test_integration.py::TestRedisConnection::test_expiry PASSED       [ 76%]
+tests/test_integration.py::TestRedisAttendanceCache::test_attendance_cache PASSED [ 82%]
+tests/test_integration.py::TestRedisCooldown::test_cooldown PASSED       [ 88%]
+tests/test_integration.py::TestRedisFailureFallback::test_redis_unavailable_fallback PASSED [ 94%]
+tests/test_integration.py::TestPostgresRedisIntegration::test_attendance_with_redis_cache PASSED [100%]
+
+=================================== PASSES ====================================
+_______________ TestPostgresMigrations.test_migration_revision ________________
+---------------------------- Captured stdout call -----------------------------
+  ✅ Migration heads: ['b4e8c1d2f3a0']
+=========================== short test summary info ===========================
+PASSED tests/test_integration.py::TestPostgresConnection::test_connection
+PASSED tests/test_integration.py::TestPostgresConnection::test_tables_exist
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_write
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_read_today
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_pagination
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_statistics
+PASSED tests/test_integration.py::TestPostgresRecognition::test_recognition_write
+PASSED tests/test_integration.py::TestPostgresRecognition::test_recognition_recent
+PASSED tests/test_integration.py::TestPostgresMigrations::test_migration_revision
+PASSED tests/test_integration.py::TestPostgresReconnect::test_pool_pre_ping
+PASSED tests/test_integration.py::TestRedisConnection::test_connection
+PASSED tests/test_integration.py::TestRedisConnection::test_set_get
+PASSED tests/test_integration.py::TestRedisConnection::test_expiry
+PASSED tests/test_integration.py::TestRedisAttendanceCache::test_attendance_cache
+PASSED tests/test_integration.py::TestRedisCooldown::test_cooldown
+PASSED tests/test_integration.py::TestRedisFailureFallback::test_redis_unavailable_fallback
+PASSED tests/test_integration.py::TestPostgresRedisIntegration::test_attendance_with_redis_cache
+============================= 17 passed in 5.42s ==============================
+
+=== STEP 6: MULTI-CAMERA POSTGRESQL CONCURRENCY & CONSISTENCY ===
+PostgreSQL pool_pre_ping recovery after engine.dispose(): PASSED
+2 concurrent cameras on PostgreSQL 17: created_True_count=1, db_rows=1
+4 concurrent cameras on PostgreSQL 17: created_True_count=1, db_rows=1
+10 concurrent cameras on PostgreSQL 17: created_True_count=1, db_rows=1
+Duplicate event retry idempotency on PostgreSQL 17: PASSED (created=False)
+Transaction rollback isolation on PostgreSQL 17: PASSED (0 leaked rows)
+Employee rename historical attendance consistency on PostgreSQL 17: PASSED
+
+=== STEP 7: FULL PYTEST REGRESSION SUITE (WITH POSTGRESQL 17 + REDIS 8.0.5) ===
+Full pytest suite rc=0 (full output saved to PHASE_1_PYTEST_LOG.txt); last 25 lines:
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_attendance_marked
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_jpeg_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_png_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_webp_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_no_path_traversal
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_is_unique
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_default_allowed_formats
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_oversized_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_empty_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_text_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_binary_non_image_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_exe_magic_bytes_are_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_renamed_non_image
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_corrupted_image_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_truncated_jpeg_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_oversized_dimensions_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_no_extension_provided
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_unsupported_format_in_allowed_list
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_empty_allowed_formats_rejects_all
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_path_traversal
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_backslash_paths
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_truncates_long_names
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_handles_normal_name
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_null_bytes
+================ 515 passed, 17 warnings in 119.17s (0:01:59) =================
+
+Cleaned up Redis (port 56379) and PostgreSQL (pid=29060)

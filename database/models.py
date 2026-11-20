@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -41,7 +42,7 @@ from sqlalchemy import (
     JSON,
     Index,
 )
-from sqlalchemy.orm import DeclarativeBase, relationship, synonym
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 
 
 def _utcnow() -> datetime:
@@ -98,10 +99,10 @@ class ActionType(str, Enum):
 class Permission(Base):
     __tablename__ = "permissions"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    resource = Column(String(100), nullable=False)
-    action = Column(String(50), nullable=False)
-    description = Column(Text, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resource: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("idx_permission_resource_action", "resource", "action", unique=True),)
 
@@ -112,12 +113,14 @@ class Permission(Base):
 class Role(Base):
     __tablename__ = "roles"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(50), unique=True, nullable=False)
-    description = Column(Text, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    permissions = relationship("Permission", secondary=role_permissions, backref="roles")
-    users = relationship("User", secondary=user_roles, back_populates="roles")
+    permissions: Mapped[List["Permission"]] = relationship(
+        "Permission", secondary=role_permissions, backref="roles"
+    )
+    users: Mapped[List["User"]] = relationship("User", secondary=user_roles, back_populates="roles")
 
     def __repr__(self) -> str:
         return f"<Role {self.name}>"
@@ -126,29 +129,41 @@ class Role(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(100), unique=True, nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # ── OIDC fields ────────────────────────────────────────────
-    oidc_sub = Column(String(255), unique=True, nullable=True)  # OIDC subject identifier
-    oidc_provider = Column(String(50), nullable=True)  # e.g. "azure", "keycloak", "google"
-    auth_method = Column(String(20), default="local")  # "local" | "oidc" | "both"
+    oidc_sub: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, nullable=True
+    )  # OIDC subject identifier
+    oidc_provider: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True
+    )  # e.g. "azure", "keycloak", "google"
+    auth_method: Mapped[str] = mapped_column(
+        String(20), default="local", nullable=True
+    )  # "local" | "oidc" | "both"
 
     # ── MFA fields ─────────────────────────────────────────────
-    is_mfa_enabled = Column(Boolean, default=False)
-    mfa_totp_secret = Column(String(64), nullable=True)  # Base32-encoded TOTP secret
-    mfa_backup_codes = Column(JSON, nullable=True)  # List of hashed backup codes
-    mfa_last_verified = Column(DateTime, nullable=True)  # Last MFA verification time
+    is_mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    mfa_totp_secret: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )  # Base32-encoded TOTP secret
+    mfa_backup_codes: Mapped[Optional[Any]] = mapped_column(
+        JSON, nullable=True
+    )  # List of hashed backup codes
+    mfa_last_verified: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )  # Last MFA verification time
 
     # ── Session tracking ───────────────────────────────────────
-    is_active = Column(Boolean, default=True)
-    last_login_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=True)
 
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
+    roles: Mapped[List["Role"]] = relationship("Role", secondary=user_roles, back_populates="users")
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
@@ -159,12 +174,12 @@ class FailedLoginAttempt(Base):
 
     __tablename__ = "failed_login_attempts"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(100), nullable=False, index=True)
-    ip_address = Column(String(45), nullable=False, index=True)
-    user_agent = Column(String(500), nullable=True)
-    attempted_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
-    success = Column(Boolean, default=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False, index=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False, index=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
 
     __table_args__ = (
         Index("idx_failed_login_username_time", "username", "attempted_at"),
@@ -180,17 +195,17 @@ class RefreshToken(Base):
 
     __tablename__ = "refresh_tokens"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    token_hash = Column(String(128), unique=True, nullable=False)
-    expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=_utcnow)
-    revoked_at = Column(DateTime, nullable=True)
-    replaced_by = Column(String(128), nullable=True)  # Token rotation chain
-    device_info = Column(String(255), nullable=True)
-    ip_address = Column(String(45), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    replaced_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)  # Token rotation chain
+    device_info: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
-    user = relationship("User", foreign_keys=[user_id])
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
 
     @property
     def is_revoked(self) -> bool:
@@ -198,7 +213,7 @@ class RefreshToken(Base):
 
     @property
     def is_expired(self) -> bool:
-        return _utcnow() > self.expires_at  # type: ignore[return-value]
+        return _utcnow() > self.expires_at
 
     __table_args__ = (Index("idx_refresh_token_user", "user_id", "revoked_at"),)
 
@@ -212,15 +227,15 @@ class RefreshToken(Base):
 class Institution(Base):
     __tablename__ = "institutions"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255), nullable=False)
-    code = Column(String(20), unique=True, nullable=False)
-    address = Column(Text, nullable=True)
-    phone = Column(String(20), nullable=True)
-    email = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
 
-    departments = relationship("Department", back_populates="institution")
+    departments: Mapped[List["Department"]] = relationship("Department", back_populates="institution")
 
     def __repr__(self) -> str:
         return f"<Institution {self.name}>"
@@ -229,20 +244,24 @@ class Institution(Base):
 class Department(Base):
     __tablename__ = "departments"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False)
-    name = Column(String(255), nullable=False)
-    code = Column(String(20), nullable=False)
-    head_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    institution_id: Mapped[int] = mapped_column(Integer, ForeignKey("institutions.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    head_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("staff.id", name="fk_departments_head_id", use_alter=True), nullable=True
     )
-    is_active = Column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
 
-    institution = relationship("Institution", back_populates="departments")
-    head = relationship("Staff", foreign_keys=[head_id], primaryjoin="Department.head_id == Staff.id")
-    courses = relationship("Course", back_populates="department")
-    students = relationship("Student", back_populates="department")
-    staff_members = relationship("Staff", back_populates="department", foreign_keys="Staff.department_id")
+    institution: Mapped["Institution"] = relationship("Institution", back_populates="departments")
+    head: Mapped[Optional["Staff"]] = relationship(
+        "Staff", foreign_keys=[head_id], primaryjoin="Department.head_id == Staff.id"
+    )
+    courses: Mapped[List["Course"]] = relationship("Course", back_populates="department")
+    students: Mapped[List["Student"]] = relationship("Student", back_populates="department")
+    staff_members: Mapped[List["Staff"]] = relationship(
+        "Staff", back_populates="department", foreign_keys="Staff.department_id"
+    )
 
     __table_args__ = (Index("idx_department_inst_code", "institution_id", "code", unique=True),)
 
@@ -253,16 +272,18 @@ class Department(Base):
 class Course(Base):
     __tablename__ = "courses"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
-    code = Column(String(50), nullable=False)
-    name = Column(String(255), nullable=False)
-    credits = Column(Integer, default=3)
-    description = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    department_id: Mapped[int] = mapped_column(Integer, ForeignKey("departments.id"), nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    credits: Mapped[int] = mapped_column(Integer, default=3, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
 
-    department = relationship("Department", back_populates="courses", foreign_keys="Course.department_id")
-    sections = relationship("Section", back_populates="course")
+    department: Mapped["Department"] = relationship(
+        "Department", back_populates="courses", foreign_keys="Course.department_id"
+    )
+    sections: Mapped[List["Section"]] = relationship("Section", back_populates="course")
     # NOTE: Enrollments accessed via course.sections[*].enrollments (no direct FK on Enrollment)
 
     __table_args__ = (Index("idx_course_dept_code", "department_id", "code", unique=True),)
@@ -274,17 +295,17 @@ class Course(Base):
 class Classroom(Base):
     __tablename__ = "classrooms"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False)
-    building = Column(String(100), nullable=False)
-    room_number = Column(String(20), nullable=False)
-    capacity = Column(Integer, nullable=True)
-    floor = Column(String(20), nullable=True)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    institution_id: Mapped[int] = mapped_column(Integer, ForeignKey("institutions.id"), nullable=False)
+    building: Mapped[str] = mapped_column(String(100), nullable=False)
+    room_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    floor: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
 
-    institution = relationship("Institution")
-    cameras = relationship("Camera", back_populates="classroom")
-    attendance_records = relationship("Attendance", back_populates="classroom")
+    institution: Mapped["Institution"] = relationship("Institution")
+    cameras: Mapped[List["Camera"]] = relationship("Camera", back_populates="classroom")
+    attendance_records: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="classroom")
     # NOTE: Sections accessed via classroom.timetables[*].section (no direct FK on Section)
 
     __table_args__ = (Index("idx_classroom_building_room", "building", "room_number", unique=True),)
@@ -298,17 +319,17 @@ class Timetable(Base):
 
     __tablename__ = "timetables"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=False)
-    day_of_week = Column(Integer, nullable=False)  # 0=Monday, 6=Sunday
-    start_time = Column(String(8), nullable=False)  # HH:MM:SS
-    end_time = Column(String(8), nullable=False)  # HH:MM:SS
-    instructor_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    section_id: Mapped[int] = mapped_column(Integer, ForeignKey("sections.id"), nullable=False)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classrooms.id"), nullable=False)
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time: Mapped[str] = mapped_column(String(8), nullable=False)  # HH:MM:SS
+    end_time: Mapped[str] = mapped_column(String(8), nullable=False)  # HH:MM:SS
+    instructor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("staff.id"), nullable=True)
 
-    section = relationship("Section", back_populates="timetables")
-    classroom = relationship("Classroom")
-    instructor = relationship("Staff", foreign_keys=[instructor_id])
+    section: Mapped["Section"] = relationship("Section", back_populates="timetables")
+    classroom: Mapped["Classroom"] = relationship("Classroom")
+    instructor: Mapped[Optional["Staff"]] = relationship("Staff", foreign_keys=[instructor_id])
 
     __table_args__ = (
         Index("idx_timetable_section_day", "section_id", "day_of_week"),
@@ -317,7 +338,7 @@ class Timetable(Base):
 
     def __repr__(self) -> str:
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        return f"<Timetable {self.section.code} @ {days[self.day_of_week]} {self.start_time}-{self.end_time}>"
+        return f"<Timetable section={self.section_id} @ {days[self.day_of_week]} {self.start_time}-{self.end_time}>"
 
 
 # ── Student & Staff Tables ───────────────────────────────────────────────
@@ -326,20 +347,24 @@ class Timetable(Base):
 class Student(Base):
     __tablename__ = "students"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(String(20), unique=True, nullable=False)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), nullable=True)
-    phone = Column(String(20), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
-    enrollment_year = Column(Integer, nullable=True)
-    graduation_year = Column(Integer, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=_utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    student_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    department_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("departments.id"), nullable=True)
+    enrollment_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    graduation_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
 
-    department = relationship("Department", back_populates="students", foreign_keys="Student.department_id")
-    enrollments = relationship("Enrollment", back_populates="student")
-    attendances = relationship("Attendance", back_populates="student", foreign_keys="Attendance.student_id")
+    department: Mapped[Optional["Department"]] = relationship(
+        "Department", back_populates="students", foreign_keys="Student.department_id"
+    )
+    enrollments: Mapped[List["Enrollment"]] = relationship("Enrollment", back_populates="student")
+    attendances: Mapped[List["Attendance"]] = relationship(
+        "Attendance", back_populates="student", foreign_keys="Attendance.student_id"
+    )
 
     __table_args__ = (
         Index("idx_student_id", "student_id", unique=True),
@@ -354,20 +379,20 @@ class Student(Base):
 class Staff(Base):
     __tablename__ = "staff"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(String(20), unique=True, nullable=False)
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), nullable=True)
-    phone = Column(String(20), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
-    position = Column(String(100), nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=_utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    department_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("departments.id"), nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
 
-    department = relationship(
+    department: Mapped[Optional["Department"]] = relationship(
         "Department", back_populates="staff_members", foreign_keys="Staff.department_id"
     )
-    attendances = relationship(
+    attendances: Mapped[List["Attendance"]] = relationship(
         "Attendance", back_populates="instructor", foreign_keys="Attendance.instructor_id"
     )
 
@@ -382,18 +407,18 @@ class Employee(Base):
 
     __tablename__ = "employees"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(String(20), unique=True, nullable=False)
-    name = Column(String(100), nullable=False)
-    department = Column(String(100), nullable=True)
-    photo_path = Column(String(500), nullable=True)
-    faiss_id = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    photo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    faiss_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=True)
 
-    attendance_records = relationship("Attendance", back_populates="employee")
-    audit_logs = relationship("AuditLog", back_populates="employee")
-    recognition_logs = relationship(
+    attendance_records: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="employee")
+    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="employee")
+    recognition_logs: Mapped[List["RecognitionLog"]] = relationship(
         "RecognitionLog",
         back_populates="employee",
     )
@@ -413,17 +438,21 @@ class Section(Base):
 
     __tablename__ = "sections"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
-    section_name = Column(String(50), nullable=False)
-    semester = Column(String(20), nullable=False)
-    year = Column(Integer, nullable=False)
-    max_capacity = Column(Integer, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    course_id: Mapped[int] = mapped_column(Integer, ForeignKey("courses.id"), nullable=False)
+    section_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    semester: Mapped[str] = mapped_column(String(20), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    course = relationship("Course", back_populates="sections")
-    timetables = relationship("Timetable", back_populates="section")
-    enrollments = relationship("Enrollment", back_populates="section", foreign_keys="Enrollment.section_id")
-    attendances = relationship("Attendance", back_populates="section", foreign_keys="Attendance.section_id")
+    course: Mapped["Course"] = relationship("Course", back_populates="sections")
+    timetables: Mapped[List["Timetable"]] = relationship("Timetable", back_populates="section")
+    enrollments: Mapped[List["Enrollment"]] = relationship(
+        "Enrollment", back_populates="section", foreign_keys="Enrollment.section_id"
+    )
+    attendances: Mapped[List["Attendance"]] = relationship(
+        "Attendance", back_populates="section", foreign_keys="Attendance.section_id"
+    )
 
     __table_args__ = (Index("idx_section_course_semester", "course_id", "semester", "year"),)
 
@@ -436,14 +465,14 @@ class Enrollment(Base):
 
     __tablename__ = "enrollments"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
-    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
-    enrollment_date = Column(DateTime, default=_utcnow)
-    status = Column(String(20), default="ACTIVE")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("students.id"), nullable=False)
+    section_id: Mapped[int] = mapped_column(Integer, ForeignKey("sections.id"), nullable=False)
+    enrollment_date: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=True)
 
-    student = relationship("Student", back_populates="enrollments")
-    section = relationship("Section", back_populates="enrollments")
+    student: Mapped["Student"] = relationship("Student", back_populates="enrollments")
+    section: Mapped["Section"] = relationship("Section", back_populates="enrollments")
 
     __table_args__ = (Index("idx_enrollment_student_section", "student_id", "section_id", unique=True),)
 
@@ -459,28 +488,30 @@ class Camera(Base):
 
     __tablename__ = "cameras"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False)
-    camera_index = Column(Integer, nullable=True)
-    camera_id = Column(String(50), unique=True, nullable=False)  # UUID or custom ID
-    stream_url = Column(String(500), nullable=True)
-    credential_ref = Column(String(255), nullable=True)  # Reference to secrets manager
-    location = Column(String(200), nullable=True)
-    building = Column(String(100), nullable=True)
-    room = Column(String(50), nullable=True)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True)
-    is_active = Column(Boolean, default=True)
-    status = Column(String(20), default="OFFLINE")
-    last_seen = Column(DateTime, nullable=True)
-    fps = Column(Integer, nullable=True)
-    resolution = Column(String(20), nullable=True)
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    camera_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    camera_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)  # UUID or custom ID
+    stream_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    credential_ref: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )  # Reference to secrets manager
+    location: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    building: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    room: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    classroom_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("classrooms.id"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="OFFLINE", nullable=True)
+    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    fps: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    resolution: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=True)
 
-    classroom = relationship("Classroom", back_populates="cameras")
-    attendance_records = relationship("Attendance", back_populates="camera")
-    recognition_logs = relationship("RecognitionLog", back_populates="camera")
-    unknown_faces = relationship("UnknownFace", back_populates="camera")
+    classroom: Mapped[Optional["Classroom"]] = relationship("Classroom", back_populates="cameras")
+    attendance_records: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="camera")
+    recognition_logs: Mapped[List["RecognitionLog"]] = relationship("RecognitionLog", back_populates="camera")
+    unknown_faces: Mapped[List["UnknownFace"]] = relationship("UnknownFace", back_populates="camera")
 
     __table_args__ = (
         Index("idx_camera_id", "camera_id", unique=True),
@@ -499,44 +530,49 @@ class Attendance(Base):
 
     __tablename__ = "attendance"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Student recognition (primary source)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+    student_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("students.id"), nullable=True)
+    employee_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("employees.id"), nullable=True)
 
     # Timetable context
-    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True)
-    instructor_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
+    section_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("sections.id"), nullable=True)
+    course_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("courses.id"), nullable=True)
+    classroom_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("classrooms.id"), nullable=True)
+    instructor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("staff.id"), nullable=True)
 
     # Camera context
-    camera_id = Column(Integer, ForeignKey("cameras.id"), nullable=True)
+    camera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("cameras.id"), nullable=True)
 
     # Timing
-    timestamp = Column(DateTime, default=_utcnow, nullable=False, index=True)
-    recognized_at = Column(DateTime, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False, index=True)
+    recognized_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Recognition details
-    confidence = Column(Float, nullable=False, default=1.0)
-    method = Column(String(50), default="FACE_RECOGNITION")
-    status = Column(String(20), default="PRESENT")
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    method: Mapped[str] = mapped_column(String(50), default="FACE_RECOGNITION", nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="PRESENT", nullable=True)
+    # Nullable unique key used by atomic daily attendance marking so concurrent
+    # cameras cannot insert duplicate rows for the same person on the same day.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     # Manual override tracking
-    marked_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    marked_manually = Column(Boolean, default=False)
-    manual_notes = Column(Text, nullable=True)
+    marked_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    marked_manually: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    manual_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
-    student = relationship("Student", back_populates="attendances")
-    employee = relationship("Employee", back_populates="attendance_records")
-    section = relationship("Section", back_populates="attendances")
-    course = relationship("Course")
-    classroom = relationship("Classroom", back_populates="attendance_records")
-    instructor = relationship("Staff", foreign_keys=[instructor_id], back_populates="attendances")
-    camera = relationship("Camera", back_populates="attendance_records")
-    marked_by_user = relationship("User", foreign_keys=[marked_by_user_id])
+    student: Mapped[Optional["Student"]] = relationship("Student", back_populates="attendances")
+    employee: Mapped[Optional["Employee"]] = relationship("Employee", back_populates="attendance_records")
+    section: Mapped[Optional["Section"]] = relationship("Section", back_populates="attendances")
+    course: Mapped[Optional["Course"]] = relationship("Course")
+    classroom: Mapped[Optional["Classroom"]] = relationship("Classroom", back_populates="attendance_records")
+    instructor: Mapped[Optional["Staff"]] = relationship(
+        "Staff", foreign_keys=[instructor_id], back_populates="attendances"
+    )
+    camera: Mapped[Optional["Camera"]] = relationship("Camera", back_populates="attendance_records")
+    marked_by_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[marked_by_user_id])
 
     __table_args__ = (
         Index("idx_attendance_timestamp", "timestamp"),
@@ -544,6 +580,7 @@ class Attendance(Base):
         Index("idx_attendance_student_section", "student_id", "section_id"),
         Index("idx_attendance_course_date", "course_id", "timestamp"),
         Index("idx_attendance_camera_timestamp", "camera_id", "timestamp"),
+        Index("uq_attendance_idempotency_key", "idempotency_key", unique=True),
     )
 
     def __repr__(self) -> str:
@@ -558,32 +595,32 @@ class RecognitionLog(Base):
 
     __tablename__ = "recognition_log"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=True)
-    is_known = Column(Boolean, nullable=False, default=False)
-    confidence = Column(Float, nullable=True)
-    liveness_confidence = Column(Float, nullable=True)
-    is_spoof = Column(Boolean, default=False)
-    track_id = Column(String(50), nullable=True)
-    timestamp = Column(DateTime, default=_utcnow, nullable=False, index=True)
-    camera_id = Column(Integer, ForeignKey("cameras.id"), nullable=True)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True)
-    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
-    face_snapshot_path = Column(String(500), nullable=True)
-    embedding_path = Column(String(500), nullable=True)
-    frame_number = Column(Integer, nullable=True)
-    processing_time_ms = Column(Float, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    employee_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("employees.id"), nullable=True)
+    student_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("students.id"), nullable=True)
+    is_known: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    liveness_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    is_spoof: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    track_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False, index=True)
+    camera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("cameras.id"), nullable=True)
+    classroom_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("classrooms.id"), nullable=True)
+    section_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("sections.id"), nullable=True)
+    face_snapshot_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    embedding_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    frame_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    processing_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-    employee = relationship(
+    employee: Mapped[Optional["Employee"]] = relationship(
         "Employee",
         back_populates="recognition_logs",
         foreign_keys=[employee_id],
     )
-    student = relationship("Student", foreign_keys=[student_id])
-    camera = relationship("Camera", back_populates="recognition_logs")
-    classroom = relationship("Classroom")
-    section = relationship("Section")
+    student: Mapped[Optional["Student"]] = relationship("Student", foreign_keys=[student_id])
+    camera: Mapped[Optional["Camera"]] = relationship("Camera", back_populates="recognition_logs")
+    classroom: Mapped[Optional["Classroom"]] = relationship("Classroom")
+    section: Mapped[Optional["Section"]] = relationship("Section")
 
     __table_args__ = (
         Index("idx_recognition_timestamp", "timestamp"),
@@ -608,28 +645,28 @@ class UnknownFace(Base):
 
     __tablename__ = "unknown_faces"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    image_path = Column(String(500), nullable=False)
-    embedding_path = Column(String(500), nullable=True)
-    thumbnail_path = Column(String(500), nullable=True)
-    camera_id = Column(Integer, ForeignKey("cameras.id"), nullable=True)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True)
-    timestamp = Column(DateTime, default=_utcnow, nullable=False, index=True)
-    confidence = Column(Float, nullable=True)
-    liveness_score = Column(Float, nullable=True)
-    track_id = Column(String(50), nullable=True)
-    is_spoof = Column(Boolean, default=False)
-    reviewed = Column(Boolean, default=False)
-    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    reviewed_at = Column(DateTime, nullable=True)
-    converted_to_employee = Column(Boolean, default=False)
-    notes = Column(Text, nullable=True)
-    retention_expires_at = Column(DateTime, nullable=True)
-    face_metadata = Column(JSON, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    image_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    embedding_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    thumbnail_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    camera_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("cameras.id"), nullable=True)
+    classroom_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("classrooms.id"), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False, index=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    liveness_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    track_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_spoof: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    reviewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    reviewed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    converted_to_employee: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retention_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    face_metadata: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
-    camera = relationship("Camera", back_populates="unknown_faces")
-    classroom = relationship("Classroom")
-    reviewer = relationship("User", foreign_keys=[reviewed_by])
+    camera: Mapped[Optional["Camera"]] = relationship("Camera", back_populates="unknown_faces")
+    classroom: Mapped[Optional["Classroom"]] = relationship("Classroom")
+    reviewer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[reviewed_by])
 
     __table_args__ = (
         Index("idx_unknown_timestamp", "timestamp"),
@@ -681,24 +718,30 @@ class AuditLog(Base):
 
     __tablename__ = "audit_logs"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    action = Column(String(50), nullable=False)
-    actor = Column(String(100), nullable=False)
-    operator = synonym("actor")
-    actor_type = Column(String(20), default="USER")  # USER, SYSTEM, SERVICE
-    actor_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
-    employee_id = synonym("actor_id")
-    timestamp = Column(DateTime, default=_utcnow, nullable=False, index=True)
-    resource_type = Column(String(50), nullable=True)
-    resource_id = Column(Integer, nullable=True)
-    description = Column(Text, nullable=True)
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(String(500), nullable=True)
-    request_id = Column(String(100), nullable=True)
-    details = Column(JSON, nullable=True)
-    severity = Column(String(20), default="INFO")  # INFO, WARNING, ERROR, CRITICAL
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    actor: Mapped[str] = mapped_column(String(100), nullable=False)
+    operator: Mapped[str] = synonym("actor")
+    actor_type: Mapped[str] = mapped_column(
+        String(20), default="USER", nullable=True
+    )  # USER, SYSTEM, SERVICE
+    actor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("employees.id"), nullable=True)
+    employee_id: Mapped[Optional[int]] = synonym("actor_id")
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False, index=True)
+    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    resource_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    request_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    details: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    severity: Mapped[str] = mapped_column(
+        String(20), default="INFO", nullable=True
+    )  # INFO, WARNING, ERROR, CRITICAL
 
-    employee = relationship("Employee", foreign_keys=[actor_id], back_populates="audit_logs")
+    employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee", foreign_keys=[actor_id], back_populates="audit_logs"
+    )
 
     __table_args__ = (
         Index("idx_audit_timestamp", "timestamp"),

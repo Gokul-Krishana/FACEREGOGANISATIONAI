@@ -1,0 +1,1190 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\gokul krishana\Downloads\Face Recognition AI 2.O\Face Recognition AI\FACEREGOGANISATIONAI
+configfile: pytest.ini
+plugins: anyio-4.14.1, cov-7.1.0, typeguard-4.6.0
+collecting ... collected 515 items
+
+tests/test_attendance_service.py::TestAttendanceService::test_mark_attendance PASSED [  0%]
+tests/test_attendance_service.py::TestAttendanceService::test_mark_attendance_double_prevention PASSED [  0%]
+tests/test_attendance_service.py::TestAttendanceService::test_mark_multiple_employees PASSED [  0%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_today PASSED [  0%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_today_empty PASSED [  0%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_by_date PASSED [  1%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_by_date_no_records PASSED [  1%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_by_employee PASSED [  1%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_statistics_empty PASSED [  1%]
+tests/test_attendance_service.py::TestAttendanceService::test_get_statistics PASSED [  1%]
+tests/test_attendance_service.py::TestAttendanceService::test_csv_dual_write PASSED [  2%]
+tests/test_attendance_service.py::TestAttendanceService::test_to_dict PASSED [  2%]
+tests/test_audit_service.py::TestAuditService::test_log_basic PASSED     [  2%]
+tests/test_audit_service.py::TestAuditService::test_log_with_employee_id PASSED [  2%]
+tests/test_audit_service.py::TestAuditService::test_log_default_operator PASSED [  2%]
+tests/test_audit_service.py::TestAuditService::test_get_recent_returns_newest_first PASSED [  3%]
+tests/test_audit_service.py::TestAuditService::test_get_recent_respects_limit PASSED [  3%]
+tests/test_audit_service.py::TestAuditService::test_get_by_action_empty PASSED [  3%]
+tests/test_audit_service.py::TestAuditService::test_log_multiple_actions PASSED [  3%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_not_locked_initially PASSED [  3%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_locked_after_max_attempts PASSED [  4%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_is_per_username PASSED [  4%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_is_per_ip PASSED [  4%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_different_ip_not_affected PASSED [  4%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_creates_record PASSED [  4%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_multiple_failed_attempts PASSED [  5%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_username_lowercase PASSED [  5%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_truncates_user_agent PASSED [  5%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_successful_login PASSED [  5%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_successful_login_resets_lockout PASSED [  5%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_clean_user PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_after_failures PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_when_locked PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_after_successful_login PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_cleanup_old_attempts PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_cleanup_keeps_recent PASSED [  6%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_empty_username PASSED [  7%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_empty_ip PASSED [  7%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_special_characters_in_username PASSED [  7%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_ipv6_address PASSED [  7%]
+tests/test_brute_force_protection.py::TestBruteForceProtection::test_warning_at_threshold_minus_one PASSED [  7%]
+tests/test_camera_owner.py::TestSingleton::test_get_returns_same_instance PASSED [  8%]
+tests/test_camera_owner.py::TestSingleton::test_new_returns_same_instance PASSED [  8%]
+tests/test_camera_owner.py::TestSingleton::test_reset_creates_fresh_instance PASSED [  8%]
+tests/test_camera_owner.py::TestAcquisition::test_can_acquire_when_free PASSED [  8%]
+tests/test_camera_owner.py::TestAcquisition::test_acquire_returns_true_when_free PASSED [  8%]
+tests/test_camera_owner.py::TestAcquisition::test_acquire_returns_false_when_owned PASSED [  9%]
+tests/test_camera_owner.py::TestAcquisition::test_can_acquire_false_when_owned PASSED [  9%]
+tests/test_camera_owner.py::TestAcquisition::test_is_owned_reflects_state PASSED [  9%]
+tests/test_camera_owner.py::TestAcquisition::test_state_transitions PASSED [  9%]
+tests/test_camera_owner.py::TestAcquisition::test_acquire_stores_camera_and_pipeline PASSED [  9%]
+tests/test_camera_owner.py::TestRelease::test_release_stops_pipeline PASSED [ 10%]
+tests/test_camera_owner.py::TestRelease::test_release_releases_camera PASSED [ 10%]
+tests/test_camera_owner.py::TestRelease::test_release_clears_references PASSED [ 10%]
+tests/test_camera_owner.py::TestRelease::test_release_when_free_is_noop PASSED [ 10%]
+tests/test_camera_owner.py::TestRelease::test_release_handles_errors_gracefully PASSED [ 10%]
+tests/test_camera_owner.py::TestRelease::test_release_uses_pipeline_reference PASSED [ 11%]
+tests/test_camera_owner.py::TestStartStopStart::test_start_stop_start_works PASSED [ 11%]
+tests/test_camera_owner.py::TestStartStopStart::test_previous_camera_released_before_next_acquire PASSED [ 11%]
+tests/test_camera_owner.py::TestStartStopStart::test_no_stale_objects_after_cycle PASSED [ 11%]
+tests/test_camera_owner.py::TestThreadSafety::test_concurrent_acquire_only_one_wins PASSED [ 11%]
+tests/test_camera_owner.py::TestThreadSafety::test_concurrent_release_and_acquire_safe PASSED [ 12%]
+tests/test_cons_fixes.py::TestCrossPlatformCameras::test_preferred_backends_linux PASSED [ 12%]
+tests/test_cons_fixes.py::TestCrossPlatformCameras::test_preferred_backends_macos PASSED [ 12%]
+tests/test_cons_fixes.py::TestCrossPlatformCameras::test_list_webcams_uses_platform_backends_on_linux PASSED [ 12%]
+tests/test_cons_fixes.py::TestCrossPlatformCameras::test_webcam_source_open_fallback_to_default PASSED [ 12%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_amfr_never_accepts_when_is_live_false PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_amfr_fails_closed_without_face_crop PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_bezel_in_context_crop PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_static_open_eyes_no_blink PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_when_dl_below_threshold PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_minifasnet_onnx_separates_screen_from_real_photo PASSED [ 13%]
+tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_align_face_does_not_throw_tuple_error PASSED [ 14%]
+tests/test_cons_fixes.py::TestDashboardAuthGate::test_create_initial_admin_and_authenticate PASSED [ 14%]
+tests/test_cons_fixes.py::TestDashboardAuthGate::test_role_enforcement_blocks_non_admin_from_admin_pages PASSED [ 14%]
+tests/test_cons_fixes.py::TestDashboardAuthGate::test_require_auth_stops_when_unauthenticated PASSED [ 14%]
+tests/test_cons_fixes.py::TestOvernightDateRollover::test_recognition_service_resets_session_cache_on_new_day PASSED [ 14%]
+tests/test_cons_fixes.py::TestConcurrentIdempotentAttendance::test_two_cameras_marking_simultaneously_create_single_record PASSED [ 15%]
+tests/test_cons_fixes.py::TestIdentityDisambiguationAndRename::test_same_name_employees_resolve_and_mark_independently PASSED [ 15%]
+tests/test_cons_fixes.py::TestIdentityDisambiguationAndRename::test_renaming_employee_keeps_identity_resolution_and_leaves_colleague_intact PASSED [ 15%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_four_concurrent_cameras_idempotent PASSED [ 15%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_live_detection_clears_session_on_midnight_rollover PASSED [ 15%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[0.6] PASSED [ 16%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[1.0] PASSED [ 16%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[1.3] PASSED [ 16%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_api_attendance_service_time_window_grace_period PASSED [ 16%]
+tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_api_attendance_response_accepts_nullable_student_id PASSED [ 16%]
+tests/test_deep_liveness.py::TestDeepLivenessResult::test_creation PASSED [ 17%]
+tests/test_deep_liveness.py::TestDeepLivenessResult::test_creation_with_error PASSED [ 17%]
+tests/test_deep_liveness.py::TestDeepLivenessResult::test_repr PASSED    [ 17%]
+tests/test_deep_liveness.py::TestDeepLivenessResult::test_zero_confidence PASSED [ 17%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_init_uses_fallback_when_no_onnx PASSED [ 17%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_available_property PASSED [ 18%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_normal_face PASSED [ 18%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_without_landmarks PASSED [ 18%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_different_input_sizes PASSED [ 18%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_preserves_color PASSED [ 18%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_align_face_with_landmarks PASSED [ 19%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_align_face_identity_preserved PASSED [ 19%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_live_face_returns_result PASSED [ 19%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_spoof_print_returns_result PASSED [ 19%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_spoof_screen_returns_result PASSED [ 19%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_with_landmarks PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_returns_inference_time PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_empty_image PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_tiny_face PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_extreme_brightness PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_extreme_darkness PASSED [ 20%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_single_channel_grayscale PASSED [ 21%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_float_input PASSED [ 21%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_deterministic_results PASSED [ 21%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_singleton_returns_same_instance PASSED [ 21%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_different_images_produce_different_scores PASSED [ 21%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_live_scores_higher_than_spoof_print PASSED [ 22%]
+tests/test_deep_liveness.py::TestDeepLivenessDetector::test_live_scores_higher_than_spoof_screen PASSED [ 22%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_liveness_detector_uses_deep_liveness PASSED [ 22%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_liveness_detector_can_disable_deep_liveness PASSED [ 22%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_analyze_frame_includes_dl_score PASSED [ 22%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_analyze_frame_disabled_dl PASSED [ 23%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_deep_liveness_spoof_reason_included PASSED [ 23%]
+tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_weighted_combination_with_dl PASSED [ 23%]
+tests/test_deep_liveness.py::TestModelFallback::test_fallback_initializes_quickly PASSED [ 23%]
+tests/test_deep_liveness.py::TestModelFallback::test_fallback_is_deterministic PASSED [ 23%]
+tests/test_deep_liveness.py::TestModelFallback::test_fallback_returns_valid_scores PASSED [ 24%]
+tests/test_employee_service.py::TestEmployeeService::test_create_employee PASSED [ 24%]
+tests/test_employee_service.py::TestEmployeeService::test_create_duplicate_raises_error PASSED [ 24%]
+tests/test_employee_service.py::TestEmployeeService::test_get_by_employee_id PASSED [ 24%]
+tests/test_employee_service.py::TestEmployeeService::test_get_by_employee_id_not_found PASSED [ 24%]
+tests/test_employee_service.py::TestEmployeeService::test_get_by_id PASSED [ 25%]
+tests/test_employee_service.py::TestEmployeeService::test_get_all PASSED [ 25%]
+tests/test_employee_service.py::TestEmployeeService::test_get_all_empty PASSED [ 25%]
+tests/test_employee_service.py::TestEmployeeService::test_search PASSED  [ 25%]
+tests/test_employee_service.py::TestEmployeeService::test_update_name_and_department PASSED [ 25%]
+tests/test_employee_service.py::TestEmployeeService::test_update_partial_only_changes_provided_fields PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_update_not_found_returns_none PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_update_with_no_fields_returns_none PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_update_logs_audit PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_delete_existing PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_delete_not_found PASSED [ 26%]
+tests/test_employee_service.py::TestEmployeeService::test_count PASSED   [ 27%]
+tests/test_employee_service.py::TestEmployeeService::test_create_logs_audit PASSED [ 27%]
+tests/test_employee_service.py::TestEmployeeService::test_delete_logs_audit PASSED [ 27%]
+tests/test_employee_service.py::TestEmployeeService::test_to_dict PASSED [ 27%]
+tests/test_enrollment.py::TestFaceEnrollment::test_init_empty PASSED     [ 27%]
+tests/test_enrollment.py::TestFaceEnrollment::test_enroll_single PASSED  [ 28%]
+tests/test_enrollment.py::TestFaceEnrollment::test_enroll_multiple PASSED [ 28%]
+tests/test_enrollment.py::TestFaceEnrollment::test_search_exact_match PASSED [ 28%]
+tests/test_enrollment.py::TestFaceEnrollment::test_search_empty_index PASSED [ 28%]
+tests/test_enrollment.py::TestFaceEnrollment::test_search_threshold_rejects_far_match PASSED [ 28%]
+tests/test_enrollment.py::TestFaceEnrollment::test_search_threshold_accepts_close_match PASSED [ 29%]
+tests/test_enrollment.py::TestFaceEnrollment::test_persistence_across_reloads PASSED [ 29%]
+tests/test_enrollment.py::TestFaceEnrollment::test_clear_removes_all PASSED [ 29%]
+tests/test_enrollment.py::TestFaceEnrollment::test_search_k_returns_multiple PASSED [ 29%]
+tests/test_enrollment.py::TestFaceEnrollment::test_unique_count PASSED   [ 29%]
+tests/test_enrollment.py::TestFaceEnrollment::test_status PASSED         [ 30%]
+tests/test_enrollment.py::TestFaceEnrollment::test_metadata_format PASSED [ 30%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_init_default_weights PASSED [ 30%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_sharp PASSED [ 30%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_blurry PASSED [ 30%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_identical_face PASSED [ 31%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_ideal PASSED [ 31%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_too_bright PASSED [ 31%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_too_dark PASSED [ 31%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_contrast_high PASSED [ 31%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_contrast_low PASSED [ 32%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_ideal PASSED [ 32%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_tiny PASSED [ 32%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_large PASSED [ 32%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_zero_area PASSED [ 32%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_perfect PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_zero PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_clamped PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_frontal PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_profile PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_wrong_shape PASSED [ 33%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_high_quality PASSED [ 34%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_low_quality PASSED [ 34%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_no_landmarks PASSED [ 34%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_empty_image PASSED [ 34%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_returns_all_keys PASSED [ 34%]
+tests/test_face_quality.py::TestFaceQualityAssessment::test_score_range PASSED [ 35%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_empty_get_returns_none PASSED [ 35%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_put_get_returns_latest PASSED [ 35%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_stale_frames_dropped PASSED [ 35%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_get_returns_copy PASSED [ 35%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_put_none_ignored PASSED [ 36%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_frame_id_increments PASSED [ 36%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_timestamps_monotonic PASSED [ 36%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_get_with_meta PASSED [ 36%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_clear PASSED     [ 36%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_close_rejects_frames PASSED [ 37%]
+tests/test_frame_buffer.py::TestFrameBufferBasics::test_try_get_requires_new_frame PASSED [ 37%]
+tests/test_frame_buffer.py::TestFrameBufferThreadSafety::test_concurrent_producers_consumers PASSED [ 37%]
+tests/test_frame_buffer.py::TestFrameBufferThreadSafety::test_frame_id_thread_safe PASSED [ 37%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_empty_get_returns_none PASSED [ 37%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_put_get_list PASSED  [ 38%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_stale_results_dropped PASSED [ 38%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_get_returns_copies PASSED [ 38%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_clear_and_close PASSED [ 38%]
+tests/test_frame_buffer.py::TestResultsBuffer::test_frame_id_and_timestamp PASSED [ 38%]
+tests/test_frame_buffer.py::TestSingletons::test_singletons_exist PASSED [ 39%]
+tests/test_frame_buffer.py::TestSingletons::test_singleton_identity PASSED [ 39%]
+tests/test_frame_buffer.py::TestSingletons::test_singleton_latest_only PASSED [ 39%]
+tests/test_frame_buffer.py::TestSingletons::test_singletons_can_roundtrip PASSED [ 39%]
+tests/test_integration.py::TestPostgresConnection::test_connection PASSED [ 39%]
+tests/test_integration.py::TestPostgresConnection::test_tables_exist PASSED [ 40%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_write PASSED [ 40%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_read_today PASSED [ 40%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_pagination PASSED [ 40%]
+tests/test_integration.py::TestPostgresAttendance::test_attendance_statistics PASSED [ 40%]
+tests/test_integration.py::TestPostgresRecognition::test_recognition_write PASSED [ 40%]
+tests/test_integration.py::TestPostgresRecognition::test_recognition_recent PASSED [ 41%]
+tests/test_integration.py::TestPostgresMigrations::test_migration_revision PASSED [ 41%]
+tests/test_integration.py::TestPostgresReconnect::test_pool_pre_ping PASSED [ 41%]
+tests/test_integration.py::TestRedisConnection::test_connection PASSED   [ 41%]
+tests/test_integration.py::TestRedisConnection::test_set_get PASSED      [ 41%]
+tests/test_integration.py::TestRedisConnection::test_expiry PASSED       [ 42%]
+tests/test_integration.py::TestRedisAttendanceCache::test_attendance_cache PASSED [ 42%]
+tests/test_integration.py::TestRedisCooldown::test_cooldown PASSED       [ 42%]
+tests/test_integration.py::TestRedisFailureFallback::test_redis_unavailable_fallback PASSED [ 42%]
+tests/test_integration.py::TestPostgresRedisIntegration::test_attendance_with_redis_cache PASSED [ 42%]
+tests/test_ip_camera.py::TestIPCameraSource::test_default_construction PASSED [ 43%]
+tests/test_ip_camera.py::TestIPCameraSource::test_custom_url_construction PASSED [ 43%]
+tests/test_ip_camera.py::TestIPCameraSource::test_custom_url_construction_http PASSED [ 43%]
+tests/test_ip_camera.py::TestIPCameraSource::test_name PASSED            [ 43%]
+tests/test_ip_camera.py::TestIPCameraSource::test_source_type PASSED     [ 43%]
+tests/test_ip_camera.py::TestIPCameraSource::test_open_success PASSED    [ 44%]
+tests/test_ip_camera.py::TestIPCameraSource::test_open_failure PASSED    [ 44%]
+tests/test_ip_camera.py::TestIPCameraSource::test_open_failure_exception PASSED [ 44%]
+tests/test_ip_camera.py::TestIPCameraSource::test_read_success PASSED    [ 44%]
+tests/test_ip_camera.py::TestIPCameraSource::test_read_failure PASSED    [ 44%]
+tests/test_ip_camera.py::TestIPCameraSource::test_read_before_open PASSED [ 45%]
+tests/test_ip_camera.py::TestIPCameraSource::test_release PASSED         [ 45%]
+tests/test_ip_camera.py::TestIPCameraSource::test_set_resolution PASSED  [ 45%]
+tests/test_ip_camera.py::TestIPCameraSource::test_get_resolution_before_open PASSED [ 45%]
+tests/test_ip_camera.py::TestIPCameraSource::test_get_resolution_after_open PASSED [ 45%]
+tests/test_ip_camera.py::TestIPCameraSource::test_set_resolution_before_open_then_applied PASSED [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_info_format PASSED     [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_info_before_open PASSED [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_context_manager PASSED [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_context_manager_on_failure PASSED [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_is_opened_initial PASSED [ 46%]
+tests/test_ip_camera.py::TestIPCameraSource::test_can_open_twice PASSED  [ 47%]
+tests/test_ip_camera.py::TestIPCameraSource::test_read_after_release PASSED [ 47%]
+tests/test_latency_logger.py::TestLatencyLogger::test_empty_state PASSED [ 47%]
+tests/test_latency_logger.py::TestLatencyLogger::test_record_and_count PASSED [ 47%]
+tests/test_latency_logger.py::TestLatencyLogger::test_p50_linear_interpolation PASSED [ 47%]
+tests/test_latency_logger.py::TestLatencyLogger::test_p95_linear_interpolation PASSED [ 48%]
+tests/test_latency_logger.py::TestLatencyLogger::test_p50_odd_count_median PASSED [ 48%]
+tests/test_latency_logger.py::TestLatencyLogger::test_average PASSED     [ 48%]
+tests/test_latency_logger.py::TestLatencyLogger::test_reset PASSED       [ 48%]
+tests/test_latency_logger.py::TestLatencyLogger::test_rolling_window_bounded PASSED [ 48%]
+tests/test_latency_logger.py::TestLatencyLogger::test_minimum_window_floor PASSED [ 49%]
+tests/test_latency_logger.py::TestLatencyLogger::test_stats_dict_shape PASSED [ 49%]
+tests/test_latency_logger.py::TestLatencyLogger::test_thread_safety PASSED [ 49%]
+tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_get_with_meta_timestamp_after_put PASSED [ 49%]
+tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_latency_is_time_since_put PASSED [ 49%]
+tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_no_timestamp_when_empty PASSED [ 50%]
+tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_sampler_skips_when_no_timestamp PASSED [ 50%]
+tests/test_liveness_detector.py::TestLivenessResult::test_creation PASSED [ 50%]
+tests/test_liveness_detector.py::TestLivenessResult::test_repr PASSED    [ 50%]
+tests/test_liveness_detector.py::TestLivenessResult::test_fail_result PASSED [ 50%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_texture_real_face PASSED [ 51%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_texture_uniform PASSED [ 51%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_texture_small_face PASSED [ 51%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_blink_initial_state PASSED [ 51%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_blink_cycle_detected PASSED [ 51%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_ear_computation_valid PASSED [ 52%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_ear_zero_eye_distance PASSED [ 52%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_motion_identical_frames PASSED [ 52%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_motion_different_frames PASSED [ 52%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_motion_small_roi PASSED [ 52%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_screen_detected PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_screen_not_detected PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_screen_small_image PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_empty PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_with_landmarks PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_without_landmarks PASSED [ 53%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_reset_clears_state PASSED [ 54%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_register_blink PASSED [ 54%]
+tests/test_liveness_detector.py::TestLivenessDetector::test_multiple_blinks PASSED [ 54%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_default_construction PASSED [ 54%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_custom_url_construction PASSED [ 54%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_standard PASSED [ 55%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_without_video PASSED [ 55%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_without_video_path PASSED [ 55%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_name PASSED     [ 55%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_source_type PASSED [ 55%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_success PASSED [ 56%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_http_failure PASSED [ 56%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_connection_refused PASSED [ 56%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_video_stream_failure PASSED [ 56%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_success PASSED [ 56%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_failure PASSED [ 57%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_before_open PASSED [ 57%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_release PASSED  [ 57%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_set_resolution PASSED [ 57%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_get_resolution_before_open PASSED [ 57%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_get_resolution_after_open PASSED [ 58%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_info_format PASSED [ 58%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_info_before_open PASSED [ 58%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_context_manager PASSED [ 58%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_context_manager_on_failure PASSED [ 58%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_is_opened_initial PASSED [ 59%]
+tests/test_phone_cameras.py::TestAndroidWiFiSource::test_can_open_twice PASSED [ 59%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_default_construction PASSED [ 59%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_custom_url_construction PASSED [ 59%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_name PASSED      [ 59%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_source_type PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_success PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_failure PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_failure_exception PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_success PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_failure PASSED [ 60%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_before_open PASSED [ 61%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_release PASSED   [ 61%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_set_resolution PASSED [ 61%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_get_resolution_before_open PASSED [ 61%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_get_resolution_after_open PASSED [ 61%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_info_format PASSED [ 62%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_info_before_open PASSED [ 62%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_context_manager PASSED [ 62%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_context_manager_on_failure PASSED [ 62%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_is_opened_initial PASSED [ 62%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_can_open_twice PASSED [ 63%]
+tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_after_release PASSED [ 63%]
+tests/test_repair.py::TestLifecycle::test_initial_state PASSED           [ 63%]
+tests/test_repair.py::TestLifecycle::test_start_success PASSED           [ 63%]
+tests/test_repair.py::TestLifecycle::test_start_fails_when_create_returns_none PASSED [ 63%]
+tests/test_repair.py::TestLifecycle::test_start_fails_when_open_fails PASSED [ 64%]
+tests/test_repair.py::TestLifecycle::test_stop_releases_camera PASSED    [ 64%]
+tests/test_repair.py::TestLifecycle::test_stop_without_start PASSED      [ 64%]
+tests/test_repair.py::TestLifecycle::test_start_stop_start_cycle PASSED  [ 64%]
+tests/test_repair.py::TestLifecycle::test_stop_clears_results PASSED     [ 64%]
+tests/test_repair.py::TestOverlays::test_no_results PASSED               [ 65%]
+tests/test_repair.py::TestOverlays::test_none_frame PASSED               [ 65%]
+tests/test_repair.py::TestOverlays::test_accept_green PASSED             [ 65%]
+tests/test_repair.py::TestOverlays::test_spoof_red PASSED                [ 65%]
+tests/test_repair.py::TestOverlays::test_borderline_yellow PASSED        [ 65%]
+tests/test_repair.py::TestOverlays::test_unknown_grey PASSED             [ 66%]
+tests/test_repair.py::TestOverlays::test_already_present PASSED          [ 66%]
+tests/test_repair.py::TestOverlays::test_present_not_yet_marked PASSED   [ 66%]
+tests/test_repair.py::TestOverlays::test_multiple_results PASSED         [ 66%]
+tests/test_repair.py::TestOverlays::test_does_not_mutate_original PASSED [ 66%]
+tests/test_repair.py::TestOverlays::test_bbox_out_of_bounds PASSED       [ 66%]
+tests/test_repair.py::TestOverlays::test_missing_bbox PASSED             [ 67%]
+tests/test_repair.py::TestOverlays::test_malformed_bbox PASSED           [ 67%]
+tests/test_repair.py::TestOverlays::test_accept_with_id PASSED           [ 67%]
+tests/test_repair.py::TestOverlays::test_accept_without_id PASSED        [ 67%]
+tests/test_repair.py::TestDisconnect::test_disconnect_changes_status PASSED [ 67%]
+tests/test_repair.py::TestDisconnect::test_no_crash_after_disconnect PASSED [ 68%]
+tests/test_repair.py::TestThreadSafety::test_latest_thread_safe PASSED   [ 68%]
+tests/test_repair.py::TestThreadSafety::test_properties_thread_safe PASSED [ 68%]
+tests/test_repair.py::TestAttendanceDedup::test_first_call_returns_true PASSED [ 68%]
+tests/test_repair.py::TestAttendanceDedup::test_second_call_returns_false PASSED [ 68%]
+tests/test_repair.py::TestAttendanceDedup::test_different_names_independent PASSED [ 69%]
+tests/test_repair.py::TestAttendanceDedup::test_no_employee_id_skips PASSED [ 69%]
+tests/test_repair.py::TestAttendanceDedup::test_session_cache_on_db_already_marked PASSED [ 69%]
+tests/test_repair.py::TestAttendanceDedup::test_no_db_call_when_in_session PASSED [ 69%]
+tests/test_repair.py::TestAttendanceDedup::test_cooldown_prevents_repeat_track PASSED [ 69%]
+tests/test_repair.py::TestResultDictStructure::test_accept_result_has_attendance_marked PASSED [ 70%]
+tests/test_repair.py::TestResultDictStructure::test_accept_result_has_track_id PASSED [ 70%]
+tests/test_repair.py::TestResultDictStructure::test_accept_result_has_emp_id_and_name PASSED [ 70%]
+tests/test_repair.py::TestResultDictStructure::test_spoof_result_has_all_fields PASSED [ 70%]
+tests/test_repair.py::TestResultDictStructure::test_borderline_result_has_all_fields PASSED [ 70%]
+tests/test_repair.py::TestResultDictStructure::test_low_confidence_result_has_unknown_fields PASSED [ 71%]
+tests/test_repair.py::TestResultDictStructure::test_result_has_all_required_keys PASSED [ 71%]
+tests/test_repair.py::TestUnknownFaceCooldown::test_first_call_saves PASSED [ 71%]
+tests/test_repair.py::TestUnknownFaceCooldown::test_immediate_second_call_skipped PASSED [ 71%]
+tests/test_repair.py::TestUnknownFaceCooldown::test_after_cooldown_expired_saves_again PASSED [ 71%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_employee_calls_faiss_remove_by_name PASSED [ 72%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_handles_faiss_error_gracefully PASSED [ 72%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_non_existent_returns_false PASSED [ 72%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_calls_remove_by_name PASSED [ 72%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_falls_back_to_employee_id PASSED [ 72%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_no_fallback_when_found PASSED [ 73%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_handles_error_gracefully PASSED [ 73%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_update_renames_faiss_when_name_changes PASSED [ 73%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_update_does_not_rename_faiss_when_name_unchanged PASSED [ 73%]
+tests/test_repair.py::TestEmployeeServiceIntegration::test_update_faiss_rename_error_is_graceful PASSED [ 73%]
+tests/test_repair.py::TestFAISSRemove::test_remove_by_name_returns_true PASSED [ 73%]
+tests/test_repair.py::TestFAISSRemove::test_remove_by_name_returns_false_if_not_found PASSED [ 74%]
+tests/test_repair.py::TestFAISSRemove::test_remove_by_name_reduces_count PASSED [ 74%]
+tests/test_repair.py::TestFAISSRemove::test_remove_by_name_preserves_others PASSED [ 74%]
+tests/test_repair.py::TestFAISSRemove::test_remove_by_name_removes_all_entries PASSED [ 74%]
+tests/test_repair.py::TestFAISSRemove::test_search_after_remove PASSED   [ 74%]
+tests/test_repair.py::TestFAISSRemove::test_rename_returns_true PASSED   [ 75%]
+tests/test_repair.py::TestFAISSRemove::test_rename_not_found_returns_false PASSED [ 75%]
+tests/test_repair.py::TestFAISSRemove::test_rename_empty_new_name_returns_false PASSED [ 75%]
+tests/test_repair.py::TestFAISSRemove::test_rename_updates_metadata_and_preserves_count PASSED [ 75%]
+tests/test_repair.py::TestFAISSRemove::test_rename_all_entries PASSED    [ 75%]
+tests/test_repair.py::TestFAISSRemove::test_search_after_rename PASSED   [ 76%]
+tests/test_repair.py::TestEmployeeLookup::test_get_by_name_finds_employee PASSED [ 76%]
+tests/test_repair.py::TestEmployeeLookup::test_get_by_name_case_insensitive PASSED [ 76%]
+tests/test_repair.py::TestEmployeeLookup::test_get_by_employee_id_finds_by_id PASSED [ 76%]
+tests/test_repair.py::TestEmployeeLookup::test_get_by_name_returns_none_for_missing PASSED [ 76%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[01_Dashboard.py-None-expected_symbols0] PASSED [ 77%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[02_Employees.py-None-expected_symbols1] PASSED [ 77%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[03_Enroll.py-None-expected_symbols2] PASSED [ 77%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[05_Attendance.py-webrtc-expected_symbols3] PASSED [ 77%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[06_Unknown.py-None-expected_symbols4] PASSED [ 77%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[07_Analytics.py-None-expected_symbols5] PASSED [ 78%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[08_Settings.py-None-expected_symbols6] PASSED [ 78%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[09_Health.py-None-expected_symbols7] PASSED [ 78%]
+tests/test_repair.py::TestDashboardPageImports::test_page_imports[10_About.py-None-expected_symbols8] PASSED [ 78%]
+tests/test_repair.py::TestCameraOptions::test_pc_camera_maps_to_webcam PASSED [ 78%]
+tests/test_repair.py::TestCameraOptions::test_usb_camera_maps_to_usb_auto PASSED [ 79%]
+tests/test_repair.py::TestCameraOptions::test_android_maps_to_android_wifi PASSED [ 79%]
+tests/test_repair.py::TestCameraOptions::test_iphone_maps_to_iphone_wifi PASSED [ 79%]
+tests/test_repair.py::TestCameraOptions::test_ip_camera_maps_to_ip_camera PASSED [ 79%]
+tests/test_repair.py::TestCameraOptions::test_all_five_camera_options_present PASSED [ 79%]
+tests/test_repair.py::TestCameraOptions::test_no_unknown_camera_types PASSED [ 80%]
+tests/test_repair.py::TestCameraOptions::test_phone_connection_options PASSED [ 80%]
+tests/test_repair.py::TestCameraOptions::test_pc_camera_is_first_option PASSED [ 80%]
+tests/test_repair.py::TestScanLocalCameras::test_detects_one_camera PASSED [ 80%]
+tests/test_repair.py::TestScanLocalCameras::test_no_cameras_detected PASSED [ 80%]
+tests/test_repair.py::TestScanLocalCameras::test_some_cameras_detect PASSED [ 80%]
+tests/test_repair.py::TestScanLocalCameras::test_custom_max_devices PASSED [ 81%]
+tests/test_repair.py::TestScanLocalCameras::test_read_failure_still_reports PASSED [ 81%]
+tests/test_repair.py::TestScanLocalCameras::test_exception_during_open_skipped PASSED [ 81%]
+tests/test_repair.py::TestScanLocalCameras::test_all_cameras_opened PASSED [ 81%]
+tests/test_repair.py::TestScanLocalCameras::test_returned_dict_has_required_fields PASSED [ 81%]
+tests/test_repair.py::TestRenderCameraConfig::test_webcam_no_cache_defaults_to_device_0 PASSED [ 82%]
+tests/test_repair.py::TestRenderCameraConfig::test_webcam_single_cache_uses_that_index PASSED [ 82%]
+tests/test_repair.py::TestRenderCameraConfig::test_webcam_multi_cache_shows_selectbox PASSED [ 82%]
+tests/test_repair.py::TestRenderCameraConfig::test_webcam_selectbox_first_camera_returns_index_0 PASSED [ 82%]
+tests/test_repair.py::TestRenderCameraConfig::test_usb_auto_returns_empty_config PASSED [ 82%]
+tests/test_repair.py::TestRenderCameraConfig::test_android_wifi_has_url PASSED [ 83%]
+tests/test_repair.py::TestRenderCameraConfig::test_android_usb_has_device_id PASSED [ 83%]
+tests/test_repair.py::TestRenderCameraConfig::test_iphone_wifi_has_url PASSED [ 83%]
+tests/test_repair.py::TestRenderCameraConfig::test_iphone_usb_has_device_id PASSED [ 83%]
+tests/test_repair.py::TestRenderCameraConfig::test_ip_camera_has_url PASSED [ 83%]
+tests/test_repair.py::TestRenderCameraConfig::test_ip_camera_has_username_and_password PASSED [ 84%]
+tests/test_repair.py::TestFullRegression::test_enroll_then_delete_syncs_faiss PASSED [ 84%]
+tests/test_repair.py::TestFullRegression::test_unknown_face_does_not_flood_disk PASSED [ 84%]
+tests/test_repository.py::TestEmployeeRepo::test_create_employee PASSED  [ 84%]
+tests/test_repository.py::TestEmployeeRepo::test_get_by_id PASSED        [ 84%]
+tests/test_repository.py::TestEmployeeRepo::test_get_by_id_not_found PASSED [ 85%]
+tests/test_repository.py::TestEmployeeRepo::test_get_by_employee_id PASSED [ 85%]
+tests/test_repository.py::TestEmployeeRepo::test_get_by_employee_id_not_found PASSED [ 85%]
+tests/test_repository.py::TestEmployeeRepo::test_get_all_empty PASSED    [ 85%]
+tests/test_repository.py::TestEmployeeRepo::test_get_all_multiple PASSED [ 85%]
+tests/test_repository.py::TestEmployeeRepo::test_search_by_name PASSED   [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_search_by_employee_id PASSED [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_search_by_department PASSED [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_search_no_results PASSED [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_search_case_insensitive PASSED [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_delete_existing PASSED  [ 86%]
+tests/test_repository.py::TestEmployeeRepo::test_delete_not_found PASSED [ 87%]
+tests/test_repository.py::TestEmployeeRepo::test_count PASSED            [ 87%]
+tests/test_repository.py::TestCameraRepo::test_create_camera PASSED      [ 87%]
+tests/test_repository.py::TestCameraRepo::test_get_all PASSED            [ 87%]
+tests/test_repository.py::TestCameraRepo::test_get_active PASSED         [ 87%]
+tests/test_repository.py::TestCameraRepo::test_get_by_index PASSED       [ 88%]
+tests/test_repository.py::TestCameraRepo::test_get_by_index_not_found PASSED [ 88%]
+tests/test_repository.py::TestAuditLogRepo::test_create_log PASSED       [ 88%]
+tests/test_repository.py::TestAuditLogRepo::test_get_recent PASSED       [ 88%]
+tests/test_repository.py::TestAuditLogRepo::test_get_by_action PASSED    [ 88%]
+tests/test_repository.py::TestRecognitionLogRepo::test_create_basic PASSED [ 89%]
+tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_liveness_confidence PASSED [ 89%]
+tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_is_spoof PASSED [ 89%]
+tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_track_id PASSED [ 89%]
+tests/test_repository.py::TestRecognitionLogRepo::test_create_all_amfr_fields_together PASSED [ 89%]
+tests/test_repository_pagination.py::test_student_repo_search_paginates PASSED [ 90%]
+tests/test_repository_pagination.py::test_employee_repo_search_paginated PASSED [ 90%]
+tests/test_repository_pagination.py::test_attendance_repo_statistics_and_limits PASSED [ 90%]
+tests/test_tracking.py::TestTrackState::test_initial_state PASSED        [ 90%]
+tests/test_tracking.py::TestTrackState::test_avg_arcface_empty PASSED    [ 90%]
+tests/test_tracking.py::TestTrackState::test_avg_arcface_with_values PASSED [ 91%]
+tests/test_tracking.py::TestTrackState::test_identity_stability_zero PASSED [ 91%]
+tests/test_tracking.py::TestTrackState::test_identity_stability_half PASSED [ 91%]
+tests/test_tracking.py::TestTrackState::test_repr PASSED                 [ 91%]
+tests/test_tracking.py::TestMultiFrameTracker::test_iou_identical PASSED [ 91%]
+tests/test_tracking.py::TestMultiFrameTracker::test_iou_no_overlap PASSED [ 92%]
+tests/test_tracking.py::TestMultiFrameTracker::test_iou_partial PASSED   [ 92%]
+tests/test_tracking.py::TestMultiFrameTracker::test_iou_zero_area PASSED [ 92%]
+tests/test_tracking.py::TestMultiFrameTracker::test_greedy_basic PASSED  [ 92%]
+tests/test_tracking.py::TestMultiFrameTracker::test_greedy_empty PASSED  [ 92%]
+tests/test_tracking.py::TestMultiFrameTracker::test_greedy_no_match PASSED [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_greedy_uneven PASSED [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_first_frame PASSED   [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_track_identity_assigned PASSED [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_disappeared_then_pruned PASSED [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_reappear_after_disappear PASSED [ 93%]
+tests/test_tracking.py::TestMultiFrameTracker::test_score_accumulation PASSED [ 94%]
+tests/test_tracking.py::TestMultiFrameTracker::test_no_detections_first_frame PASSED [ 94%]
+tests/test_tracking.py::TestMultiFrameTracker::test_no_detections_after_tracks PASSED [ 94%]
+tests/test_tracking.py::TestMultiFrameTracker::test_reset_clears_all PASSED [ 94%]
+tests/test_tracking.py::TestMultiFrameTracker::test_multiple_persons_separate_tracks PASSED [ 94%]
+tests/test_tracking.py::TestMultiFrameTracker::test_identity_switch_penalty PASSED [ 95%]
+tests/test_tracking.py::TestMultiFrameTracker::test_spoof_frame_tracking PASSED [ 95%]
+tests/test_tracking.py::TestMultiFrameTracker::test_attendance_marked PASSED [ 95%]
+tests/test_upload_security.py::TestValidateImageUpload::test_valid_jpeg_passes PASSED [ 95%]
+tests/test_upload_security.py::TestValidateImageUpload::test_valid_png_passes PASSED [ 95%]
+tests/test_upload_security.py::TestValidateImageUpload::test_valid_webp_passes PASSED [ 96%]
+tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_no_path_traversal PASSED [ 96%]
+tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_is_unique PASSED [ 96%]
+tests/test_upload_security.py::TestValidateImageUpload::test_default_allowed_formats PASSED [ 96%]
+tests/test_upload_security.py::TestValidateImageUpload::test_oversized_file_is_rejected PASSED [ 96%]
+tests/test_upload_security.py::TestValidateImageUpload::test_empty_file_is_rejected PASSED [ 97%]
+tests/test_upload_security.py::TestValidateImageUpload::test_text_file_is_rejected PASSED [ 97%]
+tests/test_upload_security.py::TestValidateImageUpload::test_binary_non_image_is_rejected PASSED [ 97%]
+tests/test_upload_security.py::TestValidateImageUpload::test_exe_magic_bytes_are_rejected PASSED [ 97%]
+tests/test_upload_security.py::TestValidateImageUpload::test_renamed_non_image PASSED [ 97%]
+tests/test_upload_security.py::TestValidateImageUpload::test_corrupted_image_is_rejected PASSED [ 98%]
+tests/test_upload_security.py::TestValidateImageUpload::test_truncated_jpeg_is_rejected PASSED [ 98%]
+tests/test_upload_security.py::TestValidateImageUpload::test_oversized_dimensions_rejected PASSED [ 98%]
+tests/test_upload_security.py::TestValidateImageUpload::test_no_extension_provided PASSED [ 98%]
+tests/test_upload_security.py::TestValidateImageUpload::test_unsupported_format_in_allowed_list PASSED [ 98%]
+tests/test_upload_security.py::TestValidateImageUpload::test_empty_allowed_formats_rejects_all PASSED [ 99%]
+tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_path_traversal PASSED [ 99%]
+tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_backslash_paths PASSED [ 99%]
+tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_truncates_long_names PASSED [ 99%]
+tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_handles_normal_name PASSED [ 99%]
+tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_null_bytes PASSED [100%]
+
+============================== warnings summary ===============================
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:64
+  C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:64: PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'
+    prop = Group((name + Suppress("=") + comma_separated(value)) | oneOf(_CONSTANTS))
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+  C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:85: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+  C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_fontconfig_pattern.py:89: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_mathtext.py:45
+  C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\Lib\site-packages\matplotlib\_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+tests/test_repair.py::TestCameraOptions::test_pc_camera_maps_to_webcam
+tests/test_repair.py::TestScanLocalCameras::test_detects_one_camera
+tests/test_repair.py::TestRenderCameraConfig::test_webcam_no_cache_defaults_to_device_0
+  C:\Users\gokul krishana\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================================== PASSES ====================================
+___________ TestBruteForceProtection.test_locked_after_max_attempts ___________
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:14 [WARNING] services.brute_force_protection: Account locked: alice from 192.168.1.1 after 5 failed attempts
+------------------------------ Captured log call ------------------------------
+WARNING  services.brute_force_protection:brute_force_protection.py:170 Account locked: alice from 192.168.1.1 after 5 failed attempts
+____________ TestBruteForceProtection.test_lockout_is_per_username ____________
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:15 [WARNING] services.brute_force_protection: Account locked: alice from 192.168.1.1 after 5 failed attempts
+------------------------------ Captured log call ------------------------------
+WARNING  services.brute_force_protection:brute_force_protection.py:170 Account locked: alice from 192.168.1.1 after 5 failed attempts
+___________ TestBruteForceProtection.test_lockout_info_when_locked ____________
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:24 [WARNING] services.brute_force_protection: Account locked: alice from 192.168.1.1 after 5 failed attempts
+------------------------------ Captured log call ------------------------------
+WARNING  services.brute_force_protection:brute_force_protection.py:170 Account locked: alice from 192.168.1.1 after 5 failed attempts
+_____________ TestBruteForceProtection.test_cleanup_old_attempts ______________
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:26 [INFO] services.brute_force_protection: Cleaned up 1 old login attempts
+------------------------------ Captured log call ------------------------------
+INFO     services.brute_force_protection:brute_force_protection.py:277 Cleaned up 1 old login attempts
+____ TestCrossPlatformCameras.test_webcam_source_open_fallback_to_default _____
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:31 [INFO] camera.webcam: Webcam opened camera #0 via Default
+------------------------------ Captured log call ------------------------------
+INFO     camera.webcam:webcam.py:93 Webcam opened camera #0 via Default
+_____ TestAntiSpoofingFixes.test_liveness_rejects_when_dl_below_threshold _____
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:31 [INFO] app.deep_liveness: Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+------------------------------ Captured log call ------------------------------
+INFO     app.deep_liveness:deep_liveness.py:239 Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+_ TestAntiSpoofingFixes.test_minifasnet_onnx_separates_screen_from_real_photo _
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:32 [INFO] app.deep_liveness: Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+------------------------------ Captured log call ------------------------------
+INFO     app.deep_liveness:deep_liveness.py:239 Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+______ TestAntiSpoofingFixes.test_align_face_does_not_throw_tuple_error _______
+---------------------------- Captured stderr call -----------------------------
+2026-11-12 01:55:32 [INFO] app.deep_liveness: Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+------------------------------ Captured log call ------------------------------
+INFO     app.deep_liveness:deep_liveness.py:239 Deep liveness model loaded: MiniFASNetV2.onnx (1.7 MB)
+______ TestDashboardAuthGate.test_create_initial_admin_and_authenticate _______
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 1bf6aa4e001c, initial_schema
+INFO  [alembic.runtime.migration] Running upgrade 1bf6aa4e001c -> 2a7c9e4f1b3d, add failed login attempts table
+INFO  [alembic.runtime.migration] Running upgrade 2a7c9e4f1b3d -> 9c4d2f6a7b11, add scalability indexes
+INFO  [alembic.runtime.migration] Running upgrade 9c4d2f6a7b11 -> b4e8c1d2f3a0, add attendance idempotency key
+_____ TestDashboardAuthGate.test_require_auth_stops_when_unauthenticated ______
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_______________ TestPostgresMigrations.test_migration_revision ________________
+---------------------------- Captured stdout call -----------------------------
+  ✅ Migration heads: ['b4e8c1d2f3a0']
+__ TestEmployeeServiceIntegration.test_delete_handles_faiss_error_gracefully __
+---------------------------- Captured stderr call -----------------------------
+WARNI [services.employee_service] Failed to remove 'Delete Test 2' from FAISS: FAISS error
+------------------------------ Captured log call ------------------------------
+WARNING  services.employee_service:employee_service.py:241 Failed to remove 'Delete Test 2' from FAISS: FAISS error
+_ TestEmployeeServiceIntegration.test_remove_faiss_embedding_handles_error_gracefully _
+---------------------------- Captured stderr call -----------------------------
+WARNI [services.employee_service] Failed to remove 'X' from FAISS: FAISS error
+------------------------------ Captured log call ------------------------------
+WARNING  services.employee_service:employee_service.py:241 Failed to remove 'X' from FAISS: FAISS error
+__ TestEmployeeServiceIntegration.test_update_faiss_rename_error_is_graceful __
+---------------------------- Captured stderr call -----------------------------
+WARNI [services.employee_service] Failed to rename 'Old' → 'New' in FAISS: FAISS rename error
+------------------------------ Captured log call ------------------------------
+WARNING  services.employee_service:employee_service.py:163 Failed to rename 'Old' → 'New' in FAISS: FAISS rename error
+_ TestDashboardPageImports.test_page_imports[01_Dashboard.py-None-expected_symbols0] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[02_Employees.py-None-expected_symbols1] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[03_Enroll.py-None-expected_symbols2] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[05_Attendance.py-webrtc-expected_symbols3] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[06_Unknown.py-None-expected_symbols4] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[07_Analytics.py-None-expected_symbols5] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[08_Settings.py-None-expected_symbols6] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[09_Health.py-None-expected_symbols7] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_ TestDashboardPageImports.test_page_imports[10_About.py-None-expected_symbols8] _
+---------------------------- Captured stderr call -----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+_______________ TestCameraOptions.test_pc_camera_maps_to_webcam _______________
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+=========================== short test summary info ===========================
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_mark_attendance
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_mark_attendance_double_prevention
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_mark_multiple_employees
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_today
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_today_empty
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_by_date
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_by_date_no_records
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_by_employee
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_statistics_empty
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_get_statistics
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_csv_dual_write
+PASSED tests/test_attendance_service.py::TestAttendanceService::test_to_dict
+PASSED tests/test_audit_service.py::TestAuditService::test_log_basic
+PASSED tests/test_audit_service.py::TestAuditService::test_log_with_employee_id
+PASSED tests/test_audit_service.py::TestAuditService::test_log_default_operator
+PASSED tests/test_audit_service.py::TestAuditService::test_get_recent_returns_newest_first
+PASSED tests/test_audit_service.py::TestAuditService::test_get_recent_respects_limit
+PASSED tests/test_audit_service.py::TestAuditService::test_get_by_action_empty
+PASSED tests/test_audit_service.py::TestAuditService::test_log_multiple_actions
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_not_locked_initially
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_locked_after_max_attempts
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_is_per_username
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_is_per_ip
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_different_ip_not_affected
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_creates_record
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_multiple_failed_attempts
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_username_lowercase
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_failed_attempt_truncates_user_agent
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_record_successful_login
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_successful_login_resets_lockout
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_clean_user
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_after_failures
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_when_locked
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_lockout_info_after_successful_login
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_cleanup_old_attempts
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_cleanup_keeps_recent
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_empty_username
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_empty_ip
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_special_characters_in_username
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_ipv6_address
+PASSED tests/test_brute_force_protection.py::TestBruteForceProtection::test_warning_at_threshold_minus_one
+PASSED tests/test_camera_owner.py::TestSingleton::test_get_returns_same_instance
+PASSED tests/test_camera_owner.py::TestSingleton::test_new_returns_same_instance
+PASSED tests/test_camera_owner.py::TestSingleton::test_reset_creates_fresh_instance
+PASSED tests/test_camera_owner.py::TestAcquisition::test_can_acquire_when_free
+PASSED tests/test_camera_owner.py::TestAcquisition::test_acquire_returns_true_when_free
+PASSED tests/test_camera_owner.py::TestAcquisition::test_acquire_returns_false_when_owned
+PASSED tests/test_camera_owner.py::TestAcquisition::test_can_acquire_false_when_owned
+PASSED tests/test_camera_owner.py::TestAcquisition::test_is_owned_reflects_state
+PASSED tests/test_camera_owner.py::TestAcquisition::test_state_transitions
+PASSED tests/test_camera_owner.py::TestAcquisition::test_acquire_stores_camera_and_pipeline
+PASSED tests/test_camera_owner.py::TestRelease::test_release_stops_pipeline
+PASSED tests/test_camera_owner.py::TestRelease::test_release_releases_camera
+PASSED tests/test_camera_owner.py::TestRelease::test_release_clears_references
+PASSED tests/test_camera_owner.py::TestRelease::test_release_when_free_is_noop
+PASSED tests/test_camera_owner.py::TestRelease::test_release_handles_errors_gracefully
+PASSED tests/test_camera_owner.py::TestRelease::test_release_uses_pipeline_reference
+PASSED tests/test_camera_owner.py::TestStartStopStart::test_start_stop_start_works
+PASSED tests/test_camera_owner.py::TestStartStopStart::test_previous_camera_released_before_next_acquire
+PASSED tests/test_camera_owner.py::TestStartStopStart::test_no_stale_objects_after_cycle
+PASSED tests/test_camera_owner.py::TestThreadSafety::test_concurrent_acquire_only_one_wins
+PASSED tests/test_camera_owner.py::TestThreadSafety::test_concurrent_release_and_acquire_safe
+PASSED tests/test_cons_fixes.py::TestCrossPlatformCameras::test_preferred_backends_linux
+PASSED tests/test_cons_fixes.py::TestCrossPlatformCameras::test_preferred_backends_macos
+PASSED tests/test_cons_fixes.py::TestCrossPlatformCameras::test_list_webcams_uses_platform_backends_on_linux
+PASSED tests/test_cons_fixes.py::TestCrossPlatformCameras::test_webcam_source_open_fallback_to_default
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_amfr_never_accepts_when_is_live_false
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_amfr_fails_closed_without_face_crop
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_bezel_in_context_crop
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_static_open_eyes_no_blink
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_liveness_rejects_when_dl_below_threshold
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_minifasnet_onnx_separates_screen_from_real_photo
+PASSED tests/test_cons_fixes.py::TestAntiSpoofingFixes::test_align_face_does_not_throw_tuple_error
+PASSED tests/test_cons_fixes.py::TestDashboardAuthGate::test_create_initial_admin_and_authenticate
+PASSED tests/test_cons_fixes.py::TestDashboardAuthGate::test_role_enforcement_blocks_non_admin_from_admin_pages
+PASSED tests/test_cons_fixes.py::TestDashboardAuthGate::test_require_auth_stops_when_unauthenticated
+PASSED tests/test_cons_fixes.py::TestOvernightDateRollover::test_recognition_service_resets_session_cache_on_new_day
+PASSED tests/test_cons_fixes.py::TestConcurrentIdempotentAttendance::test_two_cameras_marking_simultaneously_create_single_record
+PASSED tests/test_cons_fixes.py::TestIdentityDisambiguationAndRename::test_same_name_employees_resolve_and_mark_independently
+PASSED tests/test_cons_fixes.py::TestIdentityDisambiguationAndRename::test_renaming_employee_keeps_identity_resolution_and_leaves_colleague_intact
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_four_concurrent_cameras_idempotent
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_live_detection_clears_session_on_midnight_rollover
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[0.6]
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[1.0]
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_screen_glare_and_moire_spoof_detection_across_lighting[1.3]
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_api_attendance_service_time_window_grace_period
+PASSED tests/test_cons_fixes.py::TestAdditionalProductionVerification::test_api_attendance_response_accepts_nullable_student_id
+PASSED tests/test_deep_liveness.py::TestDeepLivenessResult::test_creation
+PASSED tests/test_deep_liveness.py::TestDeepLivenessResult::test_creation_with_error
+PASSED tests/test_deep_liveness.py::TestDeepLivenessResult::test_repr
+PASSED tests/test_deep_liveness.py::TestDeepLivenessResult::test_zero_confidence
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_init_uses_fallback_when_no_onnx
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_available_property
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_normal_face
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_without_landmarks
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_different_input_sizes
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_preprocess_preserves_color
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_align_face_with_landmarks
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_align_face_identity_preserved
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_live_face_returns_result
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_spoof_print_returns_result
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_spoof_screen_returns_result
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_with_landmarks
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_returns_inference_time
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_empty_image
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_tiny_face
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_extreme_brightness
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_predict_extreme_darkness
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_single_channel_grayscale
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_float_input
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_deterministic_results
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_singleton_returns_same_instance
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_different_images_produce_different_scores
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_live_scores_higher_than_spoof_print
+PASSED tests/test_deep_liveness.py::TestDeepLivenessDetector::test_live_scores_higher_than_spoof_screen
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_liveness_detector_uses_deep_liveness
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_liveness_detector_can_disable_deep_liveness
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_analyze_frame_includes_dl_score
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_analyze_frame_disabled_dl
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_deep_liveness_spoof_reason_included
+PASSED tests/test_deep_liveness.py::TestIntegrationWithLivenessDetector::test_weighted_combination_with_dl
+PASSED tests/test_deep_liveness.py::TestModelFallback::test_fallback_initializes_quickly
+PASSED tests/test_deep_liveness.py::TestModelFallback::test_fallback_is_deterministic
+PASSED tests/test_deep_liveness.py::TestModelFallback::test_fallback_returns_valid_scores
+PASSED tests/test_employee_service.py::TestEmployeeService::test_create_employee
+PASSED tests/test_employee_service.py::TestEmployeeService::test_create_duplicate_raises_error
+PASSED tests/test_employee_service.py::TestEmployeeService::test_get_by_employee_id
+PASSED tests/test_employee_service.py::TestEmployeeService::test_get_by_employee_id_not_found
+PASSED tests/test_employee_service.py::TestEmployeeService::test_get_by_id
+PASSED tests/test_employee_service.py::TestEmployeeService::test_get_all
+PASSED tests/test_employee_service.py::TestEmployeeService::test_get_all_empty
+PASSED tests/test_employee_service.py::TestEmployeeService::test_search
+PASSED tests/test_employee_service.py::TestEmployeeService::test_update_name_and_department
+PASSED tests/test_employee_service.py::TestEmployeeService::test_update_partial_only_changes_provided_fields
+PASSED tests/test_employee_service.py::TestEmployeeService::test_update_not_found_returns_none
+PASSED tests/test_employee_service.py::TestEmployeeService::test_update_with_no_fields_returns_none
+PASSED tests/test_employee_service.py::TestEmployeeService::test_update_logs_audit
+PASSED tests/test_employee_service.py::TestEmployeeService::test_delete_existing
+PASSED tests/test_employee_service.py::TestEmployeeService::test_delete_not_found
+PASSED tests/test_employee_service.py::TestEmployeeService::test_count
+PASSED tests/test_employee_service.py::TestEmployeeService::test_create_logs_audit
+PASSED tests/test_employee_service.py::TestEmployeeService::test_delete_logs_audit
+PASSED tests/test_employee_service.py::TestEmployeeService::test_to_dict
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_init_empty
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_enroll_single
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_enroll_multiple
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_search_exact_match
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_search_empty_index
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_search_threshold_rejects_far_match
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_search_threshold_accepts_close_match
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_persistence_across_reloads
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_clear_removes_all
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_search_k_returns_multiple
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_unique_count
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_status
+PASSED tests/test_enrollment.py::TestFaceEnrollment::test_metadata_format
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_init_default_weights
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_sharp
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_blurry
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_blur_identical_face
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_ideal
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_too_bright
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_brightness_too_dark
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_contrast_high
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_contrast_low
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_ideal
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_tiny
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_large
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_face_size_zero_area
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_perfect
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_zero
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_det_score_clamped
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_frontal
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_profile
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_pose_wrong_shape
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_high_quality
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_low_quality
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_no_landmarks
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_empty_image
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_assess_returns_all_keys
+PASSED tests/test_face_quality.py::TestFaceQualityAssessment::test_score_range
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_empty_get_returns_none
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_put_get_returns_latest
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_stale_frames_dropped
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_get_returns_copy
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_put_none_ignored
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_frame_id_increments
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_timestamps_monotonic
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_get_with_meta
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_clear
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_close_rejects_frames
+PASSED tests/test_frame_buffer.py::TestFrameBufferBasics::test_try_get_requires_new_frame
+PASSED tests/test_frame_buffer.py::TestFrameBufferThreadSafety::test_concurrent_producers_consumers
+PASSED tests/test_frame_buffer.py::TestFrameBufferThreadSafety::test_frame_id_thread_safe
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_empty_get_returns_none
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_put_get_list
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_stale_results_dropped
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_get_returns_copies
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_clear_and_close
+PASSED tests/test_frame_buffer.py::TestResultsBuffer::test_frame_id_and_timestamp
+PASSED tests/test_frame_buffer.py::TestSingletons::test_singletons_exist
+PASSED tests/test_frame_buffer.py::TestSingletons::test_singleton_identity
+PASSED tests/test_frame_buffer.py::TestSingletons::test_singleton_latest_only
+PASSED tests/test_frame_buffer.py::TestSingletons::test_singletons_can_roundtrip
+PASSED tests/test_integration.py::TestPostgresConnection::test_connection
+PASSED tests/test_integration.py::TestPostgresConnection::test_tables_exist
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_write
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_read_today
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_pagination
+PASSED tests/test_integration.py::TestPostgresAttendance::test_attendance_statistics
+PASSED tests/test_integration.py::TestPostgresRecognition::test_recognition_write
+PASSED tests/test_integration.py::TestPostgresRecognition::test_recognition_recent
+PASSED tests/test_integration.py::TestPostgresMigrations::test_migration_revision
+PASSED tests/test_integration.py::TestPostgresReconnect::test_pool_pre_ping
+PASSED tests/test_integration.py::TestRedisConnection::test_connection
+PASSED tests/test_integration.py::TestRedisConnection::test_set_get
+PASSED tests/test_integration.py::TestRedisConnection::test_expiry
+PASSED tests/test_integration.py::TestRedisAttendanceCache::test_attendance_cache
+PASSED tests/test_integration.py::TestRedisCooldown::test_cooldown
+PASSED tests/test_integration.py::TestRedisFailureFallback::test_redis_unavailable_fallback
+PASSED tests/test_integration.py::TestPostgresRedisIntegration::test_attendance_with_redis_cache
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_default_construction
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_custom_url_construction
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_custom_url_construction_http
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_name
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_source_type
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_open_success
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_open_failure
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_open_failure_exception
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_read_success
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_read_failure
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_read_before_open
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_release
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_set_resolution
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_get_resolution_before_open
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_get_resolution_after_open
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_set_resolution_before_open_then_applied
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_info_format
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_info_before_open
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_context_manager
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_context_manager_on_failure
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_is_opened_initial
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_can_open_twice
+PASSED tests/test_ip_camera.py::TestIPCameraSource::test_read_after_release
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_empty_state
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_record_and_count
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_p50_linear_interpolation
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_p95_linear_interpolation
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_p50_odd_count_median
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_average
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_reset
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_rolling_window_bounded
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_minimum_window_floor
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_stats_dict_shape
+PASSED tests/test_latency_logger.py::TestLatencyLogger::test_thread_safety
+PASSED tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_get_with_meta_timestamp_after_put
+PASSED tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_latency_is_time_since_put
+PASSED tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_no_timestamp_when_empty
+PASSED tests/test_latency_logger.py::TestFrameBufferLatencyIntegration::test_sampler_skips_when_no_timestamp
+PASSED tests/test_liveness_detector.py::TestLivenessResult::test_creation
+PASSED tests/test_liveness_detector.py::TestLivenessResult::test_repr
+PASSED tests/test_liveness_detector.py::TestLivenessResult::test_fail_result
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_texture_real_face
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_texture_uniform
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_texture_small_face
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_blink_initial_state
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_blink_cycle_detected
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_ear_computation_valid
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_ear_zero_eye_distance
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_motion_identical_frames
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_motion_different_frames
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_motion_small_roi
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_screen_detected
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_screen_not_detected
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_screen_small_image
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_empty
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_with_landmarks
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_analyze_frame_without_landmarks
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_reset_clears_state
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_register_blink
+PASSED tests/test_liveness_detector.py::TestLivenessDetector::test_multiple_blinks
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_default_construction
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_custom_url_construction
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_standard
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_without_video
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_parse_base_url_without_video_path
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_name
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_source_type
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_success
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_http_failure
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_connection_refused
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_open_video_stream_failure
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_success
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_failure
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_read_before_open
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_release
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_set_resolution
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_get_resolution_before_open
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_get_resolution_after_open
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_info_format
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_info_before_open
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_context_manager
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_context_manager_on_failure
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_is_opened_initial
+PASSED tests/test_phone_cameras.py::TestAndroidWiFiSource::test_can_open_twice
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_default_construction
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_custom_url_construction
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_name
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_source_type
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_success
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_failure
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_open_failure_exception
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_success
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_failure
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_before_open
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_release
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_set_resolution
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_get_resolution_before_open
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_get_resolution_after_open
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_info_format
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_info_before_open
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_context_manager
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_context_manager_on_failure
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_is_opened_initial
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_can_open_twice
+PASSED tests/test_phone_cameras.py::TestiPhoneWiFiSource::test_read_after_release
+PASSED tests/test_repair.py::TestLifecycle::test_initial_state
+PASSED tests/test_repair.py::TestLifecycle::test_start_success
+PASSED tests/test_repair.py::TestLifecycle::test_start_fails_when_create_returns_none
+PASSED tests/test_repair.py::TestLifecycle::test_start_fails_when_open_fails
+PASSED tests/test_repair.py::TestLifecycle::test_stop_releases_camera
+PASSED tests/test_repair.py::TestLifecycle::test_stop_without_start
+PASSED tests/test_repair.py::TestLifecycle::test_start_stop_start_cycle
+PASSED tests/test_repair.py::TestLifecycle::test_stop_clears_results
+PASSED tests/test_repair.py::TestOverlays::test_no_results
+PASSED tests/test_repair.py::TestOverlays::test_none_frame
+PASSED tests/test_repair.py::TestOverlays::test_accept_green
+PASSED tests/test_repair.py::TestOverlays::test_spoof_red
+PASSED tests/test_repair.py::TestOverlays::test_borderline_yellow
+PASSED tests/test_repair.py::TestOverlays::test_unknown_grey
+PASSED tests/test_repair.py::TestOverlays::test_already_present
+PASSED tests/test_repair.py::TestOverlays::test_present_not_yet_marked
+PASSED tests/test_repair.py::TestOverlays::test_multiple_results
+PASSED tests/test_repair.py::TestOverlays::test_does_not_mutate_original
+PASSED tests/test_repair.py::TestOverlays::test_bbox_out_of_bounds
+PASSED tests/test_repair.py::TestOverlays::test_missing_bbox
+PASSED tests/test_repair.py::TestOverlays::test_malformed_bbox
+PASSED tests/test_repair.py::TestOverlays::test_accept_with_id
+PASSED tests/test_repair.py::TestOverlays::test_accept_without_id
+PASSED tests/test_repair.py::TestDisconnect::test_disconnect_changes_status
+PASSED tests/test_repair.py::TestDisconnect::test_no_crash_after_disconnect
+PASSED tests/test_repair.py::TestThreadSafety::test_latest_thread_safe
+PASSED tests/test_repair.py::TestThreadSafety::test_properties_thread_safe
+PASSED tests/test_repair.py::TestAttendanceDedup::test_first_call_returns_true
+PASSED tests/test_repair.py::TestAttendanceDedup::test_second_call_returns_false
+PASSED tests/test_repair.py::TestAttendanceDedup::test_different_names_independent
+PASSED tests/test_repair.py::TestAttendanceDedup::test_no_employee_id_skips
+PASSED tests/test_repair.py::TestAttendanceDedup::test_session_cache_on_db_already_marked
+PASSED tests/test_repair.py::TestAttendanceDedup::test_no_db_call_when_in_session
+PASSED tests/test_repair.py::TestAttendanceDedup::test_cooldown_prevents_repeat_track
+PASSED tests/test_repair.py::TestResultDictStructure::test_accept_result_has_attendance_marked
+PASSED tests/test_repair.py::TestResultDictStructure::test_accept_result_has_track_id
+PASSED tests/test_repair.py::TestResultDictStructure::test_accept_result_has_emp_id_and_name
+PASSED tests/test_repair.py::TestResultDictStructure::test_spoof_result_has_all_fields
+PASSED tests/test_repair.py::TestResultDictStructure::test_borderline_result_has_all_fields
+PASSED tests/test_repair.py::TestResultDictStructure::test_low_confidence_result_has_unknown_fields
+PASSED tests/test_repair.py::TestResultDictStructure::test_result_has_all_required_keys
+PASSED tests/test_repair.py::TestUnknownFaceCooldown::test_first_call_saves
+PASSED tests/test_repair.py::TestUnknownFaceCooldown::test_immediate_second_call_skipped
+PASSED tests/test_repair.py::TestUnknownFaceCooldown::test_after_cooldown_expired_saves_again
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_employee_calls_faiss_remove_by_name
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_handles_faiss_error_gracefully
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_delete_non_existent_returns_false
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_calls_remove_by_name
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_falls_back_to_employee_id
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_no_fallback_when_found
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_remove_faiss_embedding_handles_error_gracefully
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_update_renames_faiss_when_name_changes
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_update_does_not_rename_faiss_when_name_unchanged
+PASSED tests/test_repair.py::TestEmployeeServiceIntegration::test_update_faiss_rename_error_is_graceful
+PASSED tests/test_repair.py::TestFAISSRemove::test_remove_by_name_returns_true
+PASSED tests/test_repair.py::TestFAISSRemove::test_remove_by_name_returns_false_if_not_found
+PASSED tests/test_repair.py::TestFAISSRemove::test_remove_by_name_reduces_count
+PASSED tests/test_repair.py::TestFAISSRemove::test_remove_by_name_preserves_others
+PASSED tests/test_repair.py::TestFAISSRemove::test_remove_by_name_removes_all_entries
+PASSED tests/test_repair.py::TestFAISSRemove::test_search_after_remove
+PASSED tests/test_repair.py::TestFAISSRemove::test_rename_returns_true
+PASSED tests/test_repair.py::TestFAISSRemove::test_rename_not_found_returns_false
+PASSED tests/test_repair.py::TestFAISSRemove::test_rename_empty_new_name_returns_false
+PASSED tests/test_repair.py::TestFAISSRemove::test_rename_updates_metadata_and_preserves_count
+PASSED tests/test_repair.py::TestFAISSRemove::test_rename_all_entries
+PASSED tests/test_repair.py::TestFAISSRemove::test_search_after_rename
+PASSED tests/test_repair.py::TestEmployeeLookup::test_get_by_name_finds_employee
+PASSED tests/test_repair.py::TestEmployeeLookup::test_get_by_name_case_insensitive
+PASSED tests/test_repair.py::TestEmployeeLookup::test_get_by_employee_id_finds_by_id
+PASSED tests/test_repair.py::TestEmployeeLookup::test_get_by_name_returns_none_for_missing
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[01_Dashboard.py-None-expected_symbols0]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[02_Employees.py-None-expected_symbols1]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[03_Enroll.py-None-expected_symbols2]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[05_Attendance.py-webrtc-expected_symbols3]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[06_Unknown.py-None-expected_symbols4]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[07_Analytics.py-None-expected_symbols5]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[08_Settings.py-None-expected_symbols6]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[09_Health.py-None-expected_symbols7]
+PASSED tests/test_repair.py::TestDashboardPageImports::test_page_imports[10_About.py-None-expected_symbols8]
+PASSED tests/test_repair.py::TestCameraOptions::test_pc_camera_maps_to_webcam
+PASSED tests/test_repair.py::TestCameraOptions::test_usb_camera_maps_to_usb_auto
+PASSED tests/test_repair.py::TestCameraOptions::test_android_maps_to_android_wifi
+PASSED tests/test_repair.py::TestCameraOptions::test_iphone_maps_to_iphone_wifi
+PASSED tests/test_repair.py::TestCameraOptions::test_ip_camera_maps_to_ip_camera
+PASSED tests/test_repair.py::TestCameraOptions::test_all_five_camera_options_present
+PASSED tests/test_repair.py::TestCameraOptions::test_no_unknown_camera_types
+PASSED tests/test_repair.py::TestCameraOptions::test_phone_connection_options
+PASSED tests/test_repair.py::TestCameraOptions::test_pc_camera_is_first_option
+PASSED tests/test_repair.py::TestScanLocalCameras::test_detects_one_camera
+PASSED tests/test_repair.py::TestScanLocalCameras::test_no_cameras_detected
+PASSED tests/test_repair.py::TestScanLocalCameras::test_some_cameras_detect
+PASSED tests/test_repair.py::TestScanLocalCameras::test_custom_max_devices
+PASSED tests/test_repair.py::TestScanLocalCameras::test_read_failure_still_reports
+PASSED tests/test_repair.py::TestScanLocalCameras::test_exception_during_open_skipped
+PASSED tests/test_repair.py::TestScanLocalCameras::test_all_cameras_opened
+PASSED tests/test_repair.py::TestScanLocalCameras::test_returned_dict_has_required_fields
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_webcam_no_cache_defaults_to_device_0
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_webcam_single_cache_uses_that_index
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_webcam_multi_cache_shows_selectbox
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_webcam_selectbox_first_camera_returns_index_0
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_usb_auto_returns_empty_config
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_android_wifi_has_url
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_android_usb_has_device_id
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_iphone_wifi_has_url
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_iphone_usb_has_device_id
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_ip_camera_has_url
+PASSED tests/test_repair.py::TestRenderCameraConfig::test_ip_camera_has_username_and_password
+PASSED tests/test_repair.py::TestFullRegression::test_enroll_then_delete_syncs_faiss
+PASSED tests/test_repair.py::TestFullRegression::test_unknown_face_does_not_flood_disk
+PASSED tests/test_repository.py::TestEmployeeRepo::test_create_employee
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_by_id
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_by_id_not_found
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_by_employee_id
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_by_employee_id_not_found
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_all_empty
+PASSED tests/test_repository.py::TestEmployeeRepo::test_get_all_multiple
+PASSED tests/test_repository.py::TestEmployeeRepo::test_search_by_name
+PASSED tests/test_repository.py::TestEmployeeRepo::test_search_by_employee_id
+PASSED tests/test_repository.py::TestEmployeeRepo::test_search_by_department
+PASSED tests/test_repository.py::TestEmployeeRepo::test_search_no_results
+PASSED tests/test_repository.py::TestEmployeeRepo::test_search_case_insensitive
+PASSED tests/test_repository.py::TestEmployeeRepo::test_delete_existing
+PASSED tests/test_repository.py::TestEmployeeRepo::test_delete_not_found
+PASSED tests/test_repository.py::TestEmployeeRepo::test_count
+PASSED tests/test_repository.py::TestCameraRepo::test_create_camera
+PASSED tests/test_repository.py::TestCameraRepo::test_get_all
+PASSED tests/test_repository.py::TestCameraRepo::test_get_active
+PASSED tests/test_repository.py::TestCameraRepo::test_get_by_index
+PASSED tests/test_repository.py::TestCameraRepo::test_get_by_index_not_found
+PASSED tests/test_repository.py::TestAuditLogRepo::test_create_log
+PASSED tests/test_repository.py::TestAuditLogRepo::test_get_recent
+PASSED tests/test_repository.py::TestAuditLogRepo::test_get_by_action
+PASSED tests/test_repository.py::TestRecognitionLogRepo::test_create_basic
+PASSED tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_liveness_confidence
+PASSED tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_is_spoof
+PASSED tests/test_repository.py::TestRecognitionLogRepo::test_create_persists_track_id
+PASSED tests/test_repository.py::TestRecognitionLogRepo::test_create_all_amfr_fields_together
+PASSED tests/test_repository_pagination.py::test_student_repo_search_paginates
+PASSED tests/test_repository_pagination.py::test_employee_repo_search_paginated
+PASSED tests/test_repository_pagination.py::test_attendance_repo_statistics_and_limits
+PASSED tests/test_tracking.py::TestTrackState::test_initial_state
+PASSED tests/test_tracking.py::TestTrackState::test_avg_arcface_empty
+PASSED tests/test_tracking.py::TestTrackState::test_avg_arcface_with_values
+PASSED tests/test_tracking.py::TestTrackState::test_identity_stability_zero
+PASSED tests/test_tracking.py::TestTrackState::test_identity_stability_half
+PASSED tests/test_tracking.py::TestTrackState::test_repr
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_iou_identical
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_iou_no_overlap
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_iou_partial
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_iou_zero_area
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_greedy_basic
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_greedy_empty
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_greedy_no_match
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_greedy_uneven
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_first_frame
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_track_identity_assigned
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_disappeared_then_pruned
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_reappear_after_disappear
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_score_accumulation
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_no_detections_first_frame
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_no_detections_after_tracks
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_reset_clears_all
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_multiple_persons_separate_tracks
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_identity_switch_penalty
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_spoof_frame_tracking
+PASSED tests/test_tracking.py::TestMultiFrameTracker::test_attendance_marked
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_jpeg_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_png_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_valid_webp_passes
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_no_path_traversal
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_generated_filename_is_unique
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_default_allowed_formats
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_oversized_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_empty_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_text_file_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_binary_non_image_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_exe_magic_bytes_are_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_renamed_non_image
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_corrupted_image_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_truncated_jpeg_is_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_oversized_dimensions_rejected
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_no_extension_provided
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_unsupported_format_in_allowed_list
+PASSED tests/test_upload_security.py::TestValidateImageUpload::test_empty_allowed_formats_rejects_all
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_path_traversal
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_backslash_paths
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_truncates_long_names
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_handles_normal_name
+PASSED tests/test_upload_security.py::TestSanitizeFilename::test_sanitize_removes_null_bytes
+================ 515 passed, 17 warnings in 119.17s (0:01:59) =================

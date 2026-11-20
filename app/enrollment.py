@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import faiss
@@ -45,17 +45,15 @@ class FaceEnrollment:
         dimension: Embedding dimensionality (512 for ArcFace).
     """
 
-    def __init__(
-        self, index_path: str = cfg.FAISS_INDEX_PATH, metadata_path: str = cfg.METADATA_PATH
-    ) -> None:
+    def __init__(self, index_path: Optional[str] = None, metadata_path: Optional[str] = None) -> None:
         """Load an existing index or create a new one.
 
         Args:
             index_path: Path to the serialised FAISS index.
             metadata_path: Path to the JSON metadata file.
         """
-        self.index_path = Path(index_path)
-        self.metadata_path = Path(metadata_path)
+        self.index_path = Path(index_path if index_path is not None else cfg.FAISS_INDEX_PATH)
+        self.metadata_path = Path(metadata_path if metadata_path is not None else cfg.METADATA_PATH)
         self.dimension = cfg.EMBEDDING_DIM
 
         # Ensure directories exist
@@ -106,12 +104,16 @@ class FaceEnrollment:
 
     # ── Public API ────────────────────────────────────────────
 
-    def enroll(self, name: str, embedding: np.ndarray) -> bool:
+    def enroll(self, name: str, embedding: np.ndarray, employee_id: Optional[str] = None) -> bool:
         """Add a new face to the database.
 
         Args:
             name: Person's display name.
             embedding: 512‑D float32 embedding vector.
+            employee_id: Unique employee identifier (e.g. ``EMP001``).
+                Stored alongside ``name`` so two people with the same
+                display name remain distinguishable and renames never
+                break identity resolution.
 
         Returns:
             ``True`` on success.
@@ -119,7 +121,10 @@ class FaceEnrollment:
         emb = embedding.reshape(1, -1).astype(np.float32)
         person_id = len(self.metadata)
         self.index.add(emb)
-        self.metadata.append({"name": name, "id": person_id})
+        entry: Dict = {"name": name, "id": person_id}
+        if employee_id:
+            entry["employee_id"] = employee_id
+        self.metadata.append(entry)
         self._save()
         return True
 
@@ -156,7 +161,8 @@ class FaceEnrollment:
                 continue
 
             dist = float(dist)
-            name = self.metadata[idx]["name"]
+            entry = self.metadata[idx]
+            name = entry["name"]
 
             if dist > threshold:
                 continue
@@ -171,13 +177,15 @@ class FaceEnrollment:
             #   dist=1.5  →  31%  (probably different)
             #   dist=2.0  →  20%  (different person)
             confidence = 1.0 / (1.0 + dist * dist)
-            results.append(
-                {
-                    "name": name,
-                    "confidence": round(confidence, 4),
-                    "distance": round(dist, 4),
-                }
-            )
+            match: Dict = {
+                "name": name,
+                "confidence": round(confidence, 4),
+                "distance": round(dist, 4),
+                "faiss_id": int(idx),
+            }
+            if entry.get("employee_id"):
+                match["employee_id"] = entry["employee_id"]
+            results.append(match)
 
         return results
 
@@ -196,67 +204,70 @@ class FaceEnrollment:
         """
         return self.remove_by_name(name)
 
+    def remove_by_employee_id(self, employee_id: str) -> bool:
+        """Remove all embeddings matching a unique ``employee_id``."""
+        return self._remove_where(lambda m: m.get("employee_id") == employee_id, label=employee_id)
+
     def remove_by_name(self, name: str) -> bool:
-        """Remove all embeddings for a given name from the index.
+        """Remove all embeddings for a given name from the index."""
+        return self._remove_where(lambda m: m.get("name") == name, label=name)
 
-        Since FAISS does not support native deletion, this rebuilds
-        the index from scratch keeping only entries that do NOT match
-        *name*.  This is O(N) in the number of embeddings.
-
-        Args:
-            name: The name (employee_id string) to remove.
-
-        Returns:
-            ``True`` if any entries were removed, ``False`` if the
-            name was not found in the metadata.
-        """
-        # Count entries for this name before removal
-        before = sum(1 for m in self.metadata if m["name"] == name)
+    def _remove_where(self, predicate, label: str) -> bool:
+        """Rebuild the FAISS index keeping entries that do NOT match *predicate*."""
+        before = sum(1 for m in self.metadata if predicate(m))
         if before == 0:
             return False
 
-        # Keep only entries that DON'T match this name
-        kept_metadata = [m for m in self.metadata if m["name"] != name]
+        kept_metadata = [m for m in self.metadata if not predicate(m)]
         kept_count = len(kept_metadata)
 
         if kept_count == 0:
-            # Removed everything — clear the index
             self.metadata = []
             self.index = self._create_index()
         else:
-            # Rebuild the index from scratch with frozen embeddings.
-            # Since we don't store raw embeddings, we must reload from
-            # the FAISS index itself. FAISS doesn't support selective
-            # extraction, so we rebuild by searching for each kept ID.
-            #
-            # For HNSW/Flat indexes, we can reconstruct vectors:
             new_index = self._create_index()
-            kept_ids = [i for i, m in enumerate(self.metadata) if m["name"] != name]
+            kept_ids = [i for i, m in enumerate(self.metadata) if not predicate(m)]
 
             if hasattr(self.index, "reconstruct"):
-                # index.reconstruct() works for IndexFlat, IndexHNSW, IndexIVF
                 for kid in kept_ids:
                     vec = self.index.reconstruct(kid)
                     new_index.add(vec.reshape(1, -1))
                 self.index = new_index
             else:
-                # Fallback: clear everything
-                logger = __import__("logging").getLogger(__name__)
                 logger.warning(
                     "FAISS index type %s does not support reconstruction. Clearing all embeddings.",
                     type(self.index).__name__,
                 )
                 self.index = self._create_index()
 
-            # Re-number metadata IDs to match new index positions
+            # Re-number metadata IDs while preserving employee_id and other fields
             self.metadata = []
             for i, old_m in enumerate(kept_metadata):
-                self.metadata.append({"name": old_m["name"], "id": i})
+                item = dict(old_m)
+                item["id"] = i
+                self.metadata.append(item)
 
         self._save()
         removed = before - (len(self.metadata) - kept_count)
-        logger = __import__("logging").getLogger(__name__)
-        logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, name)
+        logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, label)
+        return True
+
+    def rename_by_employee_id(self, employee_id: str, new_name: str) -> bool:
+        """Rename embeddings matching a unique ``employee_id``."""
+        if not new_name or not new_name.strip():
+            return False
+        new_name = new_name.strip()
+        matched = 0
+        for m in self.metadata:
+            if m.get("employee_id") == employee_id:
+                m["name"] = new_name
+                matched += 1
+        if matched == 0:
+            return False
+        self._save()
+        logger.info(
+            "Renamed %d embedding(s) for employee_id '%s' → '%s' in FAISS", matched, employee_id, new_name
+        )
         return True
 
     def rename(self, old_name: str, new_name: str) -> bool:
@@ -375,12 +386,9 @@ class FaceEnrollment:
                     new_index.add(vec.reshape(1, -1))
                     # Only keep metadata if reconstruction succeeded
                     if i < len(self.metadata):
-                        new_metadata.append(
-                            {
-                                "name": self.metadata[i]["name"],
-                                "id": len(new_metadata),
-                            }
-                        )
+                        item = dict(self.metadata[i])
+                        item["id"] = len(new_metadata)
+                        new_metadata.append(item)
                 except Exception as exc:
                     dropped += 1
                     logger.warning("Failed to reconstruct embedding %d: %s", i, exc)

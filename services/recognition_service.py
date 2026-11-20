@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -81,9 +81,10 @@ class RecognitionService:
         self._frame_count = 0
 
         # Session tracking (per-pipeline, not shared)
+        self._session_date: date = date.today()
         self._marked_this_session: set = set()
         self._last_recognised: List[Dict] = []
-        self._cooldown: Dict[str, float] = {}  # name -> last_mark_time
+        self._cooldown: Dict[str, float] = {}  # key -> last_mark_time
 
         # Unknown face save cooldown (prevent flooding disk)
         self._last_unknown_save: float = 0.0
@@ -156,6 +157,7 @@ class RecognitionService:
             contains AMFR decision data.
         """
         self._frame_count += 1
+        self._rollover_session_if_new_day()
 
         # FPS
         now = time.time()
@@ -192,6 +194,7 @@ class RecognitionService:
 
             # Step 2 — RetinaFace detection (detailed face data)
             face = self.recognizer.detect_face(person_crop)
+            face = self._offset_face_to_frame(face, bbox, frame.shape[:2])
             face_data.append(face)
             if face is not None:
                 logger.debug(
@@ -258,27 +261,31 @@ class RecognitionService:
 
             if decision == AMFRDecision.ACCEPT.value:
                 # ── High confidence + live — mark attendance ──
-                # FAISS metadata stores the name used during enrollment.
-                # Use get_by_name() to look up with display name first, then fallback to employee_id.
-                emp = EmployeeService.get_by_name(name)
-                if emp is None:
-                    # Fallback: try employee_id lookup (for legacy data)
-                    emp = EmployeeService.get_by_employee_id(name)
+                emp = self._resolve_employee(
+                    name=name,
+                    employee_id=amfr_detection.get("employee_id"),
+                    faiss_id=amfr_detection.get("faiss_id"),
+                )
                 emp_id = emp.id if emp else None
+                emp_code = emp.employee_id if emp else None
                 emp_name = emp.name if emp else name
                 emp_dept = emp.department if emp else None
 
                 logger.debug(
-                    "  [PIPELINE] Employee lookup: name='%s' → emp_id=%s emp_name='%s'",
+                    "  [PIPELINE] Employee lookup: name='%s' emp_code='%s' → emp_id=%s emp_name='%s'",
                     name,
+                    emp_code,
                     emp_id,
                     emp_name,
                 )
 
+                mark_key = emp_code or name
                 attendance_marked = self._maybe_mark_attendance(
-                    name=name,
+                    name=mark_key,
                     employee_id=emp_id,  # type: ignore[arg-type]
                     confidence=risk_score,
+                    employee_name=emp_name,
+                    employee_code=emp_code,
                 )
                 logger.debug(
                     "  [PIPELINE] Attendance: %s",
@@ -296,7 +303,7 @@ class RecognitionService:
                 results.append(
                     {
                         "bbox": bbox,
-                        "name": name,  # FAISS name (display name or employee_id string)
+                        "name": emp_code or name,
                         "emp_name": emp_name,  # Database display name
                         "emp_id": emp_id,  # Database primary key
                         "department": emp_dept,  # Department for overlay display
@@ -313,10 +320,12 @@ class RecognitionService:
                 )
 
             elif decision == AMFRDecision.BORDERLINE.value:
-                # ── Uncertain — known name but needs more frames ──
-                emp = EmployeeService.get_by_name(name)
-                if emp is None:
-                    emp = EmployeeService.get_by_employee_id(name)
+                # ── Uncertain — known match but needs more frames ──
+                emp = self._resolve_employee(
+                    name=name,
+                    employee_id=amfr_detection.get("employee_id"),
+                    faiss_id=amfr_detection.get("faiss_id"),
+                )
                 emp_id = emp.id if emp else None
                 emp_dept = emp.department if emp else None
                 logger.debug("  [PIPELINE] Employee lookup: name='%s' → emp_id=%s (BORDERLINE)", name, emp_id)
@@ -453,19 +462,100 @@ class RecognitionService:
         Call this when starting a new recognition session (e.g. when
         the user clicks "Reset Session Markers").
         """
+        self._session_date = date.today()
         self._marked_this_session.clear()
         self._cooldown.clear()
         self._frame_count = 0
         self._fps = 0.0
         self.amfr.reset()
 
-    def _maybe_mark_attendance(self, name: str, employee_id: Optional[int], confidence: float) -> bool:
-        """Mark attendance with cooldown to avoid spamming.
+    def _rollover_session_if_new_day(self) -> None:
+        """Clear daily session/cooldown caches when the calendar date changes."""
+        today = date.today()
+        if getattr(self, "_session_date", None) != today:
+            self._marked_this_session.clear()
+            self._cooldown.clear()
+            self._session_date = today
+
+    @staticmethod
+    def _offset_face_to_frame(
+        face: Optional[Dict],
+        person_bbox: Tuple[int, int, int, int],
+        frame_shape: Tuple[int, int],
+        padding: float = 0.15,
+    ) -> Optional[Dict]:
+        """Translate ``detect_face(person_crop)`` bbox/landmarks to full-frame coordinates."""
+        if not isinstance(face, dict):
+            return face
+        try:
+            x1, y1, x2, y2 = person_bbox
+            fh, fw = frame_shape
+            px1 = max(0, x1 - int((x2 - x1) * padding))
+            py1 = max(0, y1 - int((y2 - y1) * padding))
+        except Exception:
+            return face
+
+        out = dict(face)
+        fb = face.get("bbox")
+        if isinstance(fb, (list, tuple)) and len(fb) == 4:
+            out["bbox"] = [
+                max(0, min(fw, int(fb[0]) + px1)),
+                max(0, min(fh, int(fb[1]) + py1)),
+                max(0, min(fw, int(fb[2]) + px1)),
+                max(0, min(fh, int(fb[3]) + py1)),
+            ]
+        lm = face.get("landmarks")
+        if isinstance(lm, (list, tuple)) and len(lm) > 0:
+            out["landmarks"] = [[float(pt[0]) + px1, float(pt[1]) + py1] for pt in lm]
+        return out
+
+    @staticmethod
+    def _resolve_employee(
+        name: str,
+        employee_id: Optional[str] = None,
+        faiss_id: Optional[int] = None,
+    ):
+        """Resolve an employee unambiguously without relying solely on display name."""
+        if employee_id:
+            emp = EmployeeService.get_by_employee_id(employee_id)
+            if emp is not None:
+                return emp
+        if faiss_id is not None:
+            emp = EmployeeService.get_by_faiss_id(faiss_id)
+            if emp is not None:
+                return emp
+        # Legacy FAISS entry without employee_id metadata:
+        # 1) Try exact employee_id match (some legacy enrollments used employee_id as name)
+        emp = EmployeeService.get_by_employee_id(name)
+        if emp is not None:
+            return emp
+        # 2) Fall back to display name ONLY if unambiguous (exactly one match)
+        matches = EmployeeService.get_all_by_name(name)
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            logger.warning(
+                "Ambiguous employee name '%s' matches %d records; skipping attendance until re-enrolled with unique ID",
+                name,
+                len(matches),
+            )
+        return None
+
+    def _maybe_mark_attendance(
+        self,
+        name: str,
+        employee_id: Optional[int],
+        confidence: float,
+        employee_name: Optional[str] = None,
+        employee_code: Optional[str] = None,
+    ) -> bool:
+        """Mark attendance with midnight rollover and cooldown to avoid spamming.
 
         Returns:
             ``True`` if attendance was newly marked,
-            ``False`` if already marked or cooldown active.
+            ``False`` if already marked today or cooldown active.
         """
+        self._rollover_session_if_new_day()
         now = time.time()
         last = self._cooldown.get(name, 0)
         cooldown = getattr(cfg, "COOLDOWN_SECONDS", 60)
@@ -475,7 +565,8 @@ class RecognitionService:
                 result = AttendanceService.mark(
                     employee_id=employee_id,
                     confidence=confidence,
-                    employee_name=name,
+                    employee_name=employee_name or name,
+                    employee_code=employee_code,
                 )
                 if result:
                     self._marked_this_session.add(name)

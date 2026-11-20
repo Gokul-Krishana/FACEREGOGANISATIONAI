@@ -86,7 +86,7 @@ def cmd_enroll(args: argparse.Namespace) -> None:
 
     while True:
         ret, frame = cap.read()
-        if not ret:
+        if not ret or frame is None:
             continue
 
         # Show preview with instructions
@@ -259,17 +259,14 @@ def cmd_debug(args: argparse.Namespace) -> None:
         print(f"  ❌ Could not open {source_type} camera")
 
     # Also do a quick index scan (for diagnostic reference)
-    print("\n  --- Quick index scan (DirectShow) ---")
-    found_indices = []
-    for idx in range(5):
-        test_cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-        if test_cap.isOpened():
-            found_indices.append(idx)
-            test_cap.release()
+    from camera.webcam import list_webcams
+
+    print("\n  --- Quick index scan ---")
+    found_indices = list_webcams(max_devices=5)
     if found_indices:
-        print(f"  Available DirectShow device(s): {found_indices}")
+        print(f"  Available camera device(s): {found_indices}")
     else:
-        print("  No DirectShow cameras found on indices 0-4")
+        print("  No cameras found on indices 0-4")
 
     # YOLO model
     print("\n[4/6] YOLO model:")
@@ -283,8 +280,9 @@ def cmd_debug(args: argparse.Namespace) -> None:
         # Quick test with Lena
         if Path("dataset/lena.jpg").exists():
             img = cv2.imread("dataset/lena.jpg")
-            results = det.detect(img)
-            print(f"  Test detection: {len(results)} person(s) found")
+            if img is not None:
+                results = det.detect(img)
+                print(f"  Test detection: {len(results)} person(s) found")
     else:
         print(f"  [FAIL] Model not found: {cfg.YOLO_MODEL_PATH}")
 
@@ -301,11 +299,12 @@ def cmd_debug(args: argparse.Namespace) -> None:
         # Test with a simple image
         if Path("dataset/lena.jpg").exists():
             img = cv2.imread("dataset/lena.jpg")
-            emb = recognizer.extract_embedding(img)
-            if emb is not None:
-                print(f"  Test embedding: shape={emb.shape}, norm={np.linalg.norm(emb):.2f}")
-            else:
-                print("  [WARN] No face detected in lena.jpg")
+            if img is not None:
+                emb = recognizer.extract_embedding(img)
+                if emb is not None:
+                    print(f"  Test embedding: shape={emb.shape}, norm={np.linalg.norm(emb):.2f}")
+                else:
+                    print("  [WARN] No face detected in lena.jpg")
     except Exception as e:
         print(f"  [FAIL] {e}")
 

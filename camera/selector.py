@@ -29,8 +29,6 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-import cv2
-
 from camera.base import CameraSource
 from camera.webcam import WebcamSource, USBAnySource
 from utils.logging_setup import get_logger
@@ -299,13 +297,10 @@ def get_available_cameras() -> List[Dict]:
     """
     results: List[Dict] = []
 
-    # Check OpenCV webcams
-    available_indices = []
-    for idx in range(5):
-        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-        if cap.isOpened():
-            available_indices.append(idx)
-            cap.release()
+    # Check OpenCV webcams (cross-platform)
+    from camera.webcam import list_webcams
+
+    available_indices = list_webcams(max_devices=5)
 
     results.append(
         {

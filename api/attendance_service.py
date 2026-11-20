@@ -4,7 +4,7 @@ Attendance service with timetable-aware processing.
 
 from __future__ import annotations
 
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -33,7 +33,6 @@ class AttendanceService:
         Returns the matching Timetable entry if found, else None.
         """
         day_of_week = timestamp.weekday()  # 0=Monday, 6=Sunday
-        current_time = timestamp.time()
 
         timetable = (
             session.query(Timetable)
@@ -47,14 +46,12 @@ class AttendanceService:
         if not timetable:
             return None
 
-        start_h, start_m, start_s = map(int, timetable.start_time.split(":"))
-        end_h, end_m, end_s = map(int, timetable.end_time.split(":"))
-
-        start = dt_time(start_h, start_m, start_s)
-        end = dt_time(end_h, end_m, end_s)
-        grace = dt_time(0, AttendanceService.GRACE_PERIOD_MINUTES, 0)
-
-        if start <= current_time <= end + grace:
+        if AttendanceService.is_within_time_window(
+            timestamp,
+            str(timetable.start_time),
+            str(timetable.end_time),
+            grace_minutes=AttendanceService.GRACE_PERIOD_MINUTES,
+        ):
             return timetable
         return None
 
@@ -67,16 +64,15 @@ class AttendanceService:
     ) -> bool:
         """Check if timestamp falls within a time window with grace period."""
 
-        def parse_t(s: str) -> dt_time:
+        def parse_dt(s: str) -> datetime:
             h, m, sec = map(int, s.split(":"))
-            return dt_time(h, m, sec)
+            return datetime.combine(timestamp.date(), dt_time(h, m, sec))
 
-        start = parse_t(start_time)
-        end = parse_t(end_time)
-        grace = dt_time(0, grace_minutes, 0)
-        current = timestamp.time()
+        start_dt = parse_dt(start_time)
+        end_dt = parse_dt(end_time) + timedelta(minutes=grace_minutes)
+        current_dt = datetime.combine(timestamp.date(), timestamp.time())
 
-        return start <= current <= end + grace
+        return start_dt <= current_dt <= end_dt
 
     @staticmethod
     def is_student_enrolled(

@@ -16,7 +16,8 @@ from __future__ import annotations
 import csv
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, List
+import threading
+from typing import Dict, List, Optional
 
 import config.config as cfg
 
@@ -36,33 +37,37 @@ class AttendanceTracker:
         """
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
 
     # ── Public API ────────────────────────────────────────────
 
-    def mark(self, name: str, confidence: float = 1.0) -> bool:
-        """Record attendance for a person **once per day**.
+    def mark(self, name: str, confidence: float = 1.0, employee_id: Optional[str] = None) -> bool:
+        """Record attendance for a person **once per day** (thread-safe).
 
         Args:
-            name: Person's name.
+            name: Person's display name.
             confidence: Recognition confidence score.
+            employee_id: Optional unique identifier used to distinguish
+                people who share the same display name.
 
         Returns:
             ``True`` if the record was added; ``False`` if already
             marked today.
         """
-        today_path = self._today_path()
+        with self._lock:
+            today_path = self._today_path()
 
-        # Avoid duplicates for the same person today
-        if self._is_marked(today_path, name):
-            return False
+            # Avoid duplicates for the same person today
+            if self._is_marked(today_path, name, employee_id=employee_id):
+                return False
 
-        now = datetime.now()
-        with open(today_path, "a", newline="") as f:
-            writer = csv.writer(f)
-            if f.tell() == 0:  # empty file → write header
-                writer.writerow(["name", "timestamp", "confidence"])
-            writer.writerow([name, now.isoformat(), f"{confidence:.4f}"])
-        return True
+            now = datetime.now()
+            with open(today_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                if f.tell() == 0:  # empty file → write header
+                    writer.writerow(["name", "timestamp", "confidence", "employee_id"])
+                writer.writerow([name, now.isoformat(), f"{confidence:.4f}", employee_id or ""])
+            return True
 
     def today(self) -> List[Dict[str, str]]:
         """Return all attendance records for today."""
@@ -109,13 +114,22 @@ class AttendanceTracker:
             reader = csv.DictReader(f)
             return list(reader)
 
-    def _is_marked(self, file_path: Path, name: str) -> bool:
+    def _is_marked(self, file_path: Path, name: str, employee_id: Optional[str] = None) -> bool:
         if not file_path.exists():
             return False
         with open(file_path, "r") as f:
             reader = csv.reader(f)
             next(reader, None)  # skip header
             for row in reader:
-                if row and row[0].strip() == name:
+                if not row:
+                    continue
+                row_emp_id = row[3].strip() if len(row) >= 4 else ""
+                if employee_id and row_emp_id:
+                    if row_emp_id == employee_id:
+                        return True
+                elif not employee_id and row[0].strip() == name:
+                    return True
+                elif employee_id and not row_emp_id and row[0].strip() == name:
+                    # Legacy 3-column CSV row without employee_id
                     return True
         return False

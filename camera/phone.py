@@ -179,17 +179,21 @@ class AndroidUSBSource(CameraSource):
     # ── Lifecycle ─────────────────────────────────────────────────
     def open(self) -> bool:
         """Try USB first (OpenCV device index), then Wi-Fi fallback."""
-        # Try USB mode
-        try:
-            cap = cv2.VideoCapture(self._device_id, cv2.CAP_DSHOW)
-            if cap.isOpened():
-                self._cap = cap
-                self._mode = "usb"
-                self.set_resolution(self._width, self._height)
-                logger.info("DroidCam USB opened at device #%s", self._device_id)
-                return True
-        except Exception:
-            pass
+        from camera.webcam import get_preferred_backends, open_video_capture
+
+        # Try USB mode across platform backends
+        for backend, backend_name in get_preferred_backends():
+            try:
+                cap = open_video_capture(self._device_id, backend)
+                if cap.isOpened():
+                    self._cap = cap
+                    self._mode = "usb"
+                    self.set_resolution(self._width, self._height)
+                    logger.info("DroidCam USB opened at device #%s (%s)", self._device_id, backend_name)
+                    return True
+                cap.release()
+            except Exception:
+                continue
 
         # Fallback: Wi-Fi mode (DroidCam TCP stream)
         try:
@@ -481,21 +485,17 @@ class iPhoneUSBSource(CameraSource):
 
     # ── Lifecycle ─────────────────────────────────────────────────
     def open(self) -> bool:
-        backends = [
-            (cv2.CAP_DSHOW, "DirectShow"),
-            (None, "Default"),
-        ]
-        for backend, backend_name in backends:
+        from camera.webcam import get_preferred_backends, open_video_capture
+
+        for backend, backend_name in get_preferred_backends():
             try:
-                if backend is None:
-                    cap = cv2.VideoCapture(self._device_id)
-                else:
-                    cap = cv2.VideoCapture(self._device_id, backend)
+                cap = open_video_capture(self._device_id, backend)
                 if cap.isOpened():
                     self._cap = cap
                     self.set_resolution(self._width, self._height)
                     logger.info("iPhone USB camera opened via %s", backend_name)
                     return True
+                cap.release()
             except Exception:
                 continue
         return False

@@ -43,7 +43,7 @@ from typing import Any, Callable, Iterator, Optional, TypeVar
 
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -171,6 +171,7 @@ def init_db() -> None:
             )
 
     Base.metadata.create_all(bind=engine)
+    _ensure_attendance_idempotency_column()
 
     # Stamp the DB so Alembic knows this revision is applied
     try:
@@ -178,6 +179,26 @@ def init_db() -> None:
         alembic_command.stamp(alembic_cfg, "head")
     except Exception:
         pass  # Non-critical; alembic will catch up on next upgrade
+
+
+def _ensure_attendance_idempotency_column() -> None:
+    """Backfill ``attendance.idempotency_key`` on existing DBs when Alembic fallback is used."""
+    try:
+        insp = inspect(engine)
+        if "attendance" not in insp.get_table_names():
+            return
+        cols = {c["name"] for c in insp.get_columns("attendance")}
+        with engine.begin() as conn:
+            if "idempotency_key" not in cols:
+                conn.execute(text("ALTER TABLE attendance ADD COLUMN idempotency_key VARCHAR(128)"))
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_attendance_idempotency_key "
+                    "ON attendance (idempotency_key)"
+                )
+            )
+    except Exception as exc:
+        logger.debug("Could not ensure attendance.idempotency_key column: %s", exc)
 
 
 @contextmanager

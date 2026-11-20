@@ -39,10 +39,14 @@ class AttendanceService:
         camera_id: Optional[int] = None,
         operator: str = "system",
         employee_name: Optional[str] = None,
+        employee_code: Optional[str] = None,
     ) -> bool:
-        """Record attendance for an employee.
+        """Record attendance for an employee atomically (once per day).
 
-        Writes to both the SQLite database and the CSV log.
+        Uses ``AttendanceRepo.create_idempotent`` backed by a database-level
+        UNIQUE ``idempotency_key`` so concurrent cameras cannot create
+        duplicate daily records. Only writes the CSV log and audit entry if
+        the DB insert actually succeeded.
 
         Args:
             employee_id: Database ID of the employee.
@@ -50,25 +54,27 @@ class AttendanceService:
             camera_id: Camera that captured the recognition (optional).
             operator: Who performed this action.
             employee_name: Name for CSV logging (optional).
+            employee_code: Unique employee code (e.g. ``EMP001``) for CSV
+                deduplication across same-name employees (optional).
 
         Returns:
             ``True`` if attendance was newly recorded, ``False`` if
             already marked today (no duplicate per day).
         """
         with get_session() as session:
-            if AttendanceRepo.is_marked_today(session, employee_id):
-                return False
-
-            AttendanceRepo.create(
+            _, created = AttendanceRepo.create_idempotent(
                 session,
                 employee_id=employee_id,
                 confidence=confidence,
                 camera_id=camera_id,
             )
+            if not created:
+                return False
 
-        # Also write to CSV for backward compatibility
+        # Also write to CSV for backward compatibility (only by the winning camera)
         name = employee_name or f"ID:{employee_id}"
-        cls._csv_tracker.mark(name, confidence)
+        csv_emp_id = employee_code or f"DB:{employee_id}"
+        cls._csv_tracker.mark(name, confidence, employee_id=csv_emp_id)
 
         AuditService.log(
             "MARK_ATTENDANCE",

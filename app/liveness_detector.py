@@ -175,12 +175,16 @@ class LivenessDetector:
         self,
         face_img: np.ndarray,
         landmarks: Optional[np.ndarray] = None,
+        context_img: Optional[np.ndarray] = None,
     ) -> LivenessResult:
         """Run liveness checks on a single face frame.
 
         Args:
             face_img: BGR face crop (the face region only).
             landmarks: 5-point facial landmarks ``(5, 2)``, optional.
+            context_img: Optional padded crop around the face (e.g. 2.7x
+                scale) used for phone bezel detection and MiniFASNetV2
+                context inference.
 
         Returns:
             A ``LivenessResult`` with per-factor scores and a combined
@@ -203,8 +207,13 @@ class LivenessDetector:
         else:
             blink_score = 0.0  # No landmarks → can't assess blinking
 
-        # ── Factor 3: Screen-edge detection ──────────────────
+        # ── Factor 3: Screen-edge & display-artifact detection ──
         screen_score = self._detect_screen_edges(gray)
+        if context_img is not None and context_img.size > 0:
+            ctx_gray = cv2.cvtColor(context_img, cv2.COLOR_BGR2GRAY)
+            screen_score = max(screen_score, self._detect_screen_edges(ctx_gray))
+        artifact_score = self._detect_screen_artifacts(face_img)
+        screen_score = float(np.clip(max(screen_score, artifact_score), 0.0, 1.0))
 
         # ── Factor 4: Motion score (from previous frame) ─────
         motion_score = 0.5
@@ -215,10 +224,17 @@ class LivenessDetector:
         # ── Factor 5: Deep-learning liveness (CNN-based) ─────
         dl_score = 0.5  # Neutral by default
         dl_time_ms = 0.0
+        dl_is_live = True
         if self._deep_liveness is not None and cfg.DEEP_LIVENESS_ENABLED:
-            dl_result = self._deep_liveness.predict(face_img, landmarks)
+            # MiniFASNetV2 expects a ~2.7x context crop when available;
+            # without landmarks alignment, passing context_img preserves
+            # the phone bezel/background cues it was trained on.
+            dl_input = context_img if (context_img is not None and context_img.size > 0) else face_img
+            dl_landmarks = None if (context_img is not None and context_img.size > 0) else landmarks
+            dl_result = self._deep_liveness.predict(dl_input, dl_landmarks)
             dl_score = dl_result.dl_score
             dl_time_ms = dl_result.inference_time_ms
+            dl_is_live = dl_result.is_live
 
         # ── Combine ──────────────────────────────────────────
         # Weighted combination — different weights depending on
@@ -253,17 +269,20 @@ class LivenessDetector:
         if texture_score < 0.3:
             reasons.append("synthetic_texture")
             is_live = False
-        if blink_score < 0.2 and self._blink_ever_detected:
-            if len(self._ear_history) >= 15:
-                reasons.append("no_blink_detected")
-                is_live = False
+        if not self._blink_ever_detected and len(self._ear_history) >= 15 and blink_score < 0.25:
+            reasons.append("no_blink_detected")
+            is_live = False
+        elif blink_score < 0.2 and self._blink_ever_detected and len(self._ear_history) >= 15:
+            reasons.append("no_blink_detected")
+            is_live = False
         if motion_score < 0.25:
             reasons.append("no_motion")
 
-        # Spoof indicator (deep-learning level)
-        if dl_score < cfg.LIVENESS_SPOOF_THRESHOLD:
-            reasons.append("deep_learning_spoof")
-            is_live = False
+        # Spoof indicator (deep-learning level): honor DEEP_LIVENESS_THRESHOLD
+        if self._deep_liveness is not None and cfg.DEEP_LIVENESS_ENABLED:
+            if not dl_is_live or dl_score < cfg.LIVENESS_SPOOF_THRESHOLD:
+                reasons.append("deep_learning_spoof")
+                is_live = False
 
         return LivenessResult(
             is_live=is_live and liveness_score >= cfg.LIVENESS_MIN_SCORE,
@@ -432,13 +451,13 @@ class LivenessDetector:
         # No blink yet — neutral but decreasing with time
         if len(self._ear_history) < 15:
             return 0.5  # Not enough data
-        # After ~15 frames with no blink, score drops
+        # After ~15 frames with no blink, score drops below spoof gate
         recent = list(self._ear_history)
         recent_open = sum(1 for e in recent if e >= self._EAR_CLOSED_THRESHOLD)
         open_ratio = recent_open / max(len(recent), 1)
         if open_ratio > 0.9:
-            # Eyes consistently open → suspicious (photo)
-            return 0.3
+            # Eyes consistently open → suspicious (static photo)
+            return 0.15
         return 0.5
 
     # ── Motion Analysis ───────────────────────────────────────
@@ -515,7 +534,10 @@ class LivenessDetector:
         strong_lines = 0
         if lines is not None:
             for line in lines:
-                x1, y1, x2, y2 = line[0]
+                coordinates = np.asarray(line).reshape(-1)
+                if coordinates.size != 4:
+                    continue
+                x1, y1, x2, y2 = (int(value) for value in coordinates)
                 # Check if line is near borders
                 near_border = (
                     x1 < border_margin
@@ -535,6 +557,43 @@ class LivenessDetector:
         # Combined score
         screen_score = edge_ratio * 0.5 + line_factor * 0.5
         return float(np.clip(screen_score, 0.0, 1.0))
+
+    @staticmethod
+    def _detect_screen_artifacts(face_img: np.ndarray) -> float:
+        """Detect digital screen artifacts (periodic moire peaks and specular glare).
+
+        Returns:
+            0.0 (no screen artifacts) → 1.0 (strong digital display indicators).
+        """
+        if face_img.size == 0 or face_img.shape[0] < 32 or face_img.shape[1] < 32:
+            return 0.0
+
+        # 1. Specular glare patches (bright, desaturated screen reflections)
+        hsv = cv2.cvtColor(face_img, cv2.COLOR_BGR2HSV)
+        glare_mask = (hsv[:, :, 2] >= 248) & (hsv[:, :, 1] <= 25)
+        glare_ratio = float(np.mean(glare_mask))
+        # Natural highlights cover <2%; mobile screen glare often creates sharp bright bands
+        glare_score = float(np.clip((glare_ratio - 0.03) / 0.12, 0.0, 1.0))
+
+        # 2. Periodic pixel-grid / moire spikes in 2D FFT high-frequency ring
+        gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+        resized = cv2.resize(gray, (64, 64), interpolation=cv2.INTER_LINEAR).astype(np.float32)
+        resized -= float(np.mean(resized))
+        mag = np.abs(np.fft.fftshift(np.fft.fft2(resized)))
+        cy, cx = 32, 32
+        yy, xx = np.ogrid[:64, :64]
+        dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+        high_band = mag[(dist >= 12) & (dist <= 28)]
+        if high_band.size > 0:
+            mean_hf = float(np.mean(high_band)) + 1e-6
+            peak_hf = float(np.max(high_band))
+            peak_ratio = peak_hf / mean_hf
+            # Strong periodic screen grid creates sharp isolated spectral spikes (>18x mean)
+            moire_score = float(np.clip((peak_ratio - 14.0) / 14.0, 0.0, 1.0))
+        else:
+            moire_score = 0.0
+
+        return float(np.clip(max(glare_score, moire_score), 0.0, 1.0))
 
     # ── Helper ────────────────────────────────────────────────
 

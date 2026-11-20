@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import redis
 
@@ -15,9 +15,9 @@ import redis
 class RedisClient:
     """Redis client for state management."""
 
-    def __init__(self, url: str = None):
+    def __init__(self, url: Optional[str] = None):
         self.url = url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        self._client = None
+        self._client: Optional[redis.Redis] = None
 
     @property
     def client(self) -> redis.Redis:
@@ -41,13 +41,13 @@ class RedisClient:
     def get_student_last_seen(self, student_id: int) -> Optional[dict]:
         """Get student's last seen info."""
         key = f"student:last_seen:{student_id}"
-        data = self.client.hgetall(key)
+        data = cast(dict[str, Any], self.client.hgetall(key))
         return data if data else None
 
     def is_attendance_marked(self, student_id: int, section_id: int, date_str: str) -> bool:
         """Check if attendance already marked for student in section today."""
         key = f"attendance:marked:{student_id}:{section_id}:{date_str}"
-        return self.client.exists(key) > 0
+        return cast(int, self.client.exists(key)) > 0
 
     def mark_attendance(self, student_id: int, section_id: int, date_str: str, ttl: int = 86400) -> None:
         """Mark attendance in Redis to prevent duplicates."""
@@ -56,7 +56,9 @@ class RedisClient:
 
     # ── Camera State ───────────────────────────────────────────────
 
-    def set_camera_status(self, camera_id: int, status: str, metadata: dict = None) -> None:
+    def set_camera_status(
+        self, camera_id: int, status: str, metadata: Optional[dict[str, Any]] = None
+    ) -> None:
         """Update camera status."""
         key = f"camera:status:{camera_id}"
         data = {"status": status, "updated_at": datetime.utcnow().isoformat()}
@@ -68,16 +70,17 @@ class RedisClient:
     def get_camera_status(self, camera_id: int) -> Optional[dict]:
         """Get camera status."""
         key = f"camera:status:{camera_id}"
-        return self.client.hgetall(key) or None
+        data = cast(dict[str, Any], self.client.hgetall(key))
+        return data or None
 
     def get_all_camera_statuses(self) -> dict:
         """Get all camera statuses."""
         pattern = "camera:status:*"
-        keys = self.client.keys(pattern)
-        result = {}
+        keys = cast(list[str], self.client.keys(pattern))
+        result: dict[str, dict[str, Any]] = {}
         for key in keys:
             cam_id = key.split(":")[-1]
-            result[cam_id] = self.client.hgetall(key)
+            result[cam_id] = cast(dict[str, Any], self.client.hgetall(key))
         return result
 
     # ── Recognition Cooldown ───────────────────────────────────────
@@ -85,7 +88,7 @@ class RedisClient:
     def is_in_cooldown(self, track_id: str, camera_id: int) -> bool:
         """Check if recognition is in cooldown for this track."""
         key = f"recognition:cooldown:{camera_id}:{track_id}"
-        return self.client.exists(key) > 0
+        return cast(int, self.client.exists(key)) > 0
 
     def set_cooldown(self, track_id: str, camera_id: int, ttl: int = 60) -> None:
         """Set recognition cooldown."""
@@ -110,13 +113,14 @@ class RedisClient:
     def get_track_identity(self, track_id: str) -> Optional[dict]:
         """Get cached track identity."""
         key = f"track:identity:{track_id}"
-        return self.client.hgetall(key) or None
+        data = cast(dict[str, Any], self.client.hgetall(key))
+        return data or None
 
     # ── Session/Request Caching ────────────────────────────────────
 
     def cache_get(self, key: str) -> Optional[str]:
         """Get cached value."""
-        return self.client.get(key)
+        return cast(Optional[str], self.client.get(key))
 
     def cache_set(self, key: str, value: Any, ttl: int = 300) -> None:
         """Set cached value."""

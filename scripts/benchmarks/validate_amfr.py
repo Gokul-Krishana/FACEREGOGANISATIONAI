@@ -20,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -41,7 +42,25 @@ from app.enrollment import FaceEnrollment  # noqa: E402
 from app.amfr_engine import AMFREngine, AMFRDecision  # noqa: E402
 
 
-def extract_embeddings(image_dir: Path) -> Tuple[List[np.ndarray], List[str], List[str]]:
+def load_labels(labels_path: Path) -> Dict[str, str]:
+    if not labels_path.exists():
+        raise FileNotFoundError(
+            f"Missing evaluation labels: {labels_path}. "
+            "Create a JSON object mapping image filenames to enrolled names."
+        )
+    with labels_path.open(encoding="utf-8") as handle:
+        labels = json.load(handle)
+    if not isinstance(labels, dict) or not all(
+        isinstance(filename, str) and isinstance(label, str)
+        for filename, label in labels.items()
+    ):
+        raise ValueError("Evaluation labels must be a JSON object of filename -> person name.")
+    return labels
+
+
+def extract_embeddings(
+    image_dir: Path, labels: Dict[str, str]
+) -> Tuple[List[np.ndarray], List[str], List[str]]:
     recognizer = FaceRecognizer()
     embeddings: List[np.ndarray] = []
     names: List[str] = []
@@ -53,10 +72,11 @@ def extract_embeddings(image_dir: Path) -> Tuple[List[np.ndarray], List[str], Li
         if img is None:
             continue
         emb = recognizer.extract_embedding(img)
-        if emb is not None:
-            embeddings.append(emb)
-            names.append(img_path.stem)
-            image_paths.append(str(img_path))
+        if emb is None or img_path.name not in labels:
+            continue
+        embeddings.append(emb)
+        names.append(labels[img_path.name])
+        image_paths.append(str(img_path))
     return embeddings, names, image_paths
 
 
@@ -78,6 +98,7 @@ def validate_variant(
     query_names = names[:n]
 
     predictions: List[str] = []
+    top_three_hits: List[bool] = []
     ground_truth: List[str] = []
     latencies: List[float] = []
     accepted: List[bool] = []
@@ -85,9 +106,10 @@ def validate_variant(
     for emb, name in zip(query_embs, query_names):
         t0 = time.perf_counter()
 
-        matches = enrollment.search(emb, k=1, threshold=cfg.RECOGNITION_THRESHOLD)
+        matches = enrollment.search(emb, k=3, threshold=cfg.RECOGNITION_THRESHOLD)
         faiss_name = matches[0]["name"] if matches else "Unknown"
         faiss_conf = matches[0]["confidence"] if matches else 0.0
+        top_three_hits.append(name in {match["name"] for match in matches})
 
         quality_score = 0.5
         liveness_score = 0.5
@@ -127,8 +149,8 @@ def validate_variant(
             prediction = faiss_name if decision == AMFRDecision.ACCEPT else "Unknown"
             is_accepted = decision == AMFRDecision.ACCEPT
         else:
-            is_accepted = faiss_conf >= cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD
-            prediction = faiss_name if is_accepted else "Unknown"
+            prediction = faiss_name
+            is_accepted = bool(matches) and faiss_conf >= cfg.AMFR_HIGH_CONFIDENCE_THRESHOLD
 
         latencies.append((time.perf_counter() - t0) * 1000)
         predictions.append(prediction)
@@ -143,10 +165,30 @@ def validate_variant(
     n_unknown = sum(1 for g in ground_truth if g == "Unknown")
     latencies.sort()
 
+    labels = sorted(set(ground_truth) | set(predictions))
+    per_class: Dict[str, Dict[str, float]] = {}
+    for label in labels:
+        support = sum(actual == label for actual in ground_truth)
+        tp = sum(actual == label and predicted == label for actual, predicted in zip(ground_truth, predictions))
+        predicted_count = sum(predicted == label for predicted in predictions)
+        precision_for_label = tp / predicted_count if predicted_count else 0.0
+        recall_for_label = tp / support if support else 0.0
+        f1_for_label = (
+            2 * precision_for_label * recall_for_label / (precision_for_label + recall_for_label)
+            if precision_for_label + recall_for_label
+            else 0.0
+        )
+        per_class[label] = {
+            "precision": precision_for_label,
+            "recall": recall_for_label,
+            "f1": f1_for_label,
+            "support": support,
+        }
+    total_support = max(sum(item["support"] for item in per_class.values()), 1)
+    weighted_precision = sum(item["precision"] * item["support"] for item in per_class.values()) / total_support
+    weighted_recall = sum(item["recall"] * item["support"] for item in per_class.values()) / total_support
+    weighted_f1 = sum(item["f1"] * item["support"] for item in per_class.values()) / total_support
     accuracy = correct / max(n, 1)
-    precision = true_accepts / max(true_accepts + false_accepts, 1)
-    recall = true_accepts / max(n_known, 1)
-    f1 = 2 * precision * recall / max(precision + recall, 1e-9) if (precision + recall) > 0 else 0.0
     far = false_accepts / max(n_unknown, 1) if n_unknown > 0 else 0.0
     frr = false_rejects / max(n_known, 1) if n_known > 0 else 0.0
     tar = true_accepts / max(n_known, 1) if n_known > 0 else 0.0
@@ -163,9 +205,10 @@ def validate_variant(
         "n_known": n_known,
         "n_unknown": n_unknown,
         "accuracy": round(accuracy, 4),
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1_score": round(f1, 4),
+        "weighted_precision": round(weighted_precision, 4),
+        "weighted_recall": round(weighted_recall, 4),
+        "weighted_f1_score": round(weighted_f1, 4),
+        "top_three_hit_rate": round(sum(top_three_hits) / max(n, 1), 4),
         "far": round(far, 4),
         "frr": round(frr, 4),
         "tar": round(tar, 4),
@@ -176,10 +219,20 @@ def validate_variant(
         "false_accepts": int(false_accepts),
         "false_rejects": int(false_rejects),
         "true_accepts": int(true_accepts),
+        "per_class": per_class,
     }
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Evaluate AMFR with explicit ground-truth labels.")
+    parser.add_argument(
+        "--labels",
+        type=Path,
+        default=ROOT / "dataset" / "labels.json",
+        help="JSON object mapping image filenames to enrolled names.",
+    )
+    args = parser.parse_args()
+
     print("=" * 72)
     print("AMFR Validation - A/B/C/D Comparison")
     print("=" * 72)
@@ -192,7 +245,12 @@ def main() -> int:
     amfr = AMFREngine()
 
     dataset_dir = ROOT / "dataset"
-    query_embs, query_names, _ = extract_embeddings(dataset_dir)
+    try:
+        labels = load_labels(args.labels)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"\n  [ERROR] {exc}")
+        return 2
+    query_embs, query_names, _ = extract_embeddings(dataset_dir, labels)
     if len(query_embs) == 0:
         print("\n  [ERROR] No query embeddings from dataset/")
         print("  Add face images to dataset/ and try again.")
@@ -218,8 +276,8 @@ def main() -> int:
         )
         results[v] = r
         print(
-            f"  Accuracy: {r.get('accuracy', 'N/A')}  |  Precision: {r.get('precision', 'N/A')}  |  "
-            f"Recall: {r.get('recall', 'N/A')}  |  FAR: {r.get('far', 'N/A')}  |  FRR: {r.get('frr', 'N/A')}"
+            f"  Accuracy: {r.get('accuracy', 'N/A')}  |  Weighted precision: {r.get('weighted_precision', 'N/A')}  |  "
+            f"Weighted recall: {r.get('weighted_recall', 'N/A')}  |  Top-3: {r.get('top_three_hit_rate', 'N/A')}"
         )
 
     print("\n[3/3] Saving results...")
@@ -232,14 +290,14 @@ def main() -> int:
     print("  AMFR COMPARISON SUMMARY")
     print(f"{'=' * 72}")
     dash = "-" * 70
-    print(f"  {'Var':<5} {'Acc':<8} {'Prec':<8} {'Rec':<8} {'F1':<8} {'FAR':<8} {'FRR':<8} {'P95ms':<8}")
+    print(f"  {'Var':<5} {'Acc':<8} {'WPrec':<8} {'WRec':<8} {'WF1':<8} {'Top3':<8} {'P95ms':<8}")
     print(f"  {dash}")
     for v in ["A", "B", "C", "D"]:
         r = results.get(v, {})
         print(
-            f"  {v:<5} {str(r.get('accuracy', 'N/A')):<8} {str(r.get('precision', 'N/A')):<8} "
-            f"{str(r.get('recall', 'N/A')):<8} {str(r.get('f1_score', 'N/A')):<8} "
-            f"{str(r.get('far', 'N/A')):<8} {str(r.get('frr', 'N/A')):<8} "
+            f"  {v:<5} {str(r.get('accuracy', 'N/A')):<8} {str(r.get('weighted_precision', 'N/A')):<8} "
+            f"{str(r.get('weighted_recall', 'N/A')):<8} {str(r.get('weighted_f1_score', 'N/A')):<8} "
+            f"{str(r.get('top_three_hit_rate', 'N/A')):<8} "
             f"{str(r.get('p95_latency_ms', 'N/A')):<8}"
         )
     print("\n  LEGEND:")

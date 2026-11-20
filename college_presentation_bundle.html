@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Recognition Attendance System - Research Bundle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 32px;
+      background: #f5f7fb;
+      color: #1d2433;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      padding: 36px 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+    }
+    h1, h2, h3 {
+      color: #123a5b;
+    }
+    h1 {
+      text-align: center;
+      margin-top: 0;
+      font-size: 30px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #52637a;
+      font-size: 16px;
+      margin-bottom: 24px;
+    }
+    .paper {
+      padding: 18px 18px 14px 18px;
+      margin: 20px 0;
+      border-left: 5px solid #2d7ff9;
+      background: #f7fbff;
+      border-radius: 8px;
+    }
+    .link {
+      color: #0d5bd7;
+      word-break: break-word;
+      font-weight: 600;
+    }
+    .section {
+      margin-top: 28px;
+    }
+    .highlight {
+      background: #eef9f0;
+      border-left: 5px solid #2ca86e;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .script {
+      background: #fffaf0;
+      border-left: 5px solid #f0b429;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    ul {
+      margin: 10px 0 0 22px;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    strong {
+      color: #123a5b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Face Recognition Attendance System</h1>
+    <div class="subtitle">Research papers, academic summary, and presentation script</div>
+
+    <div class="section">
+      <h2>1. Selected Research Papers</h2>
+
+      <div class="paper">
+        <h3>RetinaFace: Single-stage Dense Face Localisation in the Wild</h3>
+        <div class="link">https://arxiv.org/abs/1905.00641</div>
+        <ul>
+          <li>Focuses on accurate and robust face detection in real-world environments.</li>
+          <li>Handles variations such as pose, scale, blur, illumination, and facial occlusion.</li>
+          <li>Very relevant to our project because attendance recognition depends on detecting the correct face from live video frames.</li>
+        </ul>
+        <p><strong>Why it matters to us:</strong> In our system, face detection is the first critical step before recognition, quality analysis, embedding extraction, and attendance recording.</p>
+      </div>
+
+      <div class="paper">
+        <h3>FaceNet: A Unified Embedding for Face Recognition and Clustering</h3>
+        <div class="link">https://arxiv.org/abs/1503.03832</div>
+        <ul>
+          <li>Introduces the concept of learning compact face embeddings for recognition.</li>
+          <li>Shows how faces can be mapped into a feature space where similar faces are close and different faces are far apart.</li>
+          <li>Directly matches our project because we compare face embeddings to verify student identity.</li>
+        </ul>
+        <p><strong>Why it matters to us:</strong> It explains the mathematical and conceptual foundation behind embedding-based identity matching.</p>
+      </div>
+
+      <div class="paper">
+        <h3>ArcFace: Additive Angular Margin Loss for Deep Face Recognition</h3>
+        <div class="link">https://arxiv.org/abs/1801.07698</div>
+        <ul>
+          <li>Improves face recognition performance by increasing inter-class separation and reducing intra-class variance.</li>
+          <li>Used widely in biometric and face verification systems.</li>
+          <li>Helpful for explaining why our recognition model can achieve high accuracy in attendance verification.</li>
+        </ul>
+        <p><strong>Why it matters to us:</strong> It supports the idea that better feature discrimination leads to more reliable attendance matching.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Academic Literature Review Paragraph</h2>
+      <p>Face recognition has become one of the most important applications of computer vision and deep learning, particularly in automated identity verification and access control systems. Early methods relied on handcrafted features and traditional classifiers, but modern approaches use deep convolutional neural networks to learn discriminative face representations directly from data. The paper <strong>FaceNet</strong> introduced the concept of embedding-based face recognition, where each face is mapped to a compact feature vector in a high-dimensional space. <strong>ArcFace</strong> further improved this approach by optimizing angular margin loss to increase inter-class separation and reduce intra-class variation, resulting in stronger recognition performance. For real-time deployment, accurate face detection is equally essential; <strong>RetinaFace</strong> demonstrates a robust single-stage detection framework capable of localizing faces under challenging conditions. Together, these research works form the foundation of modern face recognition systems, and our project applies these principles in a practical attendance system that detects faces from live camera feeds, compares embeddings against stored identities, and records attendance automatically.</p>
+    </div>
+
+    <div class="section">
+      <h2>3. Slide-Friendly Comparison</h2>
+      <div class="highlight">
+        <p><strong>RetinaFace</strong> provides the detection foundation.</p>
+        <p><strong>FaceNet</strong> provides the embedding representation.</p>
+        <p><strong>ArcFace</strong> provides the recognition improvement and stronger discrimination.</p>
+        <p>Our project combines these ideas into a complete end-to-end system: camera input → face detection → quality checks → embedding generation → identity matching → attendance marking.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Presentation Script</h2>
+      <div class="script">
+        <p>Our project is a real-time face recognition and attendance system. It follows a standard deep learning pipeline used in modern computer vision research. The first step is face detection, which is essential because the system must identify the actual person from the camera frame. This is strongly supported by the research paper RetinaFace, which focuses on accurate and robust face localization even under difficult conditions like varying lighting, pose, and occlusion.</p>
+        <p>After the face is detected, the system extracts a meaningful feature representation. This is where FaceNet becomes relevant, because it introduced the idea of converting faces into embeddings that capture identity information. In our system, these embeddings are compared against stored student data to verify identity. To improve this matching accuracy, ArcFace is highly important because it increases feature separation between different people and keeps similar faces closer together in the learned space.</p>
+        <p>So, in simple terms, our project applies the same research ideas used in modern face recognition systems: we detect the face, extract deep features, compare them to enrolled identities, and automatically mark attendance. This combination of detection, representation learning, and matching forms the basis of our project and connects directly with the literature in computer vision.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Short Professor-Friendly Summary</h2>
+      <p>Our project is grounded in established research in face detection and recognition. RetinaFace addresses the detection challenge, FaceNet introduces the embedding-based recognition concept, and ArcFace improves feature discrimination for better accuracy. Together, these papers explain the foundation of our attendance system, which uses live camera input, face detection, embedding matching, and automatic attendance logging for practical deployment in a college environment.</p>
+    </div>
+  </div>
+</body>
+</html>

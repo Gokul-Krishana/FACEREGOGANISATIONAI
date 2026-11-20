@@ -16,13 +16,14 @@ Usage::
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from dataclasses import dataclass
 from pathlib import Path
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import desc, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from database.models import (
@@ -34,6 +35,17 @@ from database.models import (
     Student,
     UnknownFace,
 )
+
+
+def _local_date_bounds_utc(target_date: date) -> Tuple[datetime, datetime]:
+    """Convert a local calendar *target_date* to naive-UTC ``(start, end)`` bounds.
+
+    Database ``timestamp`` columns store naive UTC via ``_utcnow()``, so local
+    day queries must map ``[00:00:00, 23:59:59.999999]`` local time to UTC.
+    """
+    local_start = datetime.combine(target_date, time.min).astimezone(timezone.utc).replace(tzinfo=None)
+    local_end = datetime.combine(target_date, time.max).astimezone(timezone.utc).replace(tzinfo=None)
+    return local_start, local_end
 
 
 @dataclass
@@ -177,6 +189,17 @@ class EmployeeRepo:
         return session.query(Employee).filter(Employee.name.ilike(normalized)).first()
 
     @staticmethod
+    def get_all_by_name(session: Session, name: str) -> List[Employee]:
+        """Return all employees matching a display name (case-insensitive)."""
+        normalized = name.strip().lower()
+        return session.query(Employee).filter(Employee.name.ilike(normalized)).all()
+
+    @staticmethod
+    def get_by_faiss_id(session: Session, faiss_id: int) -> Optional[Employee]:
+        """Look up an employee by their stored FAISS index ID."""
+        return session.query(Employee).filter(Employee.faiss_id == faiss_id).first()
+
+    @staticmethod
     def search(session: Session, query: str) -> List[Employee]:
         return EmployeeRepo.search_paginated(session, query=query, limit=100).items
 
@@ -225,7 +248,7 @@ class EmployeeRepo:
         Returns:
             The updated ``Employee``, or ``None`` if not found.
         """
-        _EDITABLE = {"name", "department", "photo_path"}
+        _EDITABLE = {"name", "department", "photo_path", "faiss_id"}
         emp = EmployeeRepo.get_by_id(session, emp_id)
         if not emp:
             return None
@@ -257,16 +280,58 @@ class AttendanceRepo:
         employee_id: int,
         confidence: float = 1.0,
         camera_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
     ) -> Attendance:
         record = Attendance(
             employee_id=employee_id,
             confidence=confidence,
             camera_id=camera_id,
+            idempotency_key=idempotency_key,
         )
         session.add(record)
         session.commit()
         session.refresh(record)
         return record
+
+    @staticmethod
+    def create_idempotent(
+        session: Session,
+        employee_id: int,
+        confidence: float = 1.0,
+        camera_id: Optional[int] = None,
+        target_date: Optional[date] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Tuple[Optional[Attendance], bool]:
+        """Atomically record daily attendance for an employee once per day.
+
+        Relies on a database-level UNIQUE constraint on ``idempotency_key`` so
+        two concurrent cameras racing to mark the same employee cannot both
+        succeed.
+
+        Returns:
+            ``(record, True)`` if newly created; ``(None, False)`` if already
+            recorded for *target_date*.
+        """
+        day = target_date or date.today()
+        key = idempotency_key or f"emp:{employee_id}:{day.isoformat()}"
+
+        if AttendanceRepo.is_marked_today(session, employee_id) and target_date is None:
+            return None, False
+
+        record = Attendance(
+            employee_id=employee_id,
+            confidence=confidence,
+            camera_id=camera_id,
+            idempotency_key=key,
+        )
+        session.add(record)
+        try:
+            session.commit()
+            session.refresh(record)
+            return record, True
+        except IntegrityError:
+            session.rollback()
+            return None, False
 
     @staticmethod
     def get_by_date(
@@ -275,8 +340,7 @@ class AttendanceRepo:
         limit: Optional[int] = None,
         skip: int = 0,
     ) -> List[Attendance]:
-        start = datetime.combine(target_date, datetime.min.time())
-        end = datetime.combine(target_date, datetime.max.time())
+        start, end = _local_date_bounds_utc(target_date)
         query = (
             session.query(Attendance)
             .filter(Attendance.timestamp.between(start, end))
@@ -314,8 +378,7 @@ class AttendanceRepo:
 
     @staticmethod
     def is_marked_today(session: Session, employee_id: int) -> bool:
-        start = datetime.combine(date.today(), datetime.min.time())
-        end = datetime.combine(date.today(), datetime.max.time())
+        start, end = _local_date_bounds_utc(date.today())
         return (
             session.query(func.count(Attendance.id))
             .filter(
@@ -328,8 +391,7 @@ class AttendanceRepo:
 
     @staticmethod
     def get_statistics(session: Session) -> dict:
-        start = datetime.combine(date.today(), datetime.min.time())
-        end = datetime.combine(date.today(), datetime.max.time())
+        start, end = _local_date_bounds_utc(date.today())
         today_count = (
             session.query(func.count(Attendance.id)).filter(Attendance.timestamp.between(start, end)).scalar()
             or 0
@@ -506,11 +568,8 @@ class UnknownFaceRepo:
     @staticmethod
     def get_statistics(session: Session) -> dict:
         """Return aggregate statistics for unknown faces."""
-        today_start = datetime.combine(date.today(), datetime.min.time())
-        week_ago = datetime.combine(
-            date.today() - timedelta(days=7),
-            datetime.min.time(),
-        )
+        today_start, _ = _local_date_bounds_utc(date.today())
+        week_ago, _ = _local_date_bounds_utc(date.today() - timedelta(days=7))
         total = session.query(UnknownFace).count()
         today = session.query(UnknownFace).filter(UnknownFace.timestamp >= today_start).count()
         this_week = session.query(UnknownFace).filter(UnknownFace.timestamp >= week_ago).count()

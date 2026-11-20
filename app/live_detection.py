@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -67,8 +67,7 @@ from app.attendance import AttendanceTracker  # noqa: E402
 from camera.selector import create_camera  # noqa: E402
 from camera.base import CameraSource  # noqa: E402
 from database.database import get_session  # noqa: E402
-from database.repository import AttendanceRepo, UnknownFaceRepo  # noqa: E402
-from services.employee_service import EmployeeService  # noqa: E402
+from database.repository import UnknownFaceRepo  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +97,8 @@ class LiveDetection:
         self.frame_skip = cfg.FRAME_SKIP
         self._frame_count = 0
 
-        # Track who has been marked this session
+        # Track who has been marked this session (cleared on midnight rollover)
+        self._session_date: date = date.today()
         self._marked_this_session: set = set()
 
         # Cache last detections to avoid flickering on skipped frames
@@ -127,6 +127,10 @@ class LiveDetection:
             Annotated frame with bounding boxes, AMFR badges, and labels.
         """
         self._frame_count += 1
+        today = date.today()
+        if getattr(self, "_session_date", None) != today:
+            self._marked_this_session.clear()
+            self._session_date = today
 
         # ── FPS calculation ──────────────────────────────────
         now = time.time()
@@ -155,7 +159,10 @@ class LiveDetection:
             yolo_detections.append(det)
 
             # Step 2 — RetinaFace detection (detailed face with landmarks)
+            from services.recognition_service import RecognitionService
+
             face = self.recognizer.detect_face(person_crop)
+            face = RecognitionService._offset_face_to_frame(face, bbox, frame.shape[:2])
             face_data.append(face)
 
             # Step 3 — ArcFace embedding
@@ -191,20 +198,38 @@ class LiveDetection:
 
             if decision == AMFRDecision.ACCEPT.value:
                 # ── High confidence + live → mark attendance ──
+                from services.recognition_service import RecognitionService
+
+                emp = RecognitionService._resolve_employee(
+                    name=name,
+                    employee_id=amfr_detection.get("employee_id"),
+                    faiss_id=amfr_detection.get("faiss_id"),
+                )
+                emp_code = emp.employee_id if emp else amfr_detection.get("employee_id")
+                display_name = emp.name if emp else name
+                mark_key = emp_code or name
+
                 logger.info(
                     "AMFR ACCEPT: %s | risk=%.2f%% | liveness=%.2f%%",
-                    name,
+                    display_name,
                     risk_score * 100,
                     liveness_score * 100,
                 )
-                if name not in self._marked_this_session:
-                    self.attendance.mark(name, risk_score)
-                    self._log_attendance_db(name, risk_score)
-                    self._marked_this_session.add(name)
+                if mark_key not in self._marked_this_session:
+                    self._log_attendance_db(
+                        display_name,
+                        risk_score,
+                        employee_id=emp_code,
+                        faiss_id=amfr_detection.get("faiss_id"),
+                    )
+                    if emp is None:
+                        self.attendance.mark(display_name, risk_score, employee_id=emp_code)
+                    self._marked_this_session.add(mark_key)
                 recognised.append(
                     {
                         "bbox": bbox,
-                        "name": name,
+                        "name": display_name,
+                        "emp_code": emp_code,
                         "confidence": risk_score,
                         "amfr_decision": decision,
                         "risk_score": risk_score,
@@ -501,11 +526,16 @@ class LiveDetection:
             # ── Color and card lines by AMFR decision ────────
             if decision == AMFRDecision.ACCEPT.value:
                 color = (0, 200, 0)  # Green
-                if name not in self._employee_cache:
-                    emp = EmployeeService.get_by_name(name) if name else None
-                    self._employee_cache[name] = emp.employee_id if emp else None  # type: ignore[assignment]
-                emp_id = self._employee_cache.get(name)
-                attendance_str = "[OK] Attendance Marked" if name in self._marked_this_session else ""
+                emp_id = item.get("emp_code")
+                if not emp_id and name:
+                    if name not in self._employee_cache:
+                        from services.recognition_service import RecognitionService
+
+                        emp = RecognitionService._resolve_employee(name)
+                        self._employee_cache[name] = emp.employee_id if emp else None  # type: ignore[assignment]
+                    emp_id = self._employee_cache.get(name)
+                mark_key = emp_id or name
+                attendance_str = "[OK] Attendance Marked" if mark_key in self._marked_this_session else ""
                 card_lines = [
                     f"[LIVE] {name}",
                     f"ID: {emp_id}" if emp_id else "",
@@ -622,29 +652,31 @@ class LiveDetection:
             text_y = card_y + padding_y + (i + 1) * line_height - 6
             cv2.putText(frame, line, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
 
-    def _log_attendance_db(self, name: str, confidence: float) -> None:
-        """Log an attendance event to the SQLite database.
-
-        The CSV log is handled by ``AttendanceTracker.mark()`` in the
-        caller — this method handles the database side so the dashboard
-        can query attendance records.
-
-        Args:
-            name: Person's display name (from FAISS match).
-            confidence: Recognition confidence score.
-        """
+    def _log_attendance_db(
+        self,
+        name: str,
+        confidence: float,
+        employee_id: Optional[str] = None,
+        faiss_id: Optional[int] = None,
+    ) -> None:
+        """Log an attendance event atomically via ``AttendanceService.mark``."""
         try:
-            emp = EmployeeService.get_by_name(name)
+            from services.attendance_service import AttendanceService
+            from services.recognition_service import RecognitionService
+
+            emp = RecognitionService._resolve_employee(
+                name=name,
+                employee_id=employee_id,
+                faiss_id=faiss_id,
+            )
             if emp is None:
                 return  # no DB record for this person
-            with get_session() as session:
-                # Avoid duplicates: check if already marked today
-                if not AttendanceRepo.is_marked_today(session, emp.id):  # type: ignore[arg-type]
-                    AttendanceRepo.create(
-                        session,
-                        employee_id=emp.id,  # type: ignore[arg-type]
-                        confidence=round(confidence, 4),
-                    )
+            AttendanceService.mark(
+                employee_id=emp.id,  # type: ignore[arg-type]
+                confidence=round(confidence, 4),
+                employee_name=emp.name,
+                employee_code=emp.employee_id,
+            )
         except Exception:
             logger.exception("Failed to log attendance to DB")
 

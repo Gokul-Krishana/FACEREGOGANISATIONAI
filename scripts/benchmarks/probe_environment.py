@@ -25,25 +25,33 @@ print("=" * 60)
 print(f"  OpenCV      : {cv2.__version__}")
 print()
 
+from camera.webcam import get_preferred_backends, open_video_capture  # noqa: E402
+
 # ── Cameras ──────────────────────────────────────────────────
 print("[1] Cameras")
 found = []
+backends = get_preferred_backends()
 for idx in range(5):
     try:
-        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-        if cap.isOpened():
-            ok, frame = cap.read()
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            backend = cap.getBackendName()
-            found.append({"idx": idx, "frame": ok, "res": (w, h), "fps": fps, "backend": backend})
-            print(
-                f"    Camera #{idx}: {'FRAME OK' if ok else 'opened, no frame'} "
-                f"{w}x{h} @ {fps:.0f}fps ({backend})"
-            )
+        opened = False
+        for bkd, _ in backends:
+            cap = open_video_capture(idx, bkd)
+            if cap.isOpened():
+                opened = True
+                ok, frame = cap.read()
+                w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                backend = cap.getBackendName()
+                found.append({"idx": idx, "frame": ok, "res": (w, h), "fps": fps, "backend": backend})
+                print(
+                    f"    Camera #{idx}: {'FRAME OK' if ok else 'opened, no frame'} "
+                    f"{w}x{h} @ {fps:.0f}fps ({backend})"
+                )
+                cap.release()
+                break
             cap.release()
-        else:
+        if not opened:
             print(f"    Camera #{idx}: not found")
     except Exception as e:
         print(f"    Camera #{idx}: error {e}")

@@ -245,11 +245,14 @@ class AMFREngine:
         face_bbox = face.get("bbox") if face else None
 
         # ── Step 2: Face Quality Assessment ──────────────────
+        fh, fw = frame.shape[:2]
         quality_result = None
         if face and face.get("embedding") is not None:
             if face_bbox:
-                x1, y1, x2, y2 = face_bbox
-                face_crop = frame[y1:y2, x1:x2] if y2 > y1 and x2 > x1 else None
+                fx1, fy1, fx2, fy2 = (int(v) for v in face_bbox)
+                fx1, fy1 = max(0, fx1), max(0, fy1)
+                fx2, fy2 = min(fw, fx2), min(fh, fy2)
+                face_crop = frame[fy1:fy2, fx1:fx2] if fy2 > fy1 and fx2 > fx1 else None
             else:
                 face_crop = None
 
@@ -257,7 +260,7 @@ class AMFREngine:
                 quality_result = self.quality.assess(
                     face_img=face_crop,
                     det_score=det_score,
-                    face_bbox=face_bbox,
+                    face_bbox=(fx1, fy1, fx2, fy2) if face_bbox else None,
                     img_shape=frame.shape[:2],
                     landmarks=landmarks,
                 )
@@ -265,17 +268,26 @@ class AMFREngine:
 
         # ── Step 3: FAISS search result ──────────────────────
         arcface_distance = 999.0
+        matched_employee_id = None
+        matched_faiss_id = None
         if faiss:
             name = faiss[0]["name"]
             confidence = faiss[0]["confidence"]
             arcface_distance = faiss[0].get("distance", 999.0)
+            matched_employee_id = faiss[0].get("employee_id")
+            matched_faiss_id = faiss[0].get("faiss_id")
 
         # ── Step 4: Liveness Detection (per-track instance) ──
         liveness_result = None
         face_for_liveness = None
+        context_crop = None
         if face and face_bbox:
-            x1, y1, x2, y2 = face_bbox
-            face_for_liveness = frame[y1:y2, x1:x2] if y2 > y1 and x2 > x1 else None
+            fx1, fy1, fx2, fy2 = (int(v) for v in face_bbox)
+            fx1, fy1 = max(0, fx1), max(0, fy1)
+            fx2, fy2 = min(fw, fx2), min(fh, fy2)
+            face_for_liveness = frame[fy1:fy2, fx1:fx2] if fy2 > fy1 and fx2 > fx1 else None
+            if face_for_liveness is not None and face_for_liveness.size > 0:
+                context_crop = self._extract_context_crop(frame, (fx1, fy1, fx2, fy2), scale=2.7)
 
         if face_for_liveness is not None and face_for_liveness.size > 0:
             # Use per-track liveness detector for isolated blink/motion state
@@ -283,9 +295,14 @@ class AMFREngine:
             liveness_result = liveness_detector.analyze_frame(
                 face_img=face_for_liveness,
                 landmarks=landmarks,
+                context_img=context_crop,
             )
-        liveness_score = liveness_result.liveness_score if liveness_result else 0.5
-        is_live = liveness_result.is_live if liveness_result else True
+            liveness_score = liveness_result.liveness_score
+            is_live = liveness_result.is_live
+        else:
+            # Fail closed: cannot mark attendance without a verified live face crop
+            liveness_score = 0.0
+            is_live = False
 
         # ── Step 5: AMFR Decision ────────────────────────────
         amfr_decision, risk_score, decision_details = self._decide(
@@ -300,6 +317,8 @@ class AMFREngine:
         result = {
             "bbox": bbox,
             "name": name if amfr_decision != AMFRDecision.LOW_CONFIDENCE else "Unknown",
+            "employee_id": matched_employee_id if amfr_decision != AMFRDecision.LOW_CONFIDENCE else None,
+            "faiss_id": matched_faiss_id if amfr_decision != AMFRDecision.LOW_CONFIDENCE else None,
             "confidence": round(confidence, 4),
             "is_known": amfr_decision == AMFRDecision.ACCEPT,
             "is_live": is_live,
@@ -327,6 +346,28 @@ class AMFREngine:
 
         return result
 
+    @staticmethod
+    def _extract_context_crop(
+        frame: np.ndarray,
+        face_bbox: Tuple[int, int, int, int],
+        scale: float = 2.7,
+    ) -> Optional[np.ndarray]:
+        """Extract a padded square context crop around *face_bbox* for anti-spoofing."""
+        fh, fw = frame.shape[:2]
+        x1, y1, x2, y2 = face_bbox
+        bw = max(x2 - x1, 1)
+        bh = max(y2 - y1, 1)
+        cx = (x1 + x2) / 2.0
+        cy = (y1 + y2) / 2.0
+        half = max(bw, bh) * scale / 2.0
+        sx1 = max(0, int(cx - half))
+        sy1 = max(0, int(cy - half))
+        sx2 = min(fw, int(cx + half))
+        sy2 = min(fh, int(cy + half))
+        if sx2 <= sx1 or sy2 <= sy1:
+            return None
+        return frame[sy1:sy2, sx1:sx2]
+
     # ── Decision Logic ────────────────────────────────────────
 
     def _decide(
@@ -346,12 +387,15 @@ class AMFREngine:
         """
         details: Dict = {}
 
-        # ── 1. Liveness gate (hard reject on spoof) ──────────
+        # ── 1. Liveness gate (hard reject on spoof / failed liveness) ──
         if not is_live:
             details["liveness_gate"] = "FAILED"
-            if liveness_score < cfg.LIVENESS_SPOOF_THRESHOLD:
-                details["spoof_reason"] = "liveness_below_spoof_threshold"
-                return AMFRDecision.REJECT_SPOOF, 0.0, details
+            details["spoof_reason"] = (
+                "liveness_below_spoof_threshold"
+                if liveness_score < cfg.LIVENESS_SPOOF_THRESHOLD
+                else "liveness_check_failed"
+            )
+            return AMFRDecision.REJECT_SPOOF, 0.0, details
 
         details["liveness_gate"] = "PASSED"
 

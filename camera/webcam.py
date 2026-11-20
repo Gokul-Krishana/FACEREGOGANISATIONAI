@@ -13,6 +13,7 @@ Supports:
 
 from __future__ import annotations
 
+import sys
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -22,6 +23,37 @@ from camera.base import CameraSource
 from utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
+
+
+def get_preferred_backends() -> List[Tuple[Optional[int], str]]:
+    """Return ordered ``(cv2_backend, label)`` pairs for the current OS.
+
+    On Windows tries DirectShow then Media Foundation; on Linux tries V4L2;
+    on macOS tries AVFoundation; always ends with the OpenCV default backend.
+    """
+    backends: List[Tuple[Optional[int], str]] = []
+    if sys.platform.startswith("win"):
+        for attr, label in (("CAP_DSHOW", "DirectShow"), ("CAP_MSMF", "Media Foundation")):
+            val = getattr(cv2, attr, None)
+            if val is not None:
+                backends.append((val, label))
+    elif sys.platform.startswith("linux"):
+        val = getattr(cv2, "CAP_V4L2", None)
+        if val is not None:
+            backends.append((val, "V4L2"))
+    elif sys.platform == "darwin":
+        val = getattr(cv2, "CAP_AVFOUNDATION", None)
+        if val is not None:
+            backends.append((val, "AVFoundation"))
+    backends.append((None, "Default"))
+    return backends
+
+
+def open_video_capture(device_id: int, backend: Optional[int]) -> cv2.VideoCapture:
+    """Open ``cv2.VideoCapture`` with an optional backend flag."""
+    if backend is None:
+        return cv2.VideoCapture(device_id)
+    return cv2.VideoCapture(device_id, backend)
 
 
 class WebcamSource(CameraSource):
@@ -51,23 +83,16 @@ class WebcamSource(CameraSource):
 
     # ── Lifecycle ─────────────────────────────────────────────────
     def open(self) -> bool:
-        """Open the webcam with multiple backend fallback."""
-        backends = [
-            (cv2.CAP_DSHOW, "DirectShow"),
-            (cv2.CAP_MSMF, "Media Foundation"),
-            (None, "Default"),
-        ]
-        for backend, backend_name in backends:
+        """Open the webcam with cross-platform backend fallback."""
+        for backend, backend_name in get_preferred_backends():
             try:
-                if backend is None:
-                    cap = cv2.VideoCapture(self.device_id)
-                else:
-                    cap = cv2.VideoCapture(self.device_id, backend)
+                cap = open_video_capture(self.device_id, backend)
                 if cap.isOpened():
                     self._cap = cap
                     self.set_resolution(self._width, self._height)
                     logger.info("Webcam opened camera #%s via %s", self.device_id, backend_name)
                     return True
+                cap.release()
             except Exception:
                 continue
         self._cap = None
@@ -132,11 +157,18 @@ def list_webcams(max_devices: int = 5) -> List[int]:
         List of available device indices.
     """
     available: List[int] = []
+    backends = get_preferred_backends()
     for idx in range(max_devices):
-        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-        if cap.isOpened():
-            available.append(idx)
-            cap.release()
+        for backend, _ in backends:
+            try:
+                cap = open_video_capture(idx, backend)
+                if cap.isOpened():
+                    available.append(idx)
+                    cap.release()
+                    break
+                cap.release()
+            except Exception:
+                continue
     return available
 
 
@@ -155,21 +187,17 @@ def list_all_cameras(max_devices: int = 10) -> List[Dict]:
         List of dicts with ``index``, ``name``, ``has_frame`` keys.
     """
     results: List[Dict] = []
+    backends = get_preferred_backends()
     for idx in range(max_devices):
-        # Try DirectShow first, then default backend
-        for backend in (cv2.CAP_DSHOW, None):
+        for backend, backend_name in backends:
             try:
-                if backend is None:
-                    cap = cv2.VideoCapture(idx)
-                else:
-                    cap = cv2.VideoCapture(idx, backend)
+                cap = open_video_capture(idx, backend)
                 if cap.isOpened():
                     # Read a test frame to confirm it works
                     ret, frame = cap.read()
                     has_frame = ret and frame is not None
                     h, w = frame.shape[:2] if has_frame else (0, 0)
                     cap.release()
-                    backend_name = "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
                     results.append(
                         {
                             "index": idx,
@@ -180,6 +208,7 @@ def list_all_cameras(max_devices: int = 10) -> List[Dict]:
                         }
                     )
                     break  # Found on this backend, don't try the other
+                cap.release()
             except Exception:
                 continue
     return results
@@ -249,15 +278,12 @@ class USBAnySource(CameraSource):
         # Then scan all indices to find the first working camera
         indices_to_try.extend(i for i in range(self._max_devices) if i != self._prefer_index)
 
+        backends = get_preferred_backends()
         for idx in indices_to_try:
             try:
-                # Try DirectShow first, then default
-                for backend in (cv2.CAP_DSHOW, None):
+                for backend, backend_name in backends:
                     try:
-                        if backend is None:
-                            cap = cv2.VideoCapture(idx)
-                        else:
-                            cap = cv2.VideoCapture(idx, backend)
+                        cap = open_video_capture(idx, backend)
                         if cap.isOpened():
                             # Verify with a test read
                             ret, frame = cap.read()
@@ -265,7 +291,6 @@ class USBAnySource(CameraSource):
                                 self._cap = cap
                                 self._found_index = idx
                                 self.set_resolution(self._width, self._height)
-                                backend_name = "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
                                 logger.info("USBAny found camera #%s via %s", idx, backend_name)
                                 return True
                             cap.release()

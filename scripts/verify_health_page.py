@@ -57,15 +57,18 @@ def time_health_checks() -> None:
     print("Timing heavy operations the page runs server-side:")
 
     t0 = time.perf_counter()
-    import cv2
+    from camera.webcam import get_preferred_backends, open_video_capture
 
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    opened = cap.isOpened()
-    if opened:
-        ret, frame = cap.read()
-    else:
-        ret, frame = False, None
-    cap.release()
+    opened = False
+    ret, frame = False, None
+    for backend, _ in get_preferred_backends():
+        cap = open_video_capture(0, backend)
+        if cap.isOpened():
+            opened = True
+            ret, frame = cap.read()
+            cap.release()
+            break
+        cap.release()
     print(
         f"  Camera open+read: {time.perf_counter() - t0:.1f}s "
         f"| opened={opened} | frame={frame.shape if (opened and ret) else 'N/A'}"

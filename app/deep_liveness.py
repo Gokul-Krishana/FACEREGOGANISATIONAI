@@ -288,24 +288,21 @@ class DeepLivenessDetector:
         """Run ONNX model inference."""
         start = time.perf_counter()
 
-        # Preprocess
-        input_tensor = self._preprocess(face_img, landmarks)
+        # Preprocess for MiniFASNetV2: raw BGR [0, 255] NCHW float32 at 80x80
+        input_tensor = self._preprocess_onnx(face_img, landmarks)
 
         # Inference
         outputs = self._session.run(None, {self._input_name: input_tensor})  # type: ignore[attr-defined]
 
-        # Postprocess: MiniFASNet returns shape (1, 3) → [spoof, fake, live]
-        # or (1, 2) → [spoof, live], or (1, 1) → single logit.
-        # The ONNX export emits RAW LOGITS (sum ≠ 1), so probabilities must be
-        # derived with softmax/sigmoid before thresholding — taking a logit
-        # directly and clipping to [0,1] would distort the score.
+        # Postprocess: Silent-Face-Anti-Spoofing / MiniFASNetV2 returns raw logits:
+        # shape (1, 3) → [spoof_print, live_real, spoof_replay] (index 1 is LIVE),
+        # shape (1, 2) → [spoof, live], or (1, 1) → single logit.
         raw_output = outputs[0].flatten().astype(np.float64)
         if raw_output.shape[0] >= 3:
-            # Three-class (MiniFASNetV2): index 2 is the LIVE class.
             probs = np.exp(raw_output - np.max(raw_output))
             probs = probs / probs.sum()
-            live_score = float(probs[2])
-            spoof_score = float(probs[:2].max())
+            live_score = float(probs[1])
+            spoof_score = float(max(probs[0], probs[2]))
         elif raw_output.shape[0] == 2:
             # Two-class: [spoof, live] — softmax over both logits.
             probs = np.exp(raw_output - np.max(raw_output))
@@ -330,6 +327,32 @@ class DeepLivenessDetector:
             inference_time_ms=round(elapsed, 2),
             model_available=True,
         )
+
+    def _preprocess_onnx(
+        self,
+        face_img: np.ndarray,
+        landmarks: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Preprocess a face/context crop for MiniFASNetV2 ONNX inference.
+
+        MiniFASNetV2 (Silent-Face-Anti-Spoofing) expects raw BGR pixel
+        values in ``[0, 255]`` as float32 NCHW ``(1, 3, 80, 80)`` without
+        ImageNet mean/std subtraction.
+        """
+        if len(face_img.shape) == 2:
+            bgr = cv2.cvtColor(face_img, cv2.COLOR_GRAY2BGR)
+        elif face_img.shape[2] == 1:
+            bgr = cv2.cvtColor(face_img, cv2.COLOR_GRAY2BGR)
+        else:
+            bgr = face_img[:, :, :3]
+
+        if landmarks is not None and len(landmarks) == 5:
+            bgr = self._align_face(bgr, landmarks)
+
+        w, h = _MODEL_INPUT_SIZE
+        resized = cv2.resize(bgr, (w, h), interpolation=cv2.INTER_LINEAR)
+        tensor = np.transpose(resized.astype(np.float32), (2, 0, 1))
+        return np.expand_dims(tensor, axis=0)
 
     def _preprocess(
         self,
@@ -413,7 +436,7 @@ class DeepLivenessDetector:
 
         # Estimate similarity transform
         try:
-            tform = cv2.estimateAffinePartial2D(landmarks, canonical)
+            tform, _ = cv2.estimateAffinePartial2D(landmarks, canonical)
             if tform is not None:
                 aligned = cv2.warpAffine(  # type: ignore[call-overload]
                     face_img,
