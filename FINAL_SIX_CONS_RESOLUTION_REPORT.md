@@ -230,3 +230,4 @@ Both services are active in the background:
 2. **Configure Production Database:** For multi-gate deployments, configure PostgreSQL by setting `DATABASE_URL=postgresql://user:pass@host:5432/db` in `.env`.
 3. **Deploy HTTPS Reverse Proxy:** Place Uvicorn and Streamlit behind Nginx with TLS 1.3 certificates.
 4. **Physical 24-Hour Camera Burn-in:** Mount the actual production cameras and run a 24-hour continuous stream check to verify local driver stability.
+
