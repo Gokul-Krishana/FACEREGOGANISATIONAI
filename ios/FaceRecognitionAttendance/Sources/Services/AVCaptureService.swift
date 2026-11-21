@@ -82,3 +82,4 @@ public final class AVCaptureService: NSObject, ObservableObject, AVCaptureVideoD
         }
     }
 }
+

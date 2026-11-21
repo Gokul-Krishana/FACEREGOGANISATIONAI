@@ -29,3 +29,4 @@ echo "[DB] Seeding database & RBAC roles..."
 python scripts/seed_admin.py
 
 echo "[DONE] Linux setup complete. You can now start backend and dashboard."
+

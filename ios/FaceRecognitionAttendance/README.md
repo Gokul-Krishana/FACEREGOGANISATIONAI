@@ -59,3 +59,4 @@ ios/FaceRecognitionAttendance/
 - This iOS package is completely self-contained.
 - It requires no Python packages, Swift bridges, or system modifications on the Windows host.
 - The FastAPI backend serves both Windows desktop clients and iOS mobile clients via standardized REST endpoints.
+

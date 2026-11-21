@@ -75,3 +75,4 @@ public struct AttendanceCameraView: View {
         }
     }
 }
+

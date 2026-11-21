@@ -16,3 +16,4 @@ fi
 
 echo "[START] Launching FastAPI Backend on http://0.0.0.0:8000 ..."
 exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 2
+

@@ -16,3 +16,4 @@ fi
 
 echo "[START] Launching Streamlit Dashboard on port 8501 ..."
 exec streamlit run dashboard/app.py --server.port 8501 --server.headless true --server.address 0.0.0.0
+

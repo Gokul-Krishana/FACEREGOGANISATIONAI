@@ -14,3 +14,4 @@ Environment=LOG_LEVEL=INFO
 
 [Install]
 WantedBy=multi-user.target
+

@@ -18,3 +18,4 @@ python scripts/seed_admin.py
 
 echo [READY] Windows setup complete.
 pause
+

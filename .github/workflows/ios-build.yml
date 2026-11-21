@@ -1,0 +1,43 @@
+name: Apple iOS Build CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "ios/**"
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-swift-build:
+    name: macOS / Xcode Swift Build
+    runs-on: macos-14
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+          swift --version
+
+      - name: Build Swift Package
+        working-directory: ios/FaceRecognitionAttendance
+        run: |
+          swift package clean
+          swift build -c release
+
+      - name: Run Swift Package Unit Tests
+        working-directory: ios/FaceRecognitionAttendance
+        run: |
+          swift test --enable-code-coverage

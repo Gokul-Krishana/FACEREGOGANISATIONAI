@@ -14,3 +14,4 @@ if exist ".venv\Scripts\activate.bat" (
 echo [START] Launching Streamlit Dashboard on http://localhost:8501 ...
 streamlit run dashboard/app.py --server.port 8501 --server.headless true
 pause
+

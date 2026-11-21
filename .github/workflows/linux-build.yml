@@ -1,0 +1,93 @@
+name: Linux Build & Compatibility CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "requirements-linux.txt"
+      - "Dockerfile"
+      - "deployment/linux/**"
+      - "camera/**"
+      - "api/**"
+      - "app/**"
+      - "dashboard/**"
+      - "database/**"
+      - ".github/workflows/linux-build.yml"
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: linux-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-test:
+    name: Ubuntu 22.04 LTS Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Linux System Libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 \
+            libglib2.0-0 \
+            libmagic1 \
+            v4l-utils \
+            curl
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements-linux.txt
+          pip install pytest pytest-cov
+
+      - name: Verify Module Imports & Linux Camera Fallback
+        run: |
+          python -c "
+          import cv2
+          import torch
+          import faiss
+          import onnxruntime
+          import insightface
+          from camera.camera_manager import CameraManager
+          from app.amfr_pipeline import AMFREngine
+          print('All AI and computer vision modules imported successfully on Linux.')
+          "
+
+      - name: Run Test Suite
+        env:
+          JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
+        run: |
+          python -m pytest tests -q --ignore=tests/benchmarks
+
+      - name: Verify FastAPI Daemon Startup
+        env:
+          JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
+        run: |
+          uvicorn api.main:app --host 127.0.0.1 --port 8000 &
+          API_PID=$!
+          echo "Waiting for FastAPI to start..."
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8000/health > /dev/null; then
+              echo "FastAPI successfully responded HTTP 200 on Linux!"
+              break
+            fi
+            sleep 1
+          done
+          kill $API_PID || true
+
+      - name: Verify Docker Container Build
+        run: |
+          docker build -t face-recognition-ai:linux-ci .
+          docker images

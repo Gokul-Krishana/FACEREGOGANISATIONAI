@@ -36,3 +36,4 @@ public struct AttendanceSubmissionResponse: Codable {
         case timestamp
     }
 }
+
