@@ -64,7 +64,7 @@ jobs:
           import onnxruntime
           import insightface
           from camera import CameraSource, ResilientCameraSource, create_camera
-          from app.amfr_pipeline import AMFREngine
+          from app.amfr_engine import AMFREngine
           print('All AI and computer vision modules imported successfully on Linux.')
           "
 
