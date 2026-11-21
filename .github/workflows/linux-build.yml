@@ -63,7 +63,9 @@ jobs:
           import faiss
           import onnxruntime
           import insightface
-          from camera.camera_manager import CameraManager
+          from camera.resilient import ResilientCamera
+          from camera.webcam import WebcamCamera
+          from camera.base import BaseCamera
           from app.amfr_pipeline import AMFREngine
           print('All AI and computer vision modules imported successfully on Linux.')
           "
@@ -72,6 +74,7 @@ jobs:
         env:
           JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
         run: |
+          mkdir -p data logs outputs embeddings unknown_faces
           python -c "from database.database import init_db; init_db(); print('SQLite database initialized successfully.')"
           alembic upgrade head
 
