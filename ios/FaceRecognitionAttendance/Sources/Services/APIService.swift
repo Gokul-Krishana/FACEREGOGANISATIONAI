@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 public final class AttendanceAPIService: ObservableObject {
     public static let shared = AttendanceAPIService()
@@ -114,6 +116,7 @@ public final class AttendanceAPIService: ObservableObject {
         return httpResponse.statusCode == 200 || httpResponse.statusCode == 201
     }
     
+    #if canImport(UIKit)
     /// Verify captured frame and submit attendance via backend AI engine (MiniFASNetV2 + ArcFace)
     public func verifyFaceFrame(image: UIImage) async throws -> Data {
         guard let token = currentSession?.accessToken else {
@@ -144,4 +147,5 @@ public final class AttendanceAPIService: ObservableObject {
         }
         return data
     }
+    #endif
 }

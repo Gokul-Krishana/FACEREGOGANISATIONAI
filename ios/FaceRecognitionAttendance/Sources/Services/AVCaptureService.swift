@@ -1,5 +1,7 @@
+#if canImport(UIKit) && canImport(AVFoundation)
 import AVFoundation
 import UIKit
+import CoreImage
 
 public final class AVCaptureService: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published public var currentFrame: UIImage?
@@ -82,4 +84,4 @@ public final class AVCaptureService: NSObject, ObservableObject, AVCaptureVideoD
         }
     }
 }
-
+#endif

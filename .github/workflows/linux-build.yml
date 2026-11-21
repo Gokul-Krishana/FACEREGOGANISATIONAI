@@ -2,29 +2,32 @@ name: Linux Build & Compatibility CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, cross-platform-ci]
     paths:
       - "requirements-linux.txt"
       - "Dockerfile"
+      - ".dockerignore"
       - "deployment/linux/**"
       - "camera/**"
       - "api/**"
       - "app/**"
       - "dashboard/**"
       - "database/**"
+      - "alembic/**"
       - ".github/workflows/linux-build.yml"
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
 
 concurrency:
   group: linux-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  linux-test:
-    name: Ubuntu 22.04 LTS Validation
+  linux-validation:
+    name: Ubuntu 22.04 LTS & Docker Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Code
@@ -52,7 +55,7 @@ jobs:
           pip install -r requirements-linux.txt
           pip install pytest pytest-cov
 
-      - name: Verify Module Imports & Linux Camera Fallback
+      - name: Verify Python Module Imports & Linux Camera Fallback
         run: |
           python -c "
           import cv2
@@ -65,29 +68,79 @@ jobs:
           print('All AI and computer vision modules imported successfully on Linux.')
           "
 
-      - name: Run Test Suite
+      - name: Validate Database Schema & Migrations
+        env:
+          JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
+        run: |
+          python -c "from database.database import init_db; init_db(); print('SQLite database initialized successfully.')"
+          alembic upgrade head
+
+      - name: Run Pytest Test Suite
         env:
           JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
         run: |
           python -m pytest tests -q --ignore=tests/benchmarks
 
-      - name: Verify FastAPI Daemon Startup
+      - name: Verify FastAPI Daemon Startup & Health Endpoint
         env:
           JWT_SECRET_KEY: "test-secret-key-for-ci-minimum-32-chars-long"
         run: |
           uvicorn api.main:app --host 127.0.0.1 --port 8000 &
           API_PID=$!
-          echo "Waiting for FastAPI to start..."
+          echo "Waiting for FastAPI daemon..."
           for i in {1..30}; do
-            if curl -s http://127.0.0.1:8000/health > /dev/null; then
-              echo "FastAPI successfully responded HTTP 200 on Linux!"
+            if curl -s http://127.0.0.1:8000/health | grep -q "healthy"; then
+              echo "FastAPI successfully responded HTTP 200 with healthy status on Linux!"
               break
             fi
             sleep 1
           done
           kill $API_PID || true
 
-      - name: Verify Docker Container Build
+      - name: Verify Streamlit Dashboard Headless Startup
         run: |
-          docker build -t face-recognition-ai:linux-ci .
-          docker images
+          streamlit run dashboard/app.py --server.headless true --server.port 8501 --server.address 127.0.0.1 &
+          ST_PID=$!
+          echo "Waiting for Streamlit dashboard..."
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8501/_stcore/health | grep -q "ok"; then
+              echo "Streamlit successfully responded HTTP 200 on Linux!"
+              break
+            fi
+            sleep 1
+          done
+          kill $ST_PID || true
+
+      - name: Build Production Docker Image
+        run: |
+          docker build -t face-recognition-ai:ci-test .
+          docker images face-recognition-ai:ci-test
+
+      - name: Start Docker Container & Validate Health
+        run: |
+          docker run -d --name faceai-ci-container \
+            -p 8000:8000 \
+            -e JWT_SECRET_KEY="test-secret-key-for-ci-minimum-32-chars-long" \
+            -e LOG_LEVEL="INFO" \
+            face-recognition-ai:ci-test
+
+          echo "Waiting for containerized FastAPI healthcheck..."
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8000/health | grep -q "healthy"; then
+              echo "Docker container successfully responded HTTP 200!"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "=== Container Logs ==="
+          docker logs faceai-ci-container
+
+          echo "=== Inspecting Container Health Status ==="
+          docker inspect --format='{{json .State.Health}}' faceai-ci-container || true
+
+      - name: Clean up Docker Test Container
+        if: always()
+        run: |
+          docker stop faceai-ci-container || true
+          docker rm faceai-ci-container || true

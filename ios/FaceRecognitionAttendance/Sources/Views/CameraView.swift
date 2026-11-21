@@ -1,3 +1,4 @@
+#if canImport(SwiftUI) && canImport(UIKit) && canImport(AVFoundation)
 import SwiftUI
 
 public struct AttendanceCameraView: View {
@@ -75,4 +76,4 @@ public struct AttendanceCameraView: View {
         }
     }
 }
-
+#endif

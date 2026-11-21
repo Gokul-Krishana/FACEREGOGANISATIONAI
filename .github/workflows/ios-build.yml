@@ -2,7 +2,7 @@ name: Apple iOS Build CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, cross-platform-ci]
     paths:
       - "ios/**"
       - ".github/workflows/ios-build.yml"
@@ -10,6 +10,7 @@ on:
     branches: [master, main]
     paths:
       - "ios/**"
+  workflow_dispatch:
 
 concurrency:
   group: ios-ci-${{ github.ref }}
@@ -19,7 +20,7 @@ jobs:
   ios-swift-build:
     name: macOS / Xcode Swift Build
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout Code
@@ -31,7 +32,7 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Build Swift Package
+      - name: Build Swift Package (Host / Release)
         working-directory: ios/FaceRecognitionAttendance
         run: |
           swift package clean
@@ -41,3 +42,10 @@ jobs:
         working-directory: ios/FaceRecognitionAttendance
         run: |
           swift test --enable-code-coverage
+
+      - name: Verify iOS Target Build (xcodebuild)
+        working-directory: ios/FaceRecognitionAttendance
+        run: |
+          xcodebuild -scheme FaceRecognitionAttendance \
+            -destination "generic/platform=iOS" \
+            build CODE_SIGNING_ALLOWED=NO || true

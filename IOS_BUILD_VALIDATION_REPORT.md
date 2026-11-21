@@ -93,3 +93,4 @@ Because iOS applications require Apple Xcode toolchains that run only on macOS, 
 
 - **Packaging**: The entire iOS project has been archived as `Face_Recognition_AI_2.0_iOS_Source.zip`.
 - **Xcode Opening**: Developers can open the folder directly in Xcode via `File -> Open -> ios/FaceRecognitionAttendance` or add it as a Swift Package dependency to an existing iOS application.
+

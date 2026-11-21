@@ -99,3 +99,4 @@ Regressions Detected:  0 (Zero)
 - **Purged Biometric Identities**: As verified across all project databases, directories, and embedding stores, former test identities (`saubaan` and `preetam`) remain 100% eliminated. No photographs, vectors, metadata, or database rows exist in the repository or delivery archives.
 - **Biometric Processing Boundary**: Both Linux and iOS platforms preserve the AMFR (Anti-Spoofing Multi-Factor Recognition) security boundary: facial frames captured on edge devices are validated by the centralized MiniFASNetV2 + ArcFace pipeline. No spoofed frames bypass server-side verification.
 - **Git Push Restraint**: In accordance with user security instructions, no remote force-push (`git push --force`) was performed. Remote history cleanup remains ready to be executed upon the user's explicit authorization.
+

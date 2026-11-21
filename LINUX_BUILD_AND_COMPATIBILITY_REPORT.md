@@ -96,3 +96,4 @@ Automated CI workflow defined at [linux-build.yml](file:///.github/workflows/lin
   2. Automated GitHub Actions CI workflow on genuine Ubuntu 22.04 runners.
   3. Script syntax validation (`set -euo pipefail`).
 - **Archive Package**: All Linux source files, configurations, systemd services, and models are bundled into `Face_Recognition_AI_2.0_Linux.zip`.
+
