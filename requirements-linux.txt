@@ -30,6 +30,7 @@ python-jose[cryptography]>=3.3.0 # JWT tokens for authentication
 passlib[bcrypt]>=1.7.4          # Password hashing
 bcrypt>=4.0.0                   # Bcrypt engine
 PyJWT>=2.8.0                    # JWT decoding
+email-validator>=2.0.0          # EmailStr validation for Pydantic models
 slowapi>=0.1.9                  # Rate limiting
 secure>=0.3.0                   # Security headers
 python-dotenv>=1.0.0

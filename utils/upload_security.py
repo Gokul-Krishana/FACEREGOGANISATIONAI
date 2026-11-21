@@ -195,8 +195,10 @@ def sanitize_filename(filename: str) -> str:
     Used for display/storage keys, NOT for actual file writes
     (use ``_generate_safe_filename`` for that).
     """
+    # Normalize backslashes to forward slashes for cross-platform safety
+    normalized = filename.replace("\\", "/")
     # Remove any path components
-    clean = Path(filename).name
+    clean = Path(normalized).name
     # Remove null bytes
     clean = clean.replace("\x00", "")
     # Limit length
