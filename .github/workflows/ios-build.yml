@@ -19,7 +19,7 @@ concurrency:
 jobs:
   swift-linux-validation:
     name: Swift 5.9 Linux CI & SPM Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
 
     steps:
