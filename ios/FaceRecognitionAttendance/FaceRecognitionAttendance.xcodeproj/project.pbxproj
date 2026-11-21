@@ -14,7 +14,6 @@
 		91A6C7ACCDF7436A86560125 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB9C3281D5F4993979A4358 /* APIService.swift */; };
 		FF791F13952B4F428E085CEF /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C43582F4864E278EC060D4 /* KeychainHelper.swift */; };
 		F9DAAC8C06204F2A9328FF16 /* AVCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188B3CD4203C4B76ABDBA8AE /* AVCaptureService.swift */; };
-		7E3A999515DA4819B4A1C82F /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B6D81AF7CDCA4804AE45D7E0 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -109,7 +108,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7E3A999515DA4819B4A1C82F /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
