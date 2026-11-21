@@ -92,9 +92,7 @@ jobs:
       - name: Boot iOS Simulator & Await Mandatory Boot Readiness
         run: |
           echo "Booting simulator: $SIM_UDID ($SIM_NAME)..."
-          xcrun simctl boot "$SIM_UDID"
-          echo "Waiting for simulator $SIM_UDID to reach ready state..."
-          xcrun simctl bootstatus "$SIM_UDID" -b -t 180
+          xcrun simctl bootstatus "$SIM_UDID" -b
           echo "Simulator boot confirmed ready:"
           xcrun simctl list devices | grep "$SIM_UDID"
 
