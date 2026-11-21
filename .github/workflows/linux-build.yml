@@ -63,9 +63,7 @@ jobs:
           import faiss
           import onnxruntime
           import insightface
-          from camera.resilient import ResilientCamera
-          from camera.webcam import WebcamCamera
-          from camera.base import BaseCamera
+          from camera import CameraSource, ResilientCameraSource, create_camera
           from app.amfr_pipeline import AMFREngine
           print('All AI and computer vision modules imported successfully on Linux.')
           "

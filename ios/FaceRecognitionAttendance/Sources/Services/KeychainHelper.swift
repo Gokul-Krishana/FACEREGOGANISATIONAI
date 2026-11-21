@@ -1,4 +1,5 @@
 import Foundation
+#if canImport(Security)
 import Security
 
 /// Thread-safe helper for managing JWT tokens and credentials in the iOS Keychain.
@@ -67,4 +68,46 @@ public final class KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 }
-
+#else
+/// Cross-platform memory-backed fallback for non-Apple environments (e.g. Linux CI)
+public final class KeychainHelper {
+    public static let shared = KeychainHelper()
+    private var storage = [String: Data]()
+    private let lock = NSLock()
+    
+    private init() {}
+    
+    @discardableResult
+    public func save(key: String, data: Data) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        storage[key] = data
+        return true
+    }
+    
+    public func read(key: String) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage[key]
+    }
+    
+    @discardableResult
+    public func delete(key: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.removeValue(forKey: key)
+        return true
+    }
+    
+    @discardableResult
+    public func saveString(key: String, value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+        return save(key: key, data: data)
+    }
+    
+    public func readString(key: String) -> String? {
+        guard let data = read(key: key) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+#endif
