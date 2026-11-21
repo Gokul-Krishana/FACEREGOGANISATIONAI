@@ -200,12 +200,14 @@ jobs:
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/test_results"
           echo "Running unit tests on iOS Simulator: '$SIM_NAME' ($SIM_UDID)"
-          xcodebuild -list -package-path .
+          xcodebuild -list
           
           xcodebuild test \
-            -package-path . \
+            -project FaceRecognitionAttendance.xcodeproj \
             -scheme FaceRecognitionAttendance \
+            -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -derivedDataPath ./build \
             -resultBundlePath "$GITHUB_WORKSPACE/test_results/FaceRecognitionAttendanceTests.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
