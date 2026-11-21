@@ -82,35 +82,36 @@ jobs:
       - name: Build Native iOS App Target (Xcode)
         working-directory: ios/FaceRecognitionAttendance
         run: |
-          xcodebuild build \
-            -project FaceRecognitionAttendance.xcodeproj \
-            -scheme FaceRecognitionAttendance \
-            -destination "generic/platform=iOS Simulator" \
-            -derivedDataPath ./build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Run Unit Tests on iOS Simulator
-        working-directory: ios/FaceRecognitionAttendance
-        run: |
-          echo "Listing available iOS Simulators:"
-          xcrun simctl list devices available
-          
           SIM_NAME=$(xcrun simctl list devices available | grep -E 'iPhone 16|iPhone 15|iPhone 14|iPhone 13' | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+\(.*\)$//')
           if [ -z "$SIM_NAME" ]; then
             SIM_NAME="iPhone 16"
           fi
           echo "Selected simulator: '$SIM_NAME'"
           
-          xcodebuild test \
+          xcodebuild build \
             -project FaceRecognitionAttendance.xcodeproj \
             -scheme FaceRecognitionAttendance \
             -destination "platform=iOS Simulator,name=$SIM_NAME" \
             -derivedDataPath ./build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO || true
+            CODE_SIGNING_REQUIRED=NO 2>&1 | tee build.log || (echo "=== BUILD LOG FAILURE ===" && tail -n 80 build.log && exit 1)
+
+      - name: Run Unit Tests on iOS Simulator
+        working-directory: ios/FaceRecognitionAttendance
+        run: |
+          SIM_NAME=$(xcrun simctl list devices available | grep -E 'iPhone 16|iPhone 15|iPhone 14|iPhone 13' | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+\(.*\)$//')
+          if [ -z "$SIM_NAME" ]; then
+            SIM_NAME="iPhone 16"
+          fi
+          echo "Running tests on iOS Simulator: '$SIM_NAME'"
+          
+          xcodebuild test \
+            -scheme FaceRecognitionAttendance \
+            -destination "platform=iOS Simulator,name=$SIM_NAME" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Boot Simulator, Install App & Validate Launch
         working-directory: ios/FaceRecognitionAttendance
