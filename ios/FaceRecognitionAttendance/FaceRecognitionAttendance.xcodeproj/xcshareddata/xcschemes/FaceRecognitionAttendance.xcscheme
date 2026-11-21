@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1540"
+   LastUpgradeVersion = "1600"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2D8909A69D354141ADF1AF2A"
+               BlueprintIdentifier = "2285015E18EE401897E8DBAD"
                BuildableName = "FaceRecognitionAttendance.app"
                BlueprintName = "FaceRecognitionAttendance"
                ReferencedContainer = "container:FaceRecognitionAttendance.xcodeproj">
@@ -28,7 +28,7 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "10B674BD1A284B27968BBDFD"
+               BlueprintIdentifier = "F889CB42E87B4CDB84B19899"
                BuildableName = "FaceRecognitionAttendanceTests.xctest"
                BlueprintName = "FaceRecognitionAttendanceTests"
                ReferencedContainer = "container:FaceRecognitionAttendance.xcodeproj">
@@ -46,7 +46,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "10B674BD1A284B27968BBDFD"
+               BlueprintIdentifier = "F889CB42E87B4CDB84B19899"
                BuildableName = "FaceRecognitionAttendanceTests.xctest"
                BlueprintName = "FaceRecognitionAttendanceTests"
                ReferencedContainer = "container:FaceRecognitionAttendance.xcodeproj">
@@ -68,7 +68,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2D8909A69D354141ADF1AF2A"
+            BlueprintIdentifier = "2285015E18EE401897E8DBAD"
             BuildableName = "FaceRecognitionAttendance.app"
             BlueprintName = "FaceRecognitionAttendance"
             ReferencedContainer = "container:FaceRecognitionAttendance.xcodeproj">
@@ -85,7 +85,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2D8909A69D354141ADF1AF2A"
+            BlueprintIdentifier = "2285015E18EE401897E8DBAD"
             BuildableName = "FaceRecognitionAttendance.app"
             BlueprintName = "FaceRecognitionAttendance"
             ReferencedContainer = "container:FaceRecognitionAttendance.xcodeproj">
