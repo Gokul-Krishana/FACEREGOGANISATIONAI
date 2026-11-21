@@ -42,7 +42,7 @@
 		2BD15F2F66D64AA6ABFD994A /* KeychainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/FaceRecognitionAttendanceTests/KeychainTests.swift"; sourceTree = SOURCE_ROOT; };
 		DBADDA17FA944F15B4B9DE63 /* APIServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/FaceRecognitionAttendanceTests/APIServiceTests.swift"; sourceTree = SOURCE_ROOT; };
 		2285015E18EE401897E8DBAE /* FaceRecognitionAttendance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FaceRecognitionAttendance.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F889CB42E87B4CDB84B1989A /* FaceRecognitionAttendanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FaceRecognitionAttendanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F889CB42E87B4CDB84B1989A /* FaceRecognitionAttendanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.xctest; includeInIndex = 0; path = FaceRecognitionAttendanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -331,6 +331,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FaceRecognitionAttendance.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FaceRecognitionAttendance";
+				TEST_TARGET_NAME = FaceRecognitionAttendance;
 			};
 			name = Debug;
 		};
@@ -357,6 +358,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FaceRecognitionAttendance.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FaceRecognitionAttendance";
+				TEST_TARGET_NAME = FaceRecognitionAttendance;
 			};
 			name = Release;
 		};
