@@ -73,7 +73,7 @@ jobs:
           echo "Scanning available iOS Simulators..."
           xcrun simctl list devices available
           
-          SIM_NAME=$(xcrun simctl list devices available | grep -E 'iPhone 16|iPhone 15|iPhone 14|iPhone 13' | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+\(.*\)$//')
+          SIM_NAME=$(xcrun simctl list devices available | grep -E 'iPhone 16|iPhone 15|iPhone 14|iPhone 13' | head -n 1 | awk -F'[(]' '{print $1}' | xargs)
           if [ -z "$SIM_NAME" ]; then
             echo "::error::No compatible iPhone simulator found on runner!"
             exit 1
@@ -110,6 +110,7 @@ jobs:
       - name: Build Native iOS App Target (Xcode)
         working-directory: ios/FaceRecognitionAttendance
         run: |
+          set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/build_logs"
           echo "Listing Xcode Projects and Schemes:"
           xcodebuild -list
@@ -117,7 +118,7 @@ jobs:
           xcodebuild build \
             -project FaceRecognitionAttendance.xcodeproj \
             -scheme FaceRecognitionAttendance \
-            -destination "platform=iOS Simulator,name=$SIM_NAME" \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
             -derivedDataPath ./build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -195,11 +196,12 @@ jobs:
       - name: Run Unit Tests on iOS Simulator
         working-directory: ios/FaceRecognitionAttendance
         run: |
+          set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/test_results"
-          echo "Running unit tests on iOS Simulator: '$SIM_NAME'"
+          echo "Running unit tests on iOS Simulator: '$SIM_NAME' ($SIM_UDID)"
           xcodebuild test \
             -scheme FaceRecognitionAttendance \
-            -destination "platform=iOS Simulator,name=$SIM_NAME" \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
             -derivedDataPath ./build \
             -resultBundlePath "$GITHUB_WORKSPACE/test_results/FaceRecognitionAttendanceTests.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
