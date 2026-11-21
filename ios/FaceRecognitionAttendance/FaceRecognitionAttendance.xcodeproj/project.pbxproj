@@ -41,6 +41,8 @@
 		EA6429E3A546435FA5054FB4 /* ModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/FaceRecognitionAttendanceTests/ModelTests.swift"; sourceTree = SOURCE_ROOT; };
 		2BD15F2F66D64AA6ABFD994A /* KeychainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/FaceRecognitionAttendanceTests/KeychainTests.swift"; sourceTree = SOURCE_ROOT; };
 		DBADDA17FA944F15B4B9DE63 /* APIServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Tests/FaceRecognitionAttendanceTests/APIServiceTests.swift"; sourceTree = SOURCE_ROOT; };
+		2285015E18EE401897E8DBAE /* FaceRecognitionAttendance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FaceRecognitionAttendance.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F889CB42E87B4CDB84B1989A /* FaceRecognitionAttendanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FaceRecognitionAttendanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +77,8 @@
 				EA6429E3A546435FA5054FB4 /* ModelTests.swift */,
 				2BD15F2F66D64AA6ABFD994A /* KeychainTests.swift */,
 				DBADDA17FA944F15B4B9DE63 /* APIServiceTests.swift */,
+				2285015E18EE401897E8DBAE /* FaceRecognitionAttendance.app */,
+				F889CB42E87B4CDB84B1989A /* FaceRecognitionAttendanceTests.xctest */,
 			);
 			sourceTree = "<group>";
 		};
@@ -95,6 +99,7 @@
 			);
 			name = FaceRecognitionAttendance;
 			productName = FaceRecognitionAttendance;
+			productReference = 2285015E18EE401897E8DBAE /* FaceRecognitionAttendance.app */;
 			productType = "com.apple.product-type.application";
 		};
 		F889CB42E87B4CDB84B19899 /* FaceRecognitionAttendanceTests */ = {
@@ -111,6 +116,7 @@
 			);
 			name = FaceRecognitionAttendanceTests;
 			productName = FaceRecognitionAttendanceTests;
+			productReference = F889CB42E87B4CDB84B1989A /* FaceRecognitionAttendanceTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -319,6 +325,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.facerecognition.attendanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				WRAPPER_EXTENSION = xctest;
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
@@ -344,6 +351,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.facerecognition.attendanceTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				WRAPPER_EXTENSION = xctest;
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
