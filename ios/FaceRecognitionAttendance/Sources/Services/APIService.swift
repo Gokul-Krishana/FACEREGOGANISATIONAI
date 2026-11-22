@@ -107,10 +107,18 @@ public final class AttendanceAPIService: ObservableObject {
         KeychainHelper.shared.delete(key: userKey)
         KeychainHelper.shared.delete(key: roleKey)
         
-        DispatchQueue.main.async {
+        let resetState = {
             self.currentSession = nil
             self.isAuthenticated = false
             self.lastError = nil
+        }
+        
+        if Thread.isMainThread {
+            resetState()
+        } else {
+            DispatchQueue.main.sync {
+                resetState()
+            }
         }
     }
     

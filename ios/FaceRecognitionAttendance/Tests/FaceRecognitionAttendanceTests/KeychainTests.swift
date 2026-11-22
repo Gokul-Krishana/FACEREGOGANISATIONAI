@@ -174,6 +174,11 @@ final class KeychainTests: XCTestCase {
         XCTAssertEqual(KeychainHelper.shared.readString(key: userKey), "employee123")
         XCTAssertEqual(KeychainHelper.shared.readString(key: roleKey), "ADMIN")
         
+        // Restore session to activate authenticated state
+        AttendanceAPIService.shared.restoreSessionFromKeychain()
+        XCTAssertTrue(AttendanceAPIService.shared.isAuthenticated, "Service should be authenticated after restore")
+        XCTAssertNotNil(AttendanceAPIService.shared.currentSession, "Session should exist")
+        
         // Perform logout revocation
         AttendanceAPIService.shared.logout()
         
@@ -181,8 +186,8 @@ final class KeychainTests: XCTestCase {
         XCTAssertNil(KeychainHelper.shared.readString(key: tokenKey), "Access token must be purged on logout")
         XCTAssertNil(KeychainHelper.shared.readString(key: userKey), "Username must be purged on logout")
         XCTAssertNil(KeychainHelper.shared.readString(key: roleKey), "Role must be purged on logout")
-        XCTAssertFalse(AttendanceAPIService.shared.isAuthenticated, "Service must not be authenticated")
-        XCTAssertNil(AttendanceAPIService.shared.currentSession, "Session must be nil")
+        XCTAssertFalse(AttendanceAPIService.shared.isAuthenticated, "Service must not be authenticated after logout")
+        XCTAssertNil(AttendanceAPIService.shared.currentSession, "Session must be nil after logout")
     }
     
     // 10. Test tokens are never written to logs or error descriptions
