@@ -74,11 +74,18 @@ public final class AttendanceAPIService: ObservableObject {
         if httpResponse.statusCode == 200 {
             let session = try JSONDecoder().decode(UserSession.self, from: data)
             
-            // Persist to iOS Keychain
-            KeychainHelper.shared.saveString(key: tokenKey, value: session.accessToken)
-            KeychainHelper.shared.saveString(key: userKey, value: session.username)
+            // Persist to iOS Keychain (fails closed if secure storage fails)
+            let tokenSaved = KeychainHelper.shared.saveString(key: tokenKey, value: session.accessToken)
+            let userSaved = KeychainHelper.shared.saveString(key: userKey, value: session.username)
+            var roleSaved = true
             if let role = session.role {
-                KeychainHelper.shared.saveString(key: roleKey, value: role)
+                roleSaved = KeychainHelper.shared.saveString(key: roleKey, value: role)
+            }
+            
+            guard tokenSaved && userSaved && roleSaved else {
+                let errDesc = KeychainHelper.shared.lastError?.description ?? "Secure Keychain storage failed."
+                await MainActor.run { self.lastError = errDesc }
+                throw KeychainHelper.shared.lastError ?? KeychainError.failClosed(reason: errDesc)
             }
             
             await MainActor.run {
@@ -218,10 +225,16 @@ public final class AttendanceAPIService {
         
         if httpResponse.statusCode == 200 {
             let session = try JSONDecoder().decode(UserSession.self, from: data)
-            KeychainHelper.shared.saveString(key: tokenKey, value: session.accessToken)
-            KeychainHelper.shared.saveString(key: userKey, value: session.username)
+            let tokenSaved = KeychainHelper.shared.saveString(key: tokenKey, value: session.accessToken)
+            let userSaved = KeychainHelper.shared.saveString(key: userKey, value: session.username)
+            var roleSaved = true
             if let role = session.role {
-                KeychainHelper.shared.saveString(key: roleKey, value: role)
+                roleSaved = KeychainHelper.shared.saveString(key: roleKey, value: role)
+            }
+            guard tokenSaved && userSaved && roleSaved else {
+                let errDesc = KeychainHelper.shared.lastError?.description ?? "Secure Keychain storage failed."
+                self.lastError = errDesc
+                throw KeychainHelper.shared.lastError ?? KeychainError.failClosed(reason: errDesc)
             }
             self.currentSession = session
             self.isAuthenticated = true

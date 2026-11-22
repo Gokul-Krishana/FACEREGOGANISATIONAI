@@ -2,6 +2,13 @@ import XCTest
 @testable import FaceRecognitionAttendance
 
 final class APIServiceTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        KeychainHelper.shared.setTestBackend(InMemoryKeychainBackend())
+        #endif
+    }
+    
     func testAPIServiceInitialState() {
         let service = AttendanceAPIService()
         service.logout()
