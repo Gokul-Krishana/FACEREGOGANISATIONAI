@@ -172,27 +172,27 @@ public final class KeychainHelper {
     public private(set) var lastError: KeychainError?
     
     private init() {
+        #if os(iOS) && !targetEnvironment(simulator)
+        // Physical iOS device builds ALWAYS use Apple Security Keychain exclusively.
+        // It is compile-time impossible to use in-memory storage on a physical iOS device.
+        self.backend = AppleKeychainBackend()
+        #else
+        // For Simulator, macOS development/tests, or Linux CI:
         #if canImport(Security)
-        #if targetEnvironment(simulator) && DEBUG
-        // In simulator debug builds, if running under XCTest, default to InMemoryKeychainBackend for headless test runners
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil {
             self.backend = InMemoryKeychainBackend()
         } else {
             self.backend = AppleKeychainBackend()
         }
         #else
-        // Physical device builds and release builds ALWAYS use Apple Security Keychain exclusively
-        self.backend = AppleKeychainBackend()
-        #endif
-        #else
-        // Non-Apple platforms (Linux SPM CI)
         self.backend = InMemoryKeychainBackend()
+        #endif
         #endif
     }
     
-    #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+    #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
     /// Test-only backend injection hook.
-    /// Strictly stripped and uncompiled on physical iOS device builds.
+    /// Strictly stripped and uncompiled on physical iOS device builds (#if os(iOS) && !targetEnvironment(simulator)).
     public func setTestBackend(_ testBackend: KeychainBackend?) {
         lock.lock()
         defer { lock.unlock() }

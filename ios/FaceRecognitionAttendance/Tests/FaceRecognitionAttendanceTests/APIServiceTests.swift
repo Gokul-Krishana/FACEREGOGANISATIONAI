@@ -4,7 +4,7 @@ import XCTest
 final class APIServiceTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(InMemoryKeychainBackend())
         #endif
     }

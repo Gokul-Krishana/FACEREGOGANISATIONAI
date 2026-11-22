@@ -8,7 +8,7 @@ final class KeychainTests: XCTestCase {
     override func setUp() {
         super.setUp()
         mockBackend = InMemoryKeychainBackend()
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(mockBackend)
         #endif
         KeychainHelper.shared.delete(key: testKey)
@@ -16,7 +16,7 @@ final class KeychainTests: XCTestCase {
     
     override func tearDown() {
         KeychainHelper.shared.delete(key: testKey)
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(nil)
         #endif
         super.tearDown()
@@ -86,7 +86,7 @@ final class KeychainTests: XCTestCase {
         }
         
         // When injected into KeychainHelper, save must return false and record lastError
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(appleBackend)
         let saveResult = KeychainHelper.shared.saveString(key: "entitlement_test_key", value: "test-token")
         if !saveResult {
@@ -102,7 +102,7 @@ final class KeychainTests: XCTestCase {
     // 6. Test genuine Keychain failure behavior (Access Denied / Device Locked)
     func testGenuineKeychainFailureBehaviorAccessDenied() {
         let failingBackend = InMemoryKeychainBackend(simulatedError: .accessDenied(-25308))
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(failingBackend)
         #endif
         
@@ -117,7 +117,7 @@ final class KeychainTests: XCTestCase {
         let deleteResult = KeychainHelper.shared.delete(key: testKey)
         XCTAssertFalse(deleteResult, "Delete must return false when backend fails")
         
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(mockBackend)
         #endif
     }
@@ -125,7 +125,7 @@ final class KeychainTests: XCTestCase {
     // 7. Test genuine Keychain failure behavior (Unhandled OSStatus)
     func testGenuineKeychainFailureBehaviorUnhandledStatus() {
         let failingBackend = InMemoryKeychainBackend(simulatedError: .unhandledError(status: -25293))
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(failingBackend)
         #endif
         
@@ -133,7 +133,7 @@ final class KeychainTests: XCTestCase {
         XCTAssertFalse(saveResult, "Save MUST return false on unhandled Keychain failure")
         XCTAssertEqual(KeychainHelper.shared.lastError, .unhandledError(status: -25293))
         
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(mockBackend)
         #endif
     }
@@ -147,14 +147,14 @@ final class KeychainTests: XCTestCase {
         
         // Failing backend: returns nil, but lastError is populated
         let failingBackend = InMemoryKeychainBackend(simulatedError: .accessDenied(-25308))
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(failingBackend)
         #endif
         let failureRead = KeychainHelper.shared.read(key: "absent_key")
         XCTAssertNil(failureRead)
         XCTAssertEqual(KeychainHelper.shared.lastError, .accessDenied(-25308), "Genuine error must be recorded in lastError")
         
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(mockBackend)
         #endif
     }
@@ -206,7 +206,7 @@ final class KeychainTests: XCTestCase {
     // 11. Test throwing methods
     func testThrowingMethodsThrowOnFailure() {
         let failingBackend = InMemoryKeychainBackend(simulatedError: .accessDenied(-25308))
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(failingBackend)
         #endif
         
@@ -222,7 +222,7 @@ final class KeychainTests: XCTestCase {
             XCTAssertEqual(error as? KeychainError, .accessDenied(-25308))
         }
         
-        #if DEBUG && (targetEnvironment(simulator) || !canImport(Security))
+        #if DEBUG && (!os(iOS) || targetEnvironment(simulator))
         KeychainHelper.shared.setTestBackend(mockBackend)
         #endif
     }
