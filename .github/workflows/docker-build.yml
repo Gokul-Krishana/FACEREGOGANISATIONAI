@@ -92,7 +92,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         id: trivy-scan
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.29.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           format: sarif
