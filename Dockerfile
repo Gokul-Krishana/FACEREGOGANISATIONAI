@@ -60,8 +60,8 @@ COPY --from=builder /install /usr/local
 COPY --chown=faceai:faceai . .
 
 # Create runtime directories with non-root ownership
-RUN mkdir -p /app/data /app/logs /app/embeddings /app/outputs /app/unknown_faces \
-    && chown -R faceai:faceai /app/data /app/logs /app/embeddings /app/outputs /app/unknown_faces
+RUN mkdir -p /app/data /app/logs /app/embeddings /app/attendance /app/outputs /app/unknown_faces \
+    && chown -R faceai:faceai /app
 
 RUN chmod 1777 /tmp
 

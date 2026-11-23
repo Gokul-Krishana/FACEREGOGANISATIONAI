@@ -214,7 +214,10 @@ _REQUIRED_DIRS = [
 ]
 
 for _d in _REQUIRED_DIRS:
-    _d.mkdir(parents=True, exist_ok=True)
+    try:
+        _d.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
 
 # ── Logging Configuration ────────────────────────────────────
 # Uses the shared setup in utils/logging_setup.py: console + rotating file,
