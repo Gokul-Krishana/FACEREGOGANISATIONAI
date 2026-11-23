@@ -24,11 +24,14 @@ on:
       - "config/**"
       - "camera/**"
       - "utils/**"
+      - ".github/workflows/docker-build.yml"
   pull_request:
     branches: [master, main]
     paths:
       - "Dockerfile"
       - "requirements.txt"
+      - ".github/workflows/docker-build.yml"
+  workflow_dispatch:
 
 concurrency:
   group: docker-${{ github.ref }}
