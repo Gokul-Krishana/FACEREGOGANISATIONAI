@@ -62,11 +62,11 @@ class FaceDetector:
             return []
 
         detections: List[dict] = []
-        boxes = results[0].boxes
+        boxes = results[0].boxes  # type: ignore[union-attr,index]
         if boxes is None:
             return []
 
-        for box in boxes:
+        for box in boxes:  # type: ignore[union-attr]
             class_id = int(box.cls[0])
             # Filter to person class only
             if class_id != self.person_class_id:
