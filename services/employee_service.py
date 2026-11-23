@@ -191,17 +191,23 @@ class EmployeeService:
     def delete(employee_id: str, operator: str = "system") -> bool:
         """Delete an employee by their ``employee_id``.
 
-        Also removes the corresponding embedding from FAISS so the
-        deleted employee's face will no longer be recognised.
+        Also cryptographically shreds any associated photo files and removes
+        the corresponding embedding from FAISS so the deleted employee's face
+        will no longer be recognised.
 
         Returns:
             ``True`` if deleted, ``False`` if not found.
         """
+        from utils.biometric_crypto import shred_file
+
         with get_session() as session:
             emp = EmployeeRepo.get_by_employee_id(session, employee_id)
             if not emp:
                 return False
             emp_name = emp.name
+            photo_path = emp.photo_path
+            if photo_path:
+                shred_file(photo_path)
             success = EmployeeRepo.delete(session, employee_id)
 
         if success:
@@ -210,7 +216,50 @@ class EmployeeService:
 
             AuditService.log(
                 "DELETE_EMPLOYEE",
-                f"Deleted employee '{emp_name}' ({employee_id})",
+                f"Deleted employee '{emp_name}' ({employee_id}) and shredded biometric data",
+                operator=operator,
+            )
+        return success
+
+    @staticmethod
+    def shred_biometrics(employee_id: str, operator: str = "system", delete_employee: bool = True) -> bool:
+        """Permanently and cryptographically shred an employee's biometric data (GDPR / BIPA).
+
+        1. Overwrites and shreds photo file at ``photo_path`` with random bytes before deleting.
+        2. Purges embedding vector from the FAISS vector index and metadata.
+        3. If ``delete_employee=True``, removes employee record from database; otherwise nullifies
+           ``photo_path``, ``faiss_id``, and sets ``consent_given=False``.
+        4. Logs auditable destruction in audit trail.
+        """
+        from utils.biometric_crypto import shred_file
+
+        with get_session() as session:
+            emp = EmployeeRepo.get_by_employee_id(session, employee_id)
+            if not emp:
+                return False
+            emp_name = emp.name
+            photo_path = emp.photo_path
+
+            if photo_path:
+                shred_file(photo_path)
+
+            if delete_employee:
+                success = EmployeeRepo.delete(session, employee_id)
+            else:
+                EmployeeRepo.update(
+                    session,
+                    emp.id,
+                    photo_path=None,
+                    faiss_id=None,
+                    consent_given=False,
+                )
+                success = True
+
+        if success:
+            EmployeeService.remove_faiss_embedding(emp_name, fallback=employee_id)
+            AuditService.log(
+                "BIOMETRIC_SHREDDED",
+                f"Permanently shredded biometric embeddings and photos for '{emp_name}' ({employee_id})",
                 operator=operator,
             )
         return success
@@ -263,4 +312,7 @@ class EmployeeService:
             "faiss_id": emp.faiss_id,
             "created_at": emp.created_at.isoformat() if emp.created_at else None,
             "updated_at": emp.updated_at.isoformat() if emp.updated_at else None,
+            "consent_given": getattr(emp, "consent_given", True),
+            "consent_date": emp.consent_date.isoformat() if getattr(emp, "consent_date", None) else None,
+            "retention_policy_days": getattr(emp, "retention_policy_days", 365),
         }

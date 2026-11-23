@@ -99,12 +99,14 @@ def _render_page() -> None:
         table_data = []
         for emp in filtered:
             tc = today_counts.get(emp.id, 0)
+            consent_ok = getattr(emp, "consent_given", True)
             table_data.append(
                 {
                     "ID": emp.employee_id,
                     "Name": emp.name,
                     "Department": emp.department or "—",
                     "FAISS ID": emp.faiss_id if emp.faiss_id is not None else "—",
+                    "Consent": "✅ Active" if consent_ok else "⚠️ Withdrawn",
                     "Today": f"{tc} ✅" if tc > 0 else "0",
                     "Enrolled": emp.created_at.strftime("%d %b %Y") if emp.created_at else "—",
                     "emp_obj": emp,  # hidden column for actions
@@ -124,6 +126,7 @@ def _render_page() -> None:
                 "Name": st.column_config.TextColumn("Name", width="medium"),
                 "Department": st.column_config.TextColumn("Department", width="medium"),
                 "FAISS ID": st.column_config.TextColumn("FAISS", width="small"),
+                "Consent": st.column_config.TextColumn("Consent", width="small"),
                 "Today": st.column_config.TextColumn("Today", width="small"),
                 "Enrolled": st.column_config.TextColumn("Enrolled", width="small"),
             },
@@ -172,25 +175,41 @@ def _render_page() -> None:
                     st.caption("Renaming an employee also updates their recognition label (FAISS).")
 
         # ── Expandable delete rows ───────────────────────────────
-        with st.expander("🗑️ Delete an Employee"):
+        with st.expander("🗑️ Delete / Shred Employee Biometrics (GDPR & BIPA)"):
             emp_to_delete = st.selectbox(
-                "Select employee to delete",
+                "Select employee to manage",
                 options=[(e.employee_id, e.name) for e in filtered],
                 format_func=lambda x: f"{x[0]} — {x[1]}",
             )
             if emp_to_delete:
                 st.warning(
-                    f"This will remove {emp_to_delete[1]} ({emp_to_delete[0]}) from the database and remove their face embedding from the recognition index."
+                    f"⚠️ Biometric Shredding Notice for {emp_to_delete[1]} ({emp_to_delete[0]}):\n"
+                    "This permanently purges face embeddings from FAISS, cryptographically overwrites "
+                    "photos on disk (NIST SP 800-88 compliant), and records an auditable destruction log."
                 )
-                confirm = st.text_input("Type the Employee ID to confirm:", placeholder=str(emp_to_delete[0]))
+                col_del1, col_del2 = st.columns(2)
+                confirm = st.text_input("Type the Employee ID to confirm action:", placeholder=str(emp_to_delete[0]))
                 if confirm == emp_to_delete[0]:
-                    if st.button("🗑️ Delete Permanently", type="primary", use_container_width=True):
-                        success = EmployeeService.delete(str(emp_to_delete[0]), operator="dashboard")
-                        if success:
-                            st.success(f"Deleted {emp_to_delete[1]}")
-                            st.rerun()
-                        else:
-                            st.error("Failed to delete employee.")
+                    with col_del1:
+                        if st.button("🗑️ Delete Employee & Shred Biometrics", type="primary", use_container_width=True):
+                            success = EmployeeService.delete(str(emp_to_delete[0]), operator="dashboard")
+                            if success:
+                                st.success(f"Deleted {emp_to_delete[1]} and shredded biometric files.")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete employee.")
+                    with col_del2:
+                        if st.button("🛡️ Shred Biometrics Only (Withdraw Consent)", use_container_width=True):
+                            success = EmployeeService.shred_biometrics(
+                                str(emp_to_delete[0]),
+                                operator="dashboard",
+                                delete_employee=False,
+                            )
+                            if success:
+                                st.success(f"Biometrics shredded and consent withdrawn for {emp_to_delete[1]}.")
+                                st.rerun()
+                            else:
+                                st.error("Failed to shred biometrics.")
                 elif confirm:
                     st.error("ID does not match.")
 

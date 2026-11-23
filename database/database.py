@@ -172,6 +172,7 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _ensure_attendance_idempotency_column()
+    _ensure_biometric_privacy_columns()
 
     # Stamp the DB so Alembic knows this revision is applied
     try:
@@ -199,6 +200,29 @@ def _ensure_attendance_idempotency_column() -> None:
             )
     except Exception as exc:
         logger.debug("Could not ensure attendance.idempotency_key column: %s", exc)
+
+
+def _ensure_biometric_privacy_columns(target_engine=None) -> None:
+    """Backfill consent and data-retention columns on existing DB tables."""
+    eng = target_engine if target_engine is not None else engine
+    try:
+        insp = inspect(eng)
+        table_names = set(insp.get_table_names())
+        is_pg = eng.dialect.name == "postgresql"
+        dt_type = "TIMESTAMP" if is_pg else "DATETIME"
+        bool_default = "TRUE" if is_pg else "1"
+        with eng.begin() as conn:
+            for tbl in ("employees", "students", "staff"):
+                if tbl in table_names:
+                    cols = {c["name"] for c in insp.get_columns(tbl)}
+                    if "consent_given" not in cols:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN consent_given BOOLEAN DEFAULT {bool_default}"))
+                    if "consent_date" not in cols:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN consent_date {dt_type}"))
+                    if "retention_policy_days" not in cols:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN retention_policy_days INTEGER DEFAULT 365"))
+    except Exception as exc:
+        logger.debug("Could not backfill biometric privacy columns: %s", exc)
 
 
 @contextmanager

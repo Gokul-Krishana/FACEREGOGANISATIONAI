@@ -1,26 +1,17 @@
 """
-Restore — PostgreSQL + FAISS + Metadata
-=========================================
+Restore — SQLite / PostgreSQL + FAISS + Metadata
+=================================================
 
 Restores a snapshot created by ``scripts/backup.py``:
 
-    1. PostgreSQL database  (psql ← plain SQL dump)
+    1. Database (SQLite atomic restoration or PostgreSQL via psql)
     2. FAISS vector index   (embeddings/faiss.index)
     3. Embedding metadata   (embeddings/metadata.json)
-
-By default the database is restored into the URL recorded in the
-manifest. Use ``--url`` to restore into a different database (e.g. a
-staging copy). FAISS artifacts are restored into the project's
-``embeddings/`` directory — the app must be restarted after restore so
-the index is reloaded from disk.
 
 Usage:
     python scripts/restore.py --backup-dir backups/backup_20260731_120000
     python scripts/restore.py --backup-dir <dir> --url postgresql://user:pass@host:5432/db
     python scripts/restore.py --backup-dir <dir> --dry-run
-
-NOTE: The target database is dropped and recreated. The application must
-be stopped first, otherwise DROP DATABASE fails due to active connections.
 """
 
 from __future__ import annotations
@@ -31,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -50,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 import config.config as cfg  # noqa: E402
 
 EMBEDDINGS_DIR = cfg.EMBEDDINGS_DIR
+DEFAULT_SQLITE_PATH = ROOT / "data" / "face_recognition.db"
 
 # Common PostgreSQL bin locations (Windows + Linux/macOS)
 PG_BIN_CANDIDATES = [
@@ -128,35 +121,107 @@ def verify_artifacts(backup_dir: Path, manifest: dict) -> bool:
     return ok
 
 
-def resolve_target_url(manifest: dict, args) -> str | None:
-    """Determine the target DB URL. Returns None if it can't be resolved."""
-    if args.url:
-        return args.url
-    redacted = manifest.get("database", {}).get("url_redacted", "")
-    if redacted and "***" not in redacted:
-        # Manifest has a usable (unredacted) URL
-        return redacted
-    # Redacted or missing — we must not guess a password silently
-    print("  x The manifest does not contain a usable database URL (password is redacted).")
-    print("    Pass the target explicitly:  --url postgresql://user:pass@host:5432/db")
-    return None
+def restore_sqlite_db(dump_path: Path, target_path: Path, dry_run: bool = False) -> None:
+    """Restore SQLite database file atomically with integrity verification."""
+    print(f"  Target DB   : {target_path}")
+    print(f"  Dump file   : {dump_path.name}")
+
+    if dry_run:
+        print("  [dry-run] Would replace target SQLite DB and verify integrity.")
+        return
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    # Pre-backup existing DB if present
+    if target_path.exists():
+        backup_curr = target_path.with_suffix(".pre_restore")
+        shutil.copy2(target_path, backup_curr)
+        print(f"  i Created pre-restore backup: {backup_curr.name}")
+
+    # Copy dump into place
+    shutil.copy2(dump_path, target_path)
+
+    # Verify SQLite integrity
+    conn = sqlite3.connect(str(target_path))
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA integrity_check;")
+        res = cur.fetchone()[0]
+        if res != "ok":
+            raise RuntimeError(f"Restored SQLite DB failed integrity check: {res}")
+        print(f"  + SQLite integrity check: {res}")
+    finally:
+        conn.close()
+
+
+def restore_postgres_db(
+    dump_path: Path, url: str, dry_run: bool = False
+) -> None:
+    """Restore PostgreSQL database using psql."""
+    host, port, user, password, dbname = extract_credentials(url)
+    if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
+        raise ValueError(f"Invalid database name: {dbname!r}")
+
+    pg_bin = find_pg_bin()
+    print(f"  Target DB   : {host}:{port}/{dbname}")
+    print(f"  Dump file   : {dump_path.name}")
+
+    if dry_run:
+        print("  [dry-run] Would terminate connections, drop, recreate, and restore.")
+        return
+
+    env = dict(os.environ)
+    if password:
+        env["PGPASSWORD"] = password
+
+    # Terminate active connections
+    print("\n[1/4] Terminating active connections...")
+    term_sql = (
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+        f"WHERE datname = '{dbname}' AND pid <> pg_backend_pid();"
+    )
+    subprocess.run(
+        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", term_sql],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    print("[2/4] Dropping existing database...")
+    subprocess.run(
+        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS {dbname};"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    print("[3/4] Creating fresh database...")
+    subprocess.run(
+        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", f"CREATE DATABASE {dbname};"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    print("[4/4] Restoring database...")
+    r = subprocess.run(
+        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", dbname, "-f", str(dump_path)],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"psql restore failed:\n{r.stderr[-2000:]}")
+    print("  + Database restored successfully.")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Restore PostgreSQL + FAISS + metadata")
+    parser = argparse.ArgumentParser(description="Restore SQLite/PostgreSQL + FAISS + metadata")
     parser.add_argument("--backup-dir", required=True, help="Backup directory (name or path under backups/)")
-    parser.add_argument(
-        "--url", default=None, help="Target PostgreSQL URL (required if manifest URL is redacted)"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would be restored without changing anything"
-    )
-    parser.add_argument(
-        "--no-db", action="store_true", help="Restore FAISS/metadata only, skip database restore"
-    )
+    parser.add_argument("--url", default=None, help="Target DB URL or SQLite file path")
+    parser.add_argument("--dry-run", action="store_true", help="Show actions without applying")
+    parser.add_argument("--no-db", action="store_true", help="Restore FAISS only, skip DB")
     args = parser.parse_args()
 
-    # Resolve backup dir
     backup_dir = Path(args.backup_dir)
     if not backup_dir.is_absolute():
         backup_dir = ROOT / "backups" / backup_dir
@@ -166,163 +231,62 @@ def main() -> int:
 
     manifest_path = backup_dir / "manifest.json"
     if not manifest_path.exists():
-        print(f"x No manifest.json in {backup_dir} — not a valid backup")
+        print(f"x No manifest.json in {backup_dir}")
         return 1
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     print("=" * 64)
-    print("  System Restore")
+    print("  Face Recognition AI — System Restore")
     print("=" * 64)
     print(f"  Backup      : {backup_dir.name}")
     print(f"  Created     : {manifest.get('created_at', 'unknown')}")
 
-    # Integrity check first
     print("\nVerifying backup integrity...")
     if not verify_artifacts(backup_dir, manifest):
         print("\nx Backup failed integrity verification — refusing to restore.")
         return 1
 
-    # ── 1. Database restore ────────────────────────────────────
-    if not args.no_db:
-        url = resolve_target_url(manifest, args)
-        if url is None:
-            return 1
-        host, port, user, password, dbname = extract_credentials(url)
-        if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
-            print(f"x Invalid database name: {dbname!r}")
-            return 1
-        try:
-            pg_bin = find_pg_bin()
-        except FileNotFoundError as exc:
-            print(f"x {exc}")
-            return 1
-        dump_path = backup_dir / manifest.get("database", {}).get("dump_file", f"{dbname}.sql")
-        if not dump_path.exists():
-            print(f"x SQL dump not found: {dump_path}")
-            return 1
+    db_info = manifest.get("database", {})
+    db_type = db_info.get("type", "postgres" if db_info.get("dump_file", "").endswith(".sql") else "sqlite")
 
-        print(f"  Target DB   : {host}:{port}/{dbname}")
-        print(f"  Dump file   : {dump_path.name}")
-
-        if args.dry_run:
-            print("  [dry-run] Would terminate connections, drop, recreate, and restore.")
-        else:
-            env = dict(os.environ)
-            if password:
-                env["PGPASSWORD"] = password
-
-            # Terminate active connections so DROP DATABASE succeeds
-            print("\n[1/4] Terminating active connections...")
-            term_sql = (
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                f"WHERE datname = '{dbname}' AND pid <> pg_backend_pid();"
-            )
-            subprocess.run(
-                [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", term_sql],
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-
-            print("[2/4] Dropping existing database...")
-            r = subprocess.run(
-                [
-                    str(pg_bin / "psql"),
-                    "-h",
-                    host,
-                    "-p",
-                    port,
-                    "-U",
-                    user,
-                    "-d",
-                    "postgres",
-                    "-c",
-                    f"DROP DATABASE IF EXISTS {dbname};",
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-            if r.returncode != 0:
-                print(f"  x DROP DATABASE failed:\n{r.stderr[-1500:]}")
+    try:
+        if not args.no_db:
+            dump_file = db_info.get("dump_file")
+            dump_path = backup_dir / dump_file
+            if not dump_path.exists():
+                print(f"x Dump file not found: {dump_path}")
                 return 1
 
-            print("[3/4] Creating fresh database...")
-            r = subprocess.run(
-                [
-                    str(pg_bin / "psql"),
-                    "-h",
-                    host,
-                    "-p",
-                    port,
-                    "-U",
-                    user,
-                    "-d",
-                    "postgres",
-                    "-c",
-                    f"CREATE DATABASE {dbname};",
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-            if r.returncode != 0:
-                print(f"  x CREATE DATABASE failed:\n{r.stderr[-1500:]}")
-                return 1
+            if db_type == "sqlite":
+                target_sqlite = Path(args.url) if args.url else DEFAULT_SQLITE_PATH
+                restore_sqlite_db(dump_path, target_sqlite, dry_run=args.dry_run)
+            else:
+                target_url = args.url or db_info.get("url_redacted")
+                if not target_url or "***" in target_url:
+                    print("x PostgreSQL target URL must be explicitly supplied with credentials via --url")
+                    return 1
+                restore_postgres_db(dump_path, target_url, dry_run=args.dry_run)
 
-            print("[4/4] Restoring dump...")
-            r = subprocess.run(
-                [
-                    str(pg_bin / "psql"),
-                    "-h",
-                    host,
-                    "-p",
-                    port,
-                    "-U",
-                    user,
-                    "-d",
-                    dbname,
-                    "-f",
-                    str(dump_path),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-            if r.returncode != 0:
-                print(f"  x psql restore failed:\n{r.stderr[-2000:]}")
-                return 1
-            print("  + Database restored")
-    else:
-        print("  [--no-db] Skipping database restore")
+        # ── 2. Restore FAISS + Metadata ────────────────────────
+        print("\nRestoring FAISS vector index + metadata...")
+        EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
+        for name in ("faiss.index", "metadata.json"):
+            src = backup_dir / name
+            dst = EMBEDDINGS_DIR / name
+            if src.exists():
+                if args.dry_run:
+                    print(f"  [dry-run] Would copy {name} -> {dst}")
+                else:
+                    shutil.copy2(src, dst)
+                    print(f"  + Restored: {name} ({src.stat().st_size:,} bytes)")
 
-    # ── 2. FAISS + metadata restore ────────────────────────────
-    print("\nRestoring FAISS index + metadata...")
-    artifacts = manifest.get("artifacts", {})
-    for name in ("faiss.index", "metadata.json"):
-        artifact = artifacts.get(name, {})
-        if not artifact.get("exists", True):
-            print(f"  . {name}: not in backup — skipping")
-            continue
-        src = backup_dir / name
-        if not src.exists():
-            print(f"  . {name}: file missing from backup dir — skipping")
-            continue
-        if args.dry_run:
-            print(f"  [dry-run] Would restore {src.name} -> {EMBEDDINGS_DIR}")
-            continue
-        dst = EMBEDDINGS_DIR / name
-        shutil.copy2(src, dst)
-        print(f"  + {name} -> {dst}")
-
-    print("\n" + "=" * 64)
-    if not args.dry_run:
-        print("  Restore complete.")
-        print("  ! Restart the app (Streamlit/API) so the FAISS index is reloaded.")
-    else:
-        print("  [dry-run] No changes made.")
-    print("=" * 64)
-    return 0
+        print("\n" + "=" * 64)
+        print("  System restore complete!")
+        print("=" * 64)
+        return 0
+    except Exception as exc:
+        print(f"\nx Restore failed: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

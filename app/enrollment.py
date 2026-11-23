@@ -229,6 +229,106 @@ class FaceEnrollment:
 
         return results[:k]
 
+    def search_batch(
+        self,
+        embeddings: List[Optional[np.ndarray]],
+        k: int = 1,
+        threshold: float = cfg.RECOGNITION_THRESHOLD,
+        ambiguity_margin: float = 0.15,
+    ) -> List[List[Dict]]:
+        """Batch-search multiple embeddings in a single vectorized FAISS query.
+
+        Args:
+            embeddings: List of 512-D vectors (or None for failed detections).
+            k: Nearest neighbors to retrieve per query.
+            threshold: Maximum L2 distance for a valid match.
+            ambiguity_margin: Separation threshold for ambiguity check.
+
+        Returns:
+            List of match lists, matching the order and length of ``embeddings``.
+        """
+        if not embeddings:
+            return []
+
+        # Find valid embeddings and their original positions
+        valid_indices = []
+        valid_queries = []
+        for i, emb in enumerate(embeddings):
+            if emb is not None:
+                valid_indices.append(i)
+                valid_queries.append(emb.reshape(-1).astype(np.float32))
+
+        # Initialize output with empty results
+        all_results: List[List[Dict]] = [[] for _ in embeddings]
+
+        if not valid_queries or self.index.ntotal == 0:
+            return all_results
+
+        # Stack into a single 2D contiguous array
+        stacked_queries = np.vstack(valid_queries)
+        search_k = max(2, k) if self.index.ntotal >= 2 else 1
+
+        distances, indices = self.index.search(stacked_queries, search_k)
+
+        for row_idx, orig_pos in enumerate(valid_indices):
+            row_dists = distances[row_idx]
+            row_ids = indices[row_idx]
+            res_list: List[Dict] = []
+
+            for dist, idx in zip(row_dists, row_ids):
+                if idx == -1 or idx >= len(self.metadata):
+                    continue
+                dist = float(dist)
+                if dist > threshold:
+                    continue
+                entry = self.metadata[idx]
+                confidence = 1.0 / (1.0 + dist * dist)
+                match: Dict = {
+                    "name": entry["name"],
+                    "confidence": round(confidence, 4),
+                    "distance": round(dist, 4),
+                    "faiss_id": int(idx),
+                }
+                if entry.get("employee_id"):
+                    match["employee_id"] = entry["employee_id"]
+                if entry.get("employee_db_id") is not None:
+                    match["employee_db_id"] = entry["employee_db_id"]
+                res_list.append(match)
+
+            # Ambiguity check
+            if len(res_list) >= 2:
+                top1 = res_list[0]
+                top2 = res_list[1]
+                is_diff = False
+                if top1.get("employee_db_id") is not None and top2.get("employee_db_id") is not None:
+                    is_diff = top1["employee_db_id"] != top2["employee_db_id"]
+                elif top1.get("employee_id") and top2.get("employee_id"):
+                    is_diff = top1["employee_id"] != top2["employee_id"]
+                else:
+                    is_diff = top1["name"] != top2["name"]
+
+                if is_diff:
+                    dist_margin = top2["distance"] - top1["distance"]
+                    conf_margin = top1["confidence"] - top2["confidence"]
+                    if dist_margin < ambiguity_margin or conf_margin < 0.08:
+                        top1["is_ambiguous"] = True
+                        top1["ambiguity_margin"] = round(dist_margin, 4)
+                        top1["competing_name"] = top2["name"]
+                        top1["competing_employee_id"] = top2.get("employee_id")
+                    else:
+                        top1["is_ambiguous"] = False
+                else:
+                    top1["is_ambiguous"] = False
+            elif len(res_list) == 1:
+                res_list[0]["is_ambiguous"] = False
+
+            if k == 1 and len(res_list) > 1:
+                res_list = res_list[:1]
+
+            all_results[orig_pos] = res_list[:k]
+
+        return all_results
+
     def remove(self, name: str) -> bool:
         """Remove all entries for a given name.
 

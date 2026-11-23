@@ -248,7 +248,15 @@ class EmployeeRepo:
         Returns:
             The updated ``Employee``, or ``None`` if not found.
         """
-        _EDITABLE = {"name", "department", "photo_path", "faiss_id"}
+        _EDITABLE = {
+            "name",
+            "department",
+            "photo_path",
+            "faiss_id",
+            "consent_given",
+            "consent_date",
+            "retention_policy_days",
+        }
         emp = EmployeeRepo.get_by_id(session, emp_id)
         if not emp:
             return None

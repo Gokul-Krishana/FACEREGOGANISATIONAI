@@ -87,7 +87,7 @@ else:
 
     # ── Sidebar Footer ──────────────────────────────────────────
     st.sidebar.divider()
-    st.sidebar.caption("**Face Recognition AI v1.0**")
+    st.sidebar.caption("**Face Recognition AI v2.1.0** 🛡️")
 
     # Try to show enrolled count
     try:
@@ -102,6 +102,31 @@ else:
 
     st.sidebar.caption(f"⚙️ Threshold: {cfg.RECOGNITION_THRESHOLD}")
     st.sidebar.caption(f"📷 Source: {cfg.CAMERA_SOURCE_TYPE}")
+
+    # ── Modern Responsive UI Styling ────────────────────────────
+    st.markdown(
+        """
+        <style>
+        .stMetric {
+            background-color: rgba(28, 33, 40, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stButton>button {
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+        .stDataFrame {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ── Redirect to the first page ─────────────────────────────
     # The main content area is empty — the dashboard page handles everything

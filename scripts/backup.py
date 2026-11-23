@@ -1,26 +1,22 @@
 """
-Backup — PostgreSQL + FAISS + Metadata
-========================================
+Backup — SQLite / PostgreSQL + FAISS + Metadata
+================================================
 
 Creates a complete, restorable snapshot of the system state:
 
-    1. PostgreSQL database  (pg_dump → plain SQL)
+    1. Database (SQLite via atomic backup API, or PostgreSQL via pg_dump)
     2. FAISS vector index   (embeddings/faiss.index)
     3. Embedding metadata   (embeddings/metadata.json)
 
 Everything is written to ``backups/backup_YYYYMMDD_HHMMSS/`` together with
-a ``manifest.json`` that records what was captured, file hashes, and the
-original ``DATABASE_URL`` (password redacted) so ``scripts/restore.py`` can
-restore it.
+a ``manifest.json`` that records what was captured, file hashes, and database
+metadata so ``scripts/restore.py`` can restore it seamlessly.
 
 Usage:
     python scripts/backup.py
     python scripts/backup.py --output backups/custom
+    python scripts/backup.py --url sqlite:///data/face_recognition.db
     python scripts/backup.py --url postgresql://user:pass@host:5432/db
-
-Requires:
-    - pg_dump on PATH or installed PostgreSQL (auto-detected on Windows)
-    - psycopg2 for the pre-flight connection check
 """
 
 from __future__ import annotations
@@ -32,6 +28,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -55,7 +52,8 @@ EMBEDDINGS_DIR = cfg.EMBEDDINGS_DIR
 FAISS_INDEX = EMBEDDINGS_DIR / "faiss.index"
 METADATA = EMBEDDINGS_DIR / "metadata.json"
 
-DEFAULT_URL = os.getenv("DATABASE_URL", "postgresql://faceai:changeme@localhost:5432/face_recognition")
+DEFAULT_SQLITE_PATH = ROOT / "data" / "face_recognition.db"
+DEFAULT_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DEFAULT_SQLITE_PATH.as_posix()}"
 
 # Common PostgreSQL bin locations (Windows + Linux/macOS)
 PG_BIN_CANDIDATES = [
@@ -67,6 +65,22 @@ PG_BIN_CANDIDATES = [
     "/usr/local/bin",
     "/usr/bin",
 ]
+
+
+def is_sqlite_url(url: str) -> bool:
+    """Return True if URL represents an SQLite database."""
+    return url.lower().startswith("sqlite:") or not ("://" in url and not url.lower().startswith("sqlite:"))
+
+
+def extract_sqlite_path(url: str) -> Path:
+    """Extract SQLite filesystem Path from a sqlite:/// URL or plain path."""
+    if url.lower().startswith("sqlite:///"):
+        path_str = url[10:]
+        return Path(path_str)
+    elif url.lower().startswith("sqlite://"):
+        path_str = url[9:]
+        return Path(path_str)
+    return Path(url)
 
 
 def find_pg_bin() -> Path:
@@ -89,11 +103,7 @@ def sha256(path: Path) -> str:
 
 
 def extract_credentials(url: str) -> tuple[str, str, str, str, str]:
-    """Return (host, port, user, password, dbname) from a postgres URL.
-
-    The password is URL-decoded (``urlparse`` returns the encoded form,
-    which would break credentials containing ``%``, ``@``, etc.).
-    """
+    """Return (host, port, user, password, dbname) from a postgres URL."""
     parsed = urlparse(url)
     return (
         parsed.hostname or "localhost",
@@ -104,7 +114,7 @@ def extract_credentials(url: str) -> tuple[str, str, str, str, str]:
     )
 
 
-def preflight_check(url: str) -> None:
+def preflight_check_postgres(url: str) -> None:
     """Verify PostgreSQL is reachable before dumping."""
     import psycopg2
 
@@ -120,72 +130,96 @@ def preflight_check(url: str) -> None:
     conn.close()
 
 
+def backup_sqlite(db_file: Path, backup_dir: Path) -> tuple[Path, str]:
+    """Atomically snapshot SQLite database using SQLite backup API."""
+    if not db_file.exists():
+        raise FileNotFoundError(f"SQLite database file not found at: {db_file}")
+
+    dump_path = backup_dir / "database.sqlite"
+    print(f"\n[1/3] Dumping SQLite database ({db_file.name})...")
+
+    # Connect to source and force WAL checkpoint to guarantee zero uncommitted writes
+    src_conn = sqlite3.connect(str(db_file), timeout=10.0)
+    try:
+        src_conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    except Exception as exc:
+        print(f"  i WAL checkpoint note: {exc}")
+
+    dest_conn = sqlite3.connect(str(dump_path))
+    try:
+        src_conn.backup(dest_conn, pages=100)
+    finally:
+        dest_conn.close()
+        src_conn.close()
+
+    print(f"  + SQLite snapshot: {dump_path.name} ({dump_path.stat().st_size:,} bytes)")
+    return dump_path, "sqlite"
+
+
+def backup_postgres(url: str, backup_dir: Path) -> tuple[Path, str]:
+    """Dump PostgreSQL database using pg_dump."""
+    host, port, user, password, dbname = extract_credentials(url)
+    if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
+        raise ValueError(f"Invalid database name: {dbname!r}")
+
+    pg_bin = find_pg_bin()
+    print("  PostgreSQL : {}:{}".format(host, port))
+    preflight_check_postgres(url)
+
+    dump_path = backup_dir / f"{dbname}.sql"
+    env = dict(os.environ)
+    if password:
+        env["PGPASSWORD"] = password
+    cmd = [
+        str(pg_bin / "pg_dump"),
+        "-h",
+        host,
+        "-p",
+        port,
+        "-U",
+        user,
+        "--no-owner",
+        "--no-privileges",
+        "-f",
+        str(dump_path),
+        dbname,
+    ]
+    print("\n[1/3] Dumping PostgreSQL...")
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"pg_dump failed:\n{result.stderr[-2000:]}")
+    print(f"  + SQL dump: {dump_path.name} ({dump_path.stat().st_size:,} bytes)")
+    return dump_path, "postgres"
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Backup PostgreSQL + FAISS + metadata")
+    parser = argparse.ArgumentParser(description="Backup SQLite/PostgreSQL + FAISS + metadata")
     parser.add_argument(
         "--output", default=str(BACKUPS_DIR), help="Base output directory (default: backups/)"
     )
-    parser.add_argument("--url", default=DEFAULT_URL, help="PostgreSQL URL to dump")
+    parser.add_argument("--url", default=DEFAULT_URL, help="Database URL or SQLite path to dump")
     args = parser.parse_args()
 
     url = args.url
-    host, port, user, password, dbname = extract_credentials(url)
-    if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
-        print(f"x Invalid database name: {dbname!r}")
-        return 1
-    try:
-        pg_bin = find_pg_bin()
-    except FileNotFoundError as exc:
-        print(f"x {exc}")
-        return 1
-
     print("=" * 64)
-    print("  System Backup")
+    print("  Face Recognition AI — System Backup")
     print("=" * 64)
-    print(f"  PostgreSQL : {host}:{port}/{dbname}")
-    print(f"  pg_dump    : {pg_bin / 'pg_dump'}")
 
-    # Pre-flight check
-    try:
-        preflight_check(url)
-        print("  Connection : OK")
-    except Exception as exc:
-        print(f"  x Cannot reach PostgreSQL: {exc}")
-        return 1
-
-    # Create backup folder
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_dir = Path(args.output) / f"backup_{timestamp}"
     backup_dir.mkdir(parents=True, exist_ok=True)
     print(f"  Backup dir : {backup_dir}")
 
     try:
-        # ── 1. PostgreSQL dump ─────────────────────────────────
-        dump_path = backup_dir / f"{dbname}.sql"
-        env = dict(os.environ)
-        if password:
-            env["PGPASSWORD"] = password
-        cmd = [
-            str(pg_bin / "pg_dump"),
-            "-h",
-            host,
-            "-p",
-            port,
-            "-U",
-            user,
-            "--no-owner",
-            "--no-privileges",
-            "-f",
-            str(dump_path),
-            dbname,
-        ]
-        print("\n[1/3] Dumping PostgreSQL...")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"  x pg_dump failed:\n{result.stderr[-2000:]}")
-            shutil.rmtree(backup_dir, ignore_errors=True)
-            return 1
-        print(f"  + SQL dump: {dump_path.name} ({dump_path.stat().st_size:,} bytes)")
+        # ── 1. Database dump ─────────────────────────────────
+        if is_sqlite_url(url):
+            sqlite_path = extract_sqlite_path(url)
+            dump_path, db_type = backup_sqlite(sqlite_path, backup_dir)
+            url_redacted = f"sqlite:///{sqlite_path.name}"
+        else:
+            dump_path, db_type = backup_postgres(url, backup_dir)
+            host, port, user, _, dbname = extract_credentials(url)
+            url_redacted = f"postgresql://{user}:***@{host}:{port}/{dbname}"
 
         # ── 2. FAISS index + metadata ─────────────────────────
         artifacts = {}
@@ -208,9 +242,10 @@ def main() -> int:
         print("\n[3/3] Writing manifest...")
         manifest = {
             "created_at": datetime.datetime.now().isoformat(),
-            "tool_version": "backup.py",
+            "tool_version": "backup.py-v2.1",
             "database": {
-                "url_redacted": f"postgresql://{user}:***@{host}:{port}/{dbname}",
+                "type": db_type,
+                "url_redacted": url_redacted,
                 "dump_file": dump_path.name,
                 "dump_size": dump_path.stat().st_size,
                 "dump_sha256": sha256(dump_path),
@@ -223,16 +258,13 @@ def main() -> int:
 
         print("\n" + "=" * 64)
         print(f"  Backup complete: {backup_dir}")
-        print(
-            "  Restore with: python scripts/restore.py --backup-dir "
-            f"{backup_dir.name} --url postgresql://{user}:***@{host}:{port}/{dbname}"
-        )
+        print(f"  Restore with: python scripts/restore.py --backup-dir {backup_dir.name}")
         print("=" * 64)
         return 0
-    except Exception:
-        # Don't leave a broken/partial backup directory behind
+    except Exception as exc:
         shutil.rmtree(backup_dir, ignore_errors=True)
-        raise
+        print(f"  x Backup failed: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

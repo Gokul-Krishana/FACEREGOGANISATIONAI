@@ -357,6 +357,9 @@ class Student(Base):
     graduation_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    consent_given: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    consent_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    retention_policy_days: Mapped[Optional[int]] = mapped_column(Integer, default=365, nullable=True)
 
     department: Mapped[Optional["Department"]] = relationship(
         "Department", back_populates="students", foreign_keys="Student.department_id"
@@ -388,6 +391,9 @@ class Staff(Base):
     position: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    consent_given: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    consent_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    retention_policy_days: Mapped[Optional[int]] = mapped_column(Integer, default=365, nullable=True)
 
     department: Mapped[Optional["Department"]] = relationship(
         "Department", back_populates="staff_members", foreign_keys="Staff.department_id"
@@ -415,6 +421,9 @@ class Employee(Base):
     faiss_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=True)
+    consent_given: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    consent_date: Mapped[Optional[datetime]] = mapped_column(DateTime, default=_utcnow, nullable=True)
+    retention_policy_days: Mapped[Optional[int]] = mapped_column(Integer, default=365, nullable=True)
 
     attendance_records: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="employee")
     audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="employee")
@@ -711,6 +720,8 @@ class AuditAction(str, Enum):
     PASSWORD_CHANGE_FAILED = "PASSWORD_CHANGE_FAILED"
     RECOGNITION_EVENT = "RECOGNITION_EVENT"
     ATTENDANCE_SYNC = "ATTENDANCE_SYNC"
+    CONSENT_UPDATED = "CONSENT_UPDATED"
+    BIOMETRIC_SHREDDED = "BIOMETRIC_SHREDDED"
 
 
 class AuditLog(Base):

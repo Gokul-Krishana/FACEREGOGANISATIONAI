@@ -132,7 +132,7 @@ async def lifespan(app: FastAPI):
     register_default_handlers()
     await job_queue.start()
     logger = logging.getLogger(__name__)
-    logger.info("Face Recognition AI API started (v2.0.0)")
+    logger.info("Face Recognition AI API started (v2.1.0)")
     yield
     await job_queue.stop()
     logger.info("Face Recognition AI API shutting down")
@@ -1471,7 +1471,7 @@ async def health_check(request: Request):
     """Health check endpoint (not rate-limited)."""
     return HealthResponse(
         status="healthy",
-        version="2.0.0",
+        version="2.1.0",
         timestamp=_utcnow(),
         database="connected",
         redis="connected",
@@ -1747,6 +1747,11 @@ async def delete_employee(
 
     emp_id_str = employee.employee_id
     emp_name = employee.name
+    photo_path = employee.photo_path
+    if photo_path:
+        from utils.biometric_crypto import shred_file
+        shred_file(photo_path)
+
     session.delete(employee)
     session.commit()
 
@@ -1757,15 +1762,43 @@ async def delete_employee(
 
     await log_audit(
         request,
-        AuditAction.DATA_DELETED,
+        AuditAction.BIOMETRIC_SHREDDED,
         current_user.username,
         current_user.id,
         resource_type="Employee",
         resource_id=employee_id,
-        description=f"Employee '{emp_name}' ({emp_id_str}) deleted",
+        description=f"Employee '{emp_name}' ({emp_id_str}) deleted and biometric data shredded",
         session=session,
     )
     return None
+
+
+@app.post("/employees/{employee_id}/shred", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
+async def shred_employee_biometrics_endpoint(
+    employee_id: int,
+    request: Request,
+    current_user: Annotated[User, Depends(require_permission("employees", ActionType.DELETE))],
+    session: Session = Depends(get_session),
+):
+    """GDPR/BIPA Right-to-be-Forgotten endpoint: cryptographically shred biometric data.
+
+    Permanently shreds facial photos and purges FAISS vector index embeddings while
+    marking biometric consent withdrawn.
+    """
+    employee = session.get(Employee, employee_id)
+    if not employee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+
+    success = EmployeeService.shred_biometrics(
+        employee.employee_id,
+        operator=current_user.username,
+        delete_employee=False,
+    )
+    if not success:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Shredding failed")
+
+    return {"status": "success", "message": f"Biometrics permanently shredded for {employee.name}"}
 
 
 # ── Camera Management ────────────────────────────────────────────────
@@ -2559,10 +2592,43 @@ async def health_summary(request: Request):
     ready = await readiness_check(request)
     return {
         "status": "ok" if ready["ready"] else "degraded",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "timestamp": ready["timestamp"],
         "database": ready["checks"].get("database", "unknown"),
         "redis": ready["checks"].get("redis", "unknown"),
+    }
+
+
+@app.get("/health/system")
+@limiter.exempt
+async def system_health_metrics(request: Request):
+    """Detailed operational health metrics (system resources, DB, FAISS)."""
+    import shutil
+    import sys
+    from pathlib import Path
+
+    # Disk usage
+    total, used, free = shutil.disk_usage(Path(__file__).resolve().parent.parent)
+
+    # FAISS count
+    faiss_count = 0
+    try:
+        from app.enrollment import FaceEnrollment
+        enr = FaceEnrollment()
+        faiss_count = enr.count()
+    except Exception:
+        pass
+
+    return {
+        "status": "healthy",
+        "version": "2.1.0",
+        "platform": sys.platform,
+        "python_version": sys.version.split()[0],
+        "cpu_cores": os.cpu_count() or 1,
+        "disk_free_gb": round(free / (1024**3), 2),
+        "disk_total_gb": round(total / (1024**3), 2),
+        "faiss_embeddings_enrolled": faiss_count,
+        "timestamp": _utcnow().isoformat(),
     }
 
 

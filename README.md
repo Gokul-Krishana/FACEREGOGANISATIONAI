@@ -1,6 +1,6 @@
-# Face Recognition Attendance System 2.0
+# Face Recognition Attendance System 2.1.0
 
-An enterprise-grade, biometric facial recognition attendance platform designed for institutional and enterprise environments. The system provides real-time multi-camera face detection, deep anti-spoofing liveness verification, sub-millisecond vector similarity search, idempotent attendance recording, and role-based administrative access control.
+An enterprise-grade, multi-platform biometric facial recognition attendance platform designed for institutional and enterprise environments across **Windows**, **Linux**, and **Apple iOS**. The system provides real-time multi-camera face detection, deep anti-spoofing liveness verification, sub-millisecond vector similarity search, idempotent attendance recording, role-based administrative access control, AES-256-GCM biometric encryption at rest, and NIST SP 800-88 compliant cryptographic data shredding.
 
 ---
 
@@ -72,12 +72,16 @@ The platform was engineered to solve six critical operational challenges inheren
 
 - **Real-Time Detection:** YOLOv8 face detection with ONNX Runtime acceleration.
 - **Deep Feature Extraction:** 512-dimensional ArcFace deep embeddings.
-- **High-Performance Search:** Sub-millisecond vector indexing using Facebook AI Similarity Search (FAISS HNSW / Flat / IVF).
+- **High-Performance Search:** Sub-millisecond vector indexing using Facebook AI Similarity Search (FAISS HNSW / Flat / IVF) with vectorized batch search acceleration.
 - **Multi-Modal Liveness:** MiniFASNetV2 deep convolutional neural networks combined with Eye Aspect Ratio (EAR) blink heuristics and screen bezel reflection detection.
 - **Adaptive Decision Engine (AMFR):** Multi-frame consensus scoring (`ACCUMULATING`, `ACCEPT`, `BORDERLINE`, `REJECT`) ensuring zero false accepts on single transient frames.
 - **Fault-Tolerant Video Ingestion:** Re-entrant locked resilient camera streams with automatic exponential backoff reconnection (`1.0s` to `30.0s`).
 - **Database Idempotency:** Database-level uniqueness constraints guarantee exactly one attendance record per employee per day.
 - **Enterprise RBAC:** 7 hierarchically enforced roles (`SUPER_ADMIN` down to `STUDENT`) governing 60 granular permissions.
+- **Biometric Encryption & Shredding:** Authenticated AES-256-GCM vector encryption at rest, consent tracking, and NIST SP 800-88 compliant cryptographic shredding.
+- **Automated Backup & Recovery:** Atomic WAL-checkpointed SQLite snapshots, PostgreSQL dumps, SHA-256 manifest verification, and deep integrity checks.
+- **High-Availability Service Watchdog:** Continuous supervisor daemon auto-restarting FastAPI and Streamlit on failure.
+- **Native iOS Client:** Swift-based mobile client with Apple Security Keychain fail-closed architecture.
 
 ---
 

@@ -212,22 +212,14 @@ class RecognitionService:
             else:
                 logger.debug("  [PIPELINE] ArcFace: NO embedding (no face)")
 
-            # Step 4 — FAISS similarity search
-            if embedding is not None:
-                matches = self.enrollment.search(embedding, k=2, threshold=self.recog_threshold)
-                faiss_results.append(matches)
-                if matches:
-                    logger.debug(
-                        "  [PIPELINE] FAISS: matched '%s' confidence=%.4f distance=%.4f (threshold=%.2f)",
-                        matches[0]["name"],
-                        matches[0]["confidence"],
-                        matches[0].get("distance", 0),
-                        self.recog_threshold,
-                    )
-                else:
-                    logger.debug("  [PIPELINE] FAISS: no match within threshold %.2f", self.recog_threshold)
-            else:
-                faiss_results.append([])
+        # Step 4 — Vectorized FAISS similarity search across all detected persons
+        if hasattr(self.enrollment, "search_batch"):
+            faiss_results = self.enrollment.search_batch(embeddings, k=2, threshold=self.recog_threshold)
+        else:
+            faiss_results = [
+                self.enrollment.search(emb, k=2, threshold=self.recog_threshold) if emb is not None else []
+                for emb in embeddings
+            ]
 
         # Step 5 — AMFR decision engine (combines quality + liveness + arcface + tracking)
         amfr_results = self.amfr.process_frame(
@@ -516,30 +508,33 @@ class RecognitionService:
         faiss_id: Optional[int] = None,
     ):
         """Resolve an employee unambiguously without relying solely on display name."""
+        emp = None
         if employee_id:
             emp = EmployeeService.get_by_employee_id(employee_id)
-            if emp is not None:
-                return emp
-        if faiss_id is not None:
+        elif faiss_id is not None:
             emp = EmployeeService.get_by_faiss_id(faiss_id)
-            if emp is not None:
-                return emp
-        # Legacy FAISS entry without employee_id metadata:
-        # 1) Try exact employee_id match (some legacy enrollments used employee_id as name)
-        emp = EmployeeService.get_by_employee_id(name)
-        if emp is not None:
-            return emp
-        # 2) Fall back to display name ONLY if unambiguous (exactly one match)
-        matches = EmployeeService.get_all_by_name(name)
-        if len(matches) == 1:
-            return matches[0]
-        if len(matches) > 1:
-            logger.warning(
-                "Ambiguous employee name '%s' matches %d records; skipping attendance until re-enrolled with unique ID",
-                name,
-                len(matches),
-            )
-        return None
+        elif name:
+            # Legacy FAISS entry without employee_id metadata:
+            # 1) Try exact employee_id match (some legacy enrollments used employee_id as name)
+            emp = EmployeeService.get_by_employee_id(name)
+            if emp is None:
+                # 2) Fall back to display name ONLY if unambiguous (exactly one match)
+                matches = EmployeeService.get_all_by_name(name)
+                if len(matches) == 1:
+                    emp = matches[0]
+                elif len(matches) > 1:
+                    logger.warning(
+                        "Ambiguous employee name '%s' matches %d records; skipping attendance until re-enrolled with unique ID",
+                        name,
+                        len(matches),
+                    )
+                    return None
+
+        # Biometric consent check: suppress recognition if consent has been withdrawn
+        if emp is not None and not getattr(emp, "consent_given", True):
+            logger.info("Employee '%s' (%s) biometric consent withdrawn; suppressing recognition", emp.name, emp.employee_id)
+            return None
+        return emp
 
     def _maybe_mark_attendance(
         self,
