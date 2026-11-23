@@ -23,11 +23,13 @@
 
 <br/>
 
-[🎬 Cinematic Story](#the-cinematic-journey-one-continuous-flow) •
-[📐 System Architecture](#4-cinematic-system-architecture) •
-[⚡ Quick Start](#8-platform-installation-deployment) •
-[🛡️ Security & Privacy](#11-security-privacy-biometric-data) •
-[🧪 Verification (541/541 Tests)](#13-verification-test-certification)
+<p align="center">
+  <a href="#the-film-experience-an-unbroken-journey"><b>🎬 The Film Experience</b></a> &nbsp;•&nbsp;
+  <a href="#system-architecture-the-neural-nexus"><b>📐 Architecture</b></a> &nbsp;•&nbsp;
+  <a href="#platform-installation-deployment"><b>⚡ Quick Start</b></a> &nbsp;•&nbsp;
+  <a href="#security-privacy-biometric-safeguards"><b>🛡️ Security & Privacy</b></a> &nbsp;•&nbsp;
+  <a href="#verification-test-certification"><b>🧪 Verification (541/541 Tests)</b></a>
+</p>
 
 <br/>
 
@@ -37,140 +39,105 @@
 
 ## Executive Summary
 
-The **Face Recognition Attendance System 2.0** is an enterprise-grade biometric attendance verification platform engineered for colleges, universities, corporate headquarters, and high-security institutions. Powered by **YOLOv8**, **ArcFace 512-D embeddings**, **FAISS vector acceleration**, and **MiniFASNetV2 anti-spoofing**, the system transforms raw video streams into authenticated attendance events in less than **200 milliseconds**.
+The **Face Recognition Attendance System 2.0** is an enterprise-grade biometric attendance verification platform engineered for universities, corporate headquarters, and high-security institutions. Powered by **YOLOv8**, **ArcFace 512-D embeddings**, **FAISS vector acceleration**, and **MiniFASNetV2 anti-spoofing**, the system transforms raw video streams into authenticated attendance events in less than **200 milliseconds**.
 
 Operating across **Windows**, **Linux**, **Docker containers**, and **Apple iOS**, the platform pairs a high-throughput **FastAPI REST API** with a 10-page reactive **Streamlit Management Dashboard**, delivering atomic transaction guarantees, brute-force lockout, authenticated AES-256-GCM vector encryption at rest, and NIST SP 800-88 cryptographic biometric shredding.
 
 ---
 
-## Table of Contents
+## The Film Experience — An Unbroken Journey
 
-- [1. The Cinematic Journey — One Continuous Flow](#the-cinematic-journey-one-continuous-flow)
-  - [Scene 01 // The Problem](#scene-01-the-problem)
-  - [Scene 02 // Capture](#scene-02-capture)
-  - [Scene 03 // Detect](#scene-03-detect)
-  - [Scene 04 // Verify Liveness](#scene-04-verify-liveness)
-  - [Scene 05 // Recognize](#scene-05-recognize)
-  - [Scene 06 // Record](#scene-06-record)
-  - [Scene 07 // See the Result](#scene-07-see-the-result)
-  - [Scene 08 // The Unified Ecosystem](#scene-08-the-unified-ecosystem)
-- [2. Key Features](#2-key-features)
-- [3. Complete Technology Stack](#3-complete-technology-stack)
-- [4. Cinematic System Architecture](#4-cinematic-system-architecture)
-- [5. AI Recognition Pipeline](#5-ai-recognition-pipeline)
-- [6. Multi-Modal Anti-Spoofing & Liveness Defense](#6-multi-modal-anti-spoofing-liveness-defense)
-- [7. Idempotent Attendance & Concurrency Control](#7-idempotent-attendance-concurrency-control)
-- [8. Platform Installation & Deployment](#8-platform-installation-deployment)
-  - [Windows Installation (DirectShow)](#windows-installation)
-  - [Linux Ubuntu 22.04 LTS (V4L2 & systemd)](#linux-installation)
-  - [Docker Container Deployment (GHCR)](#docker-deployment)
-  - [Apple iOS Client (Swift 5.9 & SwiftUI)](#apple-ios-client)
-- [9. REST API Specification](#9-rest-api-specification)
-- [10. Management Dashboard & Telemetry](#10-management-dashboard-telemetry)
-- [11. Security, Privacy & Biometric Data](#11-security-privacy-biometric-data)
-- [12. 7-Pillar Production Hardening](#12-7-pillar-production-hardening)
-- [13. Verification & Test Certification](#13-verification-test-certification)
-- [14. Troubleshooting & Operational Guide](#14-troubleshooting-operational-guide)
-- [15. Roadmap & Future Innovations](#15-roadmap-future-innovations)
-- [16. Asset Credits & License](#16-asset-credits-license)
-
----
-
-## The Cinematic Journey — One Continuous Flow
-
-> *"A person approaches the camera. The AI detects their face, verifies liveness, recognizes their identity, validates authorization, records attendance in the database with duplicate protection, and updates the management dashboard in real time."*
-
-Experience the complete, uninterrupted 0.2-second attendance sequence below:
+> *"An employee approaches the lens. Within 200 milliseconds, deep neural nets detect the face, evaluate physiological vitality, project a 512-dimensional vector embedding, authenticate against thousands of identities, and record an idempotent transaction in the ledger. Real-time telemetry pulses to the executive command center. Zero friction. Zero human intervention."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/master_journey.gif" alt="Master Cinematic Journey: Continuous 8-Stage Flow" width="92%" style="border-radius: 8px; border: 1px solid #1E293B;" />
-  <p><em>Master Journey Animation: Complete continuous pipeline transition across all 8 processing stages.</em></p>
+  <img src="docs/assets/cinematic/master_journey.gif" alt="The Full Motion Sequence: Continuous 8-Stage Flow" width="94%" style="border-radius: 12px; border: 1px solid #1E293B; box-shadow: 0 10px 35px rgba(0, 240, 255, 0.12);" />
+  <p><em>The Full Motion Sequence — Continuous 8-stage pipeline from optical photon ingestion to immutable ledger commit.</em></p>
 </div>
 
 <br/>
 
-### Scene 01 // The Problem
-> **"Attendance should be intelligent, automatic and secure."**
+### CHAPTER 01 · THE CATALYST — The Friction of Legacy Systems
+> *"Traditional attendance systems bleed organizational time and invite proxy abuse."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_01_problem.gif" alt="Scene 01: The Problem" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_01_catalyst.gif" alt="Chapter 01: The Catalyst" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-Traditional attendance systems rely on manual registers, RFID swipe bottlenecks, or fingerprint scanners that create long morning lines, high proxy attendance risks, and manual transcription errors. **Face Recognition AI 2.0** replaces manual friction with instantaneous, hands-free biometric verification.
+Traditional attendance systems rely on paper sign-in sheets, magnetic swipe badges, or touch-based fingerprint sensors. These mechanisms produce long morning bottlenecks, high administrative overhead, and rampant proxy attendance ("buddy punching"). **Face Recognition AI 2.0** eliminates all manual intervention, transforming human transit through entryways into instantaneous, non-contact biometric verification.
 
 ---
 
-### Scene 02 // Capture
-> **"Every attendance journey begins with a live camera frame."**
+### CHAPTER 02 · THE ACQUISITION — Instantaneous Frame Ingestion
+> *"Every authentication begins at the edge of the lens."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_02_camera.gif" alt="Scene 02: Camera Capture" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_02_acquisition.gif" alt="Chapter 02: Frame Acquisition" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-The system establishes an ingestion pipeline utilizing native OS backends: **DirectShow / Media Foundation** on Windows, and **V4L2** on Linux. The resilient camera manager incorporates re-entrant locking, continuous frame jitter buffering, and an automatic exponential backoff supervisor that recovers from camera disconnects without application restarts.
+The ingestion engine establishes a fault-tolerant video pipeline tailored to each host operating system: **DirectShow / Media Foundation** on Windows and **V4L2** on Linux. Operating at a stable 30 frames per second, the pipeline features asynchronous double buffering, thread-safe frame locking, and an autonomous exponential backoff supervisor that reconnects lost cameras without interrupting the service.
 
 ---
 
-### Scene 03 // Detect
-> **"AI locates the face and evaluates whether it is suitable for recognition."**
+### CHAPTER 03 · THE LOCALIZATION — Deep Neural Face Detection
+> *"Isolating human geometry at sub-millisecond velocity."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_03_detection.gif" alt="Scene 03: Face Detection" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_03_localization.gif" alt="Chapter 03: Neural Localization" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-High-throughput neural detectors (**YOLOv8-Face** accelerated by ONNX Runtime) isolate facial bounding boxes in single-digit milliseconds. The engine extracts five crucial facial landmarks (eyes, nose, mouth corners) and applies a multi-criteria quality filter: Laplacian sharpness variance, face tilt/yaw thresholds, and illumination checks. Sub-quality or heavily occluded crops are filtered before downstream feature extraction.
+High-throughput neural detectors (**YOLOv8-Face** accelerated by ONNX Runtime) pinpoint facial bounding boxes in single-digit milliseconds. The engine extracts five crucial fiducial landmarks (eyes, nose tip, mouth corners) to apply affine alignment. Each detected face passes a strict multi-criteria quality filter: Laplacian sharpness variance, face tilt/yaw angles, and ambient illumination thresholds. Sub-quality or heavily occluded crops are filtered before downstream feature extraction.
 
 ---
 
-### Scene 04 // Verify Liveness
-> **"Check that the input appears to come from a real live person, not a photo or screen replay."**
+### CHAPTER 04 · THE DEFENSE — Impenetrable Anti-Spoofing Shield
+> *"Separating real human biology from synthetic replicas."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_04_liveness.gif" alt="Scene 04: Liveness Verification" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_04_defense.gif" alt="Chapter 04: Anti-Spoofing Defense" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-Presentation attacks are repelled using a multi-layered defense. The **MiniFASNetV2** deep convolutional neural network evaluates micro-texture spatial frequency to identify high-resolution print paper grain, moiré patterns, and mobile screen bezel reflections. In live video mode, temporal Eye Aspect Ratio (EAR) blink cycle heuristics confirm physiological vitality. Fake attempts are rejected instantly.
+Presentation attacks are repelled through a multi-modal defense architecture. The **MiniFASNetV2** deep convolutional neural network analyzes micro-texture spatial frequencies to detect paper grain, tablet moiré patterns, and mobile screen bezel reflections. Concurrently, temporal Eye Aspect Ratio (EAR) blink cycle heuristics confirm physiological vitality. Spoof attempts are rejected immediately and logged into the security audit trail.
 
 ---
 
-### Scene 05 // Recognize
-> **"AI compares facial features against enrolled identities to find a match."**
+### CHAPTER 05 · THE VECTOR SPACE — 512-Dimensional Identity Matching
+> *"Compressing biometric individuality into mathematical uniqueness."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_05_recognition.gif" alt="Scene 05: Face Recognition" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_05_vector_space.gif" alt="Chapter 05: Vector Matching" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-Verified facial crops pass through deep **ArcFace ResNet** feature extractors, generating a normalized 512-dimensional mathematical vector signature. The query vector is searched against the enrolled database via **FAISS** (Facebook AI Similarity Search) using hierarchical navigable small-world (HNSW) graphs. Vector comparisons achieve sub-millisecond execution times even with college-scale directories.
+Verified facial crops pass through deep **ArcFace ResNet** feature extractors, generating a normalized 512-dimensional mathematical vector signature. The query vector is searched against the enrolled database via **FAISS** (Facebook AI Similarity Search) using hierarchical navigable small-world (HNSW) graphs. Vector comparisons achieve sub-millisecond execution times even with enterprise directories containing thousands of identities.
 
 ---
 
-### Scene 06 // Record
-> **"Verified attendance is securely recorded, with duplicate protection."**
+### CHAPTER 06 · THE TRANSACTION — Atomic Idempotent Check-In
+> *"An immutable contract written to the database."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_06_attendance.gif" alt="Scene 06: Attendance Recording" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_06_transaction.gif" alt="Chapter 06: Idempotent Transaction" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
 Once an identity is verified, the system generates an atomic database transaction. An **Idempotency Key** composed of the employee ID and calendar date (`YYYY-MM-DD:EMP_ID`) is enforced at the database level with a unique composite index. Multiple camera hits on the same day are deduplicated automatically, guaranteeing that an employee receives exactly one official attendance check-in.
 
 ---
 
-### Scene 07 // See the Result
-> **"Attendance updates appear instantly in the management dashboard."**
+### CHAPTER 07 · THE COMMAND CENTER — Real-Time Administrative Telemetry
+> *"Total operational transparency across the institutional perimeter."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_07_dashboard.gif" alt="Scene 07: Management Dashboard" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_07_command_center.gif" alt="Chapter 07: Administrative Telemetry" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
-The committed attendance record synchronizes across the system. The 10-page reactive **Streamlit Administrative Portal** updates KPI counters (`Total Present`, `Absent`, `Punctuality Rate`), streams the live CCTV feed, displays the employee's name and check-in timestamp in the live attendance ledger, and emits an auditable entry into the tamper-evident security log.
+The committed attendance record synchronizes across the system in real time. The 10-page reactive **Streamlit Administrative Portal** updates KPI counters (`Total Present`, `Absent`, `Punctuality Rate`), streams the live CCTV feed, displays the employee's name and check-in timestamp in the live attendance ledger, and emits an auditable entry into the tamper-evident security log.
 
 ---
 
-### Scene 08 // The Unified Ecosystem
-> **"One connected, multi-platform attendance ecosystem."**
+### CHAPTER 08 · THE HORIZON — The Multi-Platform Ecosystem
+> *"One unified intelligence. Deployed natively everywhere."*
 
 <div align="center">
-  <img src="docs/assets/cinematic/scene_08_ecosystem.gif" alt="Scene 08: Ecosystem Overview" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="docs/assets/cinematic/chapter_08_horizon.gif" alt="Chapter 08: Multi-Platform Ecosystem" width="88%" style="border-radius: 8px; border: 1px solid #1E293B;" />
 </div>
 
 The platform runs harmoniously across environments:
@@ -181,7 +148,7 @@ The platform runs harmoniously across environments:
 
 ---
 
-## 2. Key Features
+## Key Features
 
 - **⚡ Sub-200ms Processing Latency:** Real-time end-to-end processing pipeline from camera frame grab to database commit.
 - **🎯 512-D ArcFace Deep Embeddings:** Additive Angular Margin loss embeddings for high discriminative feature separation.
@@ -196,7 +163,7 @@ The platform runs harmoniously across environments:
 
 ---
 
-## 3. Complete Technology Stack
+## Complete Technology Stack
 
 | Domain | Technology / Component | Version / Spec | Role & Functionality |
 | :--- | :--- | :--- | :--- |
@@ -217,7 +184,7 @@ The platform runs harmoniously across environments:
 
 ---
 
-## 4. Cinematic System Architecture
+## System Architecture — The Neural Nexus
 
 ```mermaid
 flowchart TD
@@ -274,7 +241,7 @@ flowchart TD
 
 ---
 
-## 5. AI Recognition Pipeline
+## AI Recognition Pipeline
 
 The recognition pipeline is built upon three foundational algorithms:
 
@@ -287,7 +254,7 @@ The recognition pipeline is built upon three foundational algorithms:
 
 ---
 
-## 6. Multi-Modal Anti-Spoofing & Liveness Defense
+## Multi-Modal Anti-Spoofing & Liveness Defense
 
 The platform mitigates presentation attacks through multi-modal gating:
 
@@ -322,7 +289,7 @@ The platform mitigates presentation attacks through multi-modal gating:
 
 ---
 
-## 7. Idempotent Attendance & Concurrency Control
+## Idempotent Attendance & Concurrency Control
 
 In enterprise facilities with multiple entrance gates, employees often pass several cameras within minutes. The system prevents duplicate records:
 
@@ -338,7 +305,7 @@ When concurrent hits arrive from different cameras, the first transaction commit
 
 ---
 
-## 8. Platform Installation & Deployment
+## Platform Installation & Deployment
 
 ### Windows Installation
 
@@ -461,7 +428,7 @@ swift test
 
 ---
 
-## 9. REST API Specification
+## REST API Specification
 
 The FastAPI backend provides interactive OpenAPI documentation at `/docs`:
 
@@ -479,7 +446,7 @@ The FastAPI backend provides interactive OpenAPI documentation at `/docs`:
 
 ---
 
-## 10. Management Dashboard & Telemetry
+## Management Dashboard & Telemetry
 
 The Streamlit portal provides ten administrative pages:
 
@@ -496,7 +463,7 @@ The Streamlit portal provides ten administrative pages:
 
 ---
 
-## 11. Security, Privacy & Biometric Data
+## Security, Privacy & Biometric Safeguards
 
 - **Biometric Encryption at Rest:** Facial embeddings stored on disk are protected with authenticated **AES-256-GCM / Fernet** encryption (`utils/biometric_crypto.py`). Keys are derived using PBKDF2-HMAC-SHA256 with 100,000 iterations.
 - **NIST SP 800-88 Cryptographic Shredding:** Withdrawing employee consent or deleting a record triggers permanent multi-pass random overwrites followed by zero-filling (`shred_file`) of biometric crops and vectors.
@@ -506,7 +473,7 @@ The Streamlit portal provides ten administrative pages:
 
 ---
 
-## 12. 7-Pillar Production Hardening
+## 7-Pillar Production Hardening
 
 The repository has completed seven comprehensive production hardening pillars:
 
@@ -526,7 +493,7 @@ The repository has completed seven comprehensive production hardening pillars:
 
 ---
 
-## 13. Verification & Test Certification
+## Verification & Test Certification
 
 The repository maintains an automated regression testing and validation framework:
 
@@ -542,7 +509,7 @@ The repository maintains an automated regression testing and validation framewor
 
 ---
 
-## 14. Troubleshooting & Operational Guide
+## Troubleshooting & Operational Guide
 
 <details>
 <summary><b>Click to expand common operational solutions</b></summary>
@@ -559,7 +526,7 @@ The repository maintains an automated regression testing and validation framewor
 
 ---
 
-## 15. Roadmap & Future Innovations
+## Roadmap & Future Innovations
 
 - [ ] Multi-tenant cloud synchronization for multi-campus institutional deployments.
 - [ ] Active challenge-response liveness (randomized head-nod / blink prompts).
@@ -568,7 +535,7 @@ The repository maintains an automated regression testing and validation framewor
 
 ---
 
-## 16. Asset Credits & License
+## Asset Credits & License
 
 - **License:** Proprietary institutional software. All rights reserved.
 - **Visual Assets:** Custom synthesized vector illustrations and animations. See [ASSET_CREDITS.md](docs/ASSET_CREDITS.md) for full attribution.

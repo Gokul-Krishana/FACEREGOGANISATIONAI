@@ -21,3 +21,4 @@ All cinematic visual assets, diagrams, and animations included in this repositor
 ---
 
 *All animations and illustrative assets use synthetic, non-identifiable geometric human silhouettes and fictional placeholder identifiers (e.g., EMP-1048 Sarah Jenkins). No private biometric photographs, real facial crops, or confidential employee records are stored or depicted.*
+
