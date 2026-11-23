@@ -153,3 +153,4 @@ python scripts/service_watchdog.py --interval 15 --auto-restart
 ```
 
 Logs are recorded in `logs/watchdog.log`.
+

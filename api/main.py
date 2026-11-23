@@ -1750,6 +1750,7 @@ async def delete_employee(
     photo_path = employee.photo_path
     if photo_path:
         from utils.biometric_crypto import shred_file
+
         shred_file(photo_path)
 
     session.delete(employee)
@@ -2614,6 +2615,7 @@ async def system_health_metrics(request: Request):
     faiss_count = 0
     try:
         from app.enrollment import FaceEnrollment
+
         enr = FaceEnrollment()
         faiss_count = enr.count()
     except Exception:

@@ -20,10 +20,6 @@ import pytest
 
 from app.amfr_engine import AMFRDecision, AMFREngine
 from app.enrollment import FaceEnrollment
-import config.config as cfg
-from database.database import get_session, init_db
-from database.models import Attendance, Employee
-from database.repository import AttendanceRepo, EmployeeRepo
 
 
 @pytest.fixture
@@ -155,30 +151,7 @@ def test_top1_vs_top2_ambiguity_detection(clean_enrollment):
 def test_amfr_engine_downgrades_ambiguous_matches():
     engine = AMFREngine()
 
-    # Ambiguous match candidate
-    ambiguous_faiss = [
-        {
-            "name": "Candidate Alpha",
-            "employee_id": "EMP-ALPHA",
-            "faiss_id": 0,
-            "confidence": 0.95,
-            "distance": 0.22,
-            "is_ambiguous": True,
-            "competing_name": "Candidate Beta",
-        }
-    ]
-
-    # Process frame through AMFR decision
-    fake_frame = np.full((200, 200, 3), 120, dtype=np.uint8)
-    fake_det = {"bbox": (20, 20, 100, 100)}
-    fake_face = {
-        "bbox": (25, 25, 95, 95),
-        "landmarks": [(35, 45), (75, 45), (55, 65), (40, 85), (70, 85)],
-        "det_score": 0.99,
-        "embedding": np.zeros(512, dtype=np.float32),
-    }
-
-    # Evaluate decision
+    # Evaluate decision with ambiguous match flag
     decision, risk, details = engine._decide(
         arcface_distance=0.22,
         liveness_score=0.92,
@@ -191,4 +164,3 @@ def test_amfr_engine_downgrades_ambiguous_matches():
     # Must NOT be ACCEPT! Must be BORDERLINE because match is ambiguous!
     assert decision == AMFRDecision.BORDERLINE
     assert details.get("ambiguity_gate") == "AMBIGUOUS"
-

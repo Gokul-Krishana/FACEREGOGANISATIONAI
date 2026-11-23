@@ -54,3 +54,4 @@ If you wish to withdraw biometric consent or request the permanent destruction o
    - **Delete Employee & Shred Biometrics**: Completely removes the employee record and shreds all associated biometric artifacts.
 3. **Audit Confirmation**:
    A tamper-evident audit record (`BIOMETRIC_SHREDDED`) is generated, confirming the exact timestamp of permanent file destruction.
+

@@ -26,7 +26,7 @@ from jose import jwt
 
 import config.config as cfg
 from database.database import get_session, init_db
-from database.models import Employee, Role, RoleName, User, _utcnow
+from database.models import Role, RoleName, User
 from dashboard.auth import ADMIN_ROLES, OPERATOR_ROLES, require_auth, user_has_role
 
 
@@ -57,6 +57,7 @@ def _create_test_user_with_role(username: str, role_name: RoleName, is_active: b
             session.commit()
 
         import bcrypt
+
         hashed = bcrypt.hashpw(b"ValidPass123!@", bcrypt.gensalt()).decode("utf-8")
         user = User(
             username=username,
@@ -82,6 +83,7 @@ def _generate_jwt_token(user_id: int, secret_key: str, expires_delta: timedelta 
 
 
 # ── Dashboard Page Access Tests ───────────────────────────────────────
+
 
 def test_every_dashboard_page_requires_auth():
     """Verify that every dashboard page rejects unauthenticated direct access."""
@@ -131,6 +133,7 @@ def test_dashboard_rbac_privilege_escalation_blocked():
 
 
 # ── API Endpoint Authentication Tests ─────────────────────────────────
+
 
 def test_api_endpoints_reject_unauthenticated_requests(api_client):
     """Protected endpoints must return 401 when no token is supplied."""
@@ -185,6 +188,7 @@ def test_api_rejects_inactive_account(api_client):
     """Inactive accounts (is_active=False) must be rejected with 401."""
     inactive_user_id = _create_test_user_with_role("test_inactive_user", RoleName.FACULTY, is_active=False)
     from api.main import create_access_token
+
     token = create_access_token(
         data={"sub": inactive_user_id, "username": "test_inactive_user", "roles": [RoleName.FACULTY.value]}
     )
@@ -199,6 +203,7 @@ def test_api_rbac_prevents_privilege_escalation(api_client):
     """Non-admin user (STUDENT) cannot perform admin operations (HTTP 403)."""
     student_id = _create_test_user_with_role("student_bob", RoleName.STUDENT, is_active=True)
     from api.main import create_access_token
+
     student_token = create_access_token(
         data={"sub": student_id, "username": "student_bob", "roles": [RoleName.STUDENT.value]}
     )
@@ -215,6 +220,7 @@ def test_api_authorized_admin_succeeds(api_client):
     """Authorized administrator can successfully access protected endpoints."""
     admin_id = _create_test_user_with_role("admin_verified", RoleName.SUPER_ADMIN, is_active=True)
     from api.main import create_access_token
+
     admin_token = create_access_token(
         data={"sub": admin_id, "username": "admin_verified", "roles": [RoleName.SUPER_ADMIN.value]}
     )

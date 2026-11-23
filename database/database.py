@@ -216,11 +216,15 @@ def _ensure_biometric_privacy_columns(target_engine=None) -> None:
                 if tbl in table_names:
                     cols = {c["name"] for c in insp.get_columns(tbl)}
                     if "consent_given" not in cols:
-                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN consent_given BOOLEAN DEFAULT {bool_default}"))
+                        conn.execute(
+                            text(f"ALTER TABLE {tbl} ADD COLUMN consent_given BOOLEAN DEFAULT {bool_default}")
+                        )
                     if "consent_date" not in cols:
                         conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN consent_date {dt_type}"))
                     if "retention_policy_days" not in cols:
-                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN retention_policy_days INTEGER DEFAULT 365"))
+                        conn.execute(
+                            text(f"ALTER TABLE {tbl} ADD COLUMN retention_policy_days INTEGER DEFAULT 365")
+                        )
     except Exception as exc:
         logger.debug("Could not backfill biometric privacy columns: %s", exc)
 

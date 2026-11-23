@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import threading
 import time
-from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
 from camera.base import CameraSource
 from camera.fake import FakeCameraSource
 from camera.resilient import (
-    CameraHealthMetrics,
     CameraState,
     FrozenFrameDetector,
     ResilientCameraSource,

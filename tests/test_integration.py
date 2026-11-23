@@ -105,6 +105,7 @@ def pg_engine():
     engine = sqlalchemy.create_engine(POSTGRES_URL, pool_pre_ping=True)
     Base.metadata.create_all(bind=engine)
     from database.database import _ensure_biometric_privacy_columns
+
     _ensure_biometric_privacy_columns(engine)
     yield engine
     try:

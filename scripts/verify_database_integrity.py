@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -23,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import config.config as cfg  # noqa: E402
-from database.database import engine, get_session  # noqa: E402
+from database.database import get_session  # noqa: E402
 from database.models import Attendance, AuditLog, Camera, Employee, Student, UnknownFace, User  # noqa: E402
 
 
@@ -68,7 +67,9 @@ def check_sqlite_integrity(fix_orphans: bool = False) -> bool:
                     print(f"  x PRAGMA foreign_key_check: {len(rem)} unresolvable violations remaining")
                     return False
             else:
-                print(f"  x PRAGMA foreign_key_check: FOUND {len(fk_violations)} violations (run with --fix-orphans)")
+                print(
+                    f"  x PRAGMA foreign_key_check: FOUND {len(fk_violations)} violations (run with --fix-orphans)"
+                )
                 return False
         return True
     finally:

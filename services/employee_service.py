@@ -303,6 +303,7 @@ class EmployeeService:
     @staticmethod
     def to_dict(emp: Employee) -> dict:
         """Convert an Employee ORM object to a dictionary."""
+        c_date = getattr(emp, "consent_date", None)
         return {
             "id": emp.id,
             "employee_id": emp.employee_id,
@@ -313,6 +314,6 @@ class EmployeeService:
             "created_at": emp.created_at.isoformat() if emp.created_at else None,
             "updated_at": emp.updated_at.isoformat() if emp.updated_at else None,
             "consent_given": getattr(emp, "consent_given", True),
-            "consent_date": emp.consent_date.isoformat() if getattr(emp, "consent_date", None) else None,
+            "consent_date": c_date.isoformat() if c_date is not None else None,
             "retention_policy_days": getattr(emp, "retention_policy_days", 365),
         }

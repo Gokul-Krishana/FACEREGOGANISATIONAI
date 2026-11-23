@@ -53,7 +53,11 @@ def collect_images(
     test: List[Tuple[Path, str]] = []
     duplicate_groups: List[Dict[str, object]] = []
     fingerprints: List[Tuple[Path, str, str, np.ndarray]] = []
-    class_dirs = (path for path in source.iterdir() if path.is_dir() and (class_names is None or path.name in class_names))
+    class_dirs = (
+        path
+        for path in source.iterdir()
+        if path.is_dir() and (class_names is None or path.name in class_names)
+    )
     for class_dir in sorted(class_dirs):
         files = sorted(path for path in class_dir.iterdir() if path.suffix.lower() in IMAGE_EXTENSIONS)
         if len(files) < minimum_images:
@@ -78,10 +82,8 @@ def collect_images(
         matches = [
             str(other)
             for other, other_label, other_digest, other_perceptual in fingerprints[index + 1 :]
-            if label == other_label and (
-                digest == other_digest
-                or int(np.count_nonzero(perceptual != other_perceptual)) <= 8
-            )
+            if label == other_label
+            and (digest == other_digest or int(np.count_nonzero(perceptual != other_perceptual)) <= 8)
         ]
         if matches:
             duplicate_groups.append({"label": label, "files": [str(path), *matches]})
@@ -94,10 +96,7 @@ def collect_images(
             digest, perceptual = fingerprint
             leaks = any(
                 train_label == label
-                and (
-                    digest == train_digest
-                    or int(np.count_nonzero(perceptual != train_perceptual)) <= 8
-                )
+                and (digest == train_digest or int(np.count_nonzero(perceptual != train_perceptual)) <= 8)
                 for train_path, train_label, train_digest, train_perceptual in fingerprints
                 if train_path in train_paths
             )
@@ -108,7 +107,9 @@ def collect_images(
     return train, filtered_test, duplicate_groups
 
 
-def extract(recognizer: FaceRecognizer, entries: List[Tuple[Path, str]]) -> Tuple[List[Tuple[np.ndarray, str]], List[str]]:
+def extract(
+    recognizer: FaceRecognizer, entries: List[Tuple[Path, str]]
+) -> Tuple[List[Tuple[np.ndarray, str]], List[str]]:
     embeddings: List[Tuple[np.ndarray, str]] = []
     failed: List[str] = []
     for path, label in entries:
@@ -160,9 +161,18 @@ def distinct_names(matches: List[Dict[str, object]], limit: int = 3) -> List[str
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True, help="Labeled class-folder root.")
-    parser.add_argument("--class", dest="classes", action="append", help="Class folder name; may be repeated.")
-    parser.add_argument("--unknown-source", type=Path, help="Optional folder of identities absent from the gallery.")
-    parser.add_argument("--unknown-class", dest="unknown_classes", action="append", help="Unknown class folder; may be repeated.")
+    parser.add_argument(
+        "--class", dest="classes", action="append", help="Class folder name; may be repeated."
+    )
+    parser.add_argument(
+        "--unknown-source", type=Path, help="Optional folder of identities absent from the gallery."
+    )
+    parser.add_argument(
+        "--unknown-class",
+        dest="unknown_classes",
+        action="append",
+        help="Unknown class folder; may be repeated.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--test-fraction", type=float, default=0.30)
     parser.add_argument("--output", type=Path, default=ROOT / "outputs" / "labeled_dataset_evaluation.json")
@@ -206,7 +216,12 @@ def main() -> int:
         predicted.append(prediction)
         top_three_hits += int(label in names)
         predictions.append(
-            {"expected": label, "predicted": prediction, "top_three": names, "confidence": matches[0]["confidence"] if matches else 0.0}
+            {
+                "expected": label,
+                "predicted": prediction,
+                "top_three": names,
+                "confidence": matches[0]["confidence"] if matches else 0.0,
+            }
         )
 
     unknown_result = None
@@ -225,7 +240,9 @@ def main() -> int:
             matches = enrollment.search(embedding, k=enrollment.count(), threshold=cfg.RECOGNITION_THRESHOLD)
             names = distinct_names(matches)
             accepted += int(bool(names))
-            unknown_predictions.append({"expected": label, "predicted": names[0] if names else "Unknown", "top_three": names})
+            unknown_predictions.append(
+                {"expected": label, "predicted": names[0] if names else "Unknown", "top_three": names}
+            )
         unknown_total = len(unknown_embeddings)
         unknown_result = {
             "images": unknown_total,
@@ -239,8 +256,19 @@ def main() -> int:
 
     result = {
         "source": str(args.source),
-        "split": {"test_fraction": args.test_fraction, "seed": args.seed, "train_candidates": len(train_entries), "test_candidates": len(test_entries), "duplicate_groups": duplicate_groups},
-        "extraction": {"train_embeddings": len(train_embeddings), "test_embeddings": len(test_embeddings), "train_failed": train_failed, "test_failed": test_failed},
+        "split": {
+            "test_fraction": args.test_fraction,
+            "seed": args.seed,
+            "train_candidates": len(train_entries),
+            "test_candidates": len(test_entries),
+            "duplicate_groups": duplicate_groups,
+        },
+        "extraction": {
+            "train_embeddings": len(train_embeddings),
+            "test_embeddings": len(test_embeddings),
+            "train_failed": train_failed,
+            "test_failed": test_failed,
+        },
         "enrollment": {"embeddings": enrollment.count(), "persons": enrollment.all_persons()},
         "metrics": metrics(actual, predicted, top_three_hits),
         "unknown_evaluation": unknown_result,

@@ -188,10 +188,14 @@ def _render_page() -> None:
                     "photos on disk (NIST SP 800-88 compliant), and records an auditable destruction log."
                 )
                 col_del1, col_del2 = st.columns(2)
-                confirm = st.text_input("Type the Employee ID to confirm action:", placeholder=str(emp_to_delete[0]))
+                confirm = st.text_input(
+                    "Type the Employee ID to confirm action:", placeholder=str(emp_to_delete[0])
+                )
                 if confirm == emp_to_delete[0]:
                     with col_del1:
-                        if st.button("🗑️ Delete Employee & Shred Biometrics", type="primary", use_container_width=True):
+                        if st.button(
+                            "🗑️ Delete Employee & Shred Biometrics", type="primary", use_container_width=True
+                        ):
                             success = EmployeeService.delete(str(emp_to_delete[0]), operator="dashboard")
                             if success:
                                 st.success(f"Deleted {emp_to_delete[1]} and shredded biometric files.")
@@ -206,7 +210,9 @@ def _render_page() -> None:
                                 delete_employee=False,
                             )
                             if success:
-                                st.success(f"Biometrics shredded and consent withdrawn for {emp_to_delete[1]}.")
+                                st.success(
+                                    f"Biometrics shredded and consent withdrawn for {emp_to_delete[1]}."
+                                )
                                 st.rerun()
                             else:
                                 st.error("Failed to shred biometrics.")

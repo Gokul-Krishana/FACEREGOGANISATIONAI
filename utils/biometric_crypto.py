@@ -15,7 +15,6 @@ with GDPR (Article 9 / 17), BIPA, and CCPA/CPRA regulations:
 from __future__ import annotations
 
 import base64
-import hashlib
 import logging
 import os
 import secrets

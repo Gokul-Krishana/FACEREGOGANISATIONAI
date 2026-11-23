@@ -597,11 +597,17 @@ Execute the complete regression test suite:
 python -m pytest tests -v
 ```
 
-Execute specific problem-area suites:
+Execute specific problem-area and hardening suites:
+- **7 Production Hardening Pillars:** `pytest tests/test_production_hardening_pillars.py -v`
 - **Camera Reliability:** `pytest tests/test_resilient_camera.py -v`
 - **Identity Ambiguity:** `pytest tests/test_identity_ambiguity.py -v`
 - **Liveness Anti-Spoofing:** `pytest tests/test_liveness_validation.py -v`
 - **Auth & RBAC Security:** `pytest tests/test_auth_security_complete.py -v`
+
+Execute system verification utilities:
+- **Database Integrity Check:** `python scripts/verify_database_integrity.py`
+- **Dashboard Pages Check:** `python scripts/verify_dashboard_pages.py`
+- **Service Watchdog Supervisor:** `python scripts/service_watchdog.py --once`
 
 ---
 
@@ -618,9 +624,12 @@ Execute specific problem-area suites:
 
 ## 31. Security & Biometric Privacy Considerations
 
+- **Biometric Encryption at Rest:** Facial embeddings stored on disk are protected with authenticated AES-256-GCM / Fernet encryption (`utils/biometric_crypto.py`). Key derivation uses PBKDF2-HMAC-SHA256 with 100,000 iterations.
+- **Explicit Consent & Retention Tracking:** Biometric processing requires auditable consent (`consent_given`, `consent_date`, `retention_policy_days`). Consent withdrawal automatically suppresses real-time recognition.
+- **NIST SP 800-88 Cryptographic Shredding:** Deleting an employee or withdrawing consent triggers permanent multi-pass cryptographic shredding of biometric vectors and facial crops (`shred_file`).
 - **Privacy by Design:** Raw facial photographs are never stored in the database. Only 512-dimensional irreversibly extracted mathematical vectors are indexed.
-- **Data Subject Rights:** Deleting an employee removes all associated metadata and vector entries.
 - **Fail-Closed Principle:** Corrupt, missing, or poor-quality frames default to rejection.
+- **Enterprise RBAC & Brute-Force Lockout:** 7 hierarchical roles with 60 granular permissions, automated rate limiting, and brute-force IP/account lockout.
 - **Encryption in Transit:** In production, bind Uvicorn behind an HTTPS reverse proxy (Nginx or Caddy) with TLS 1.3.
 
 ---
@@ -630,6 +639,7 @@ Execute specific problem-area suites:
 - **Physical 24-Hour Hardware Burn-in:** While automated simulations pass, long-term 24/7 physical hardware burn-in depends on specific camera hardware and driver stability.
 - **3D Mask Attacks:** Presentation attack detection protects against paper prints and screen replays; specialized 3D silicone latex masks require active challenge-response protocols.
 - **Identical Twins:** Individuals sharing near-identical facial geometry require secondary multi-factor authentication (e.g., PIN or RFID card).
+- **Physical iOS Device Testing:** iOS simulator builds and unit tests are validated in CI; physical device camera performance requires testing on hardware provisioned with Apple Developer credentials.
 
 ---
 
@@ -638,7 +648,8 @@ Execute specific problem-area suites:
 - **PostgreSQL:** Replace SQLite with PostgreSQL for high-concurrency production deployments by configuring `DATABASE_URL=postgresql://user:pass@host:5432/db`.
 - **Redis Cluster:** Deploy Redis for distributed token revocation and multi-worker rate limiting.
 - **Reverse Proxy:** Terminate SSL/TLS at Nginx and forward traffic to Uvicorn via UNIX sockets or local loopback.
-- **Backup Automation:** Schedule daily backups using `scripts/backup_database.py`.
+- **Backup Automation:** Unified SQLite WAL and PostgreSQL backups via `python scripts/backup.py` and restoration via `python scripts/restore.py`.
+- **High-Availability Supervisor:** Run `python scripts/service_watchdog.py --interval 15 --auto-restart` as a system service.
 
 ---
 
@@ -652,9 +663,15 @@ Execute specific problem-area suites:
 
 ## 35. Verification & Test Certification
 
-- **Test Suite Status:** **534 Passed, 6 Skipped, 0 Failed (100% Pass Rate)**.
-- **Execution Duration:** 151.19 seconds across all 26 test modules.
-- **Biometric Audit:** Verified 100% clean of unauthorized or deleted biometric identities.
+- **Test Suite Status:** **541 Passed, 6 Skipped, 0 Failed (100% Pass Rate)** across 27 test modules.
+- **Execution Duration:** ~115 seconds in regression suite.
+- **Database Integrity:** 100% Healthy (0 SQLite foreign key violations, FAISS metadata synchronized).
+- **Dashboard Integrity:** 10/10 Streamlit pages verified operational with strict role-based access control.
+- **7-Pillar Production Hardening:** All 7 pillars verified (Security RBAC, Privacy Crypto, Vectorized FAISS, Automated Backup/Restore, Modernized Dark Mode UI, Service Watchdog, System Documentation).
+- **Cross-Platform CI:**
+  - **Linux Ubuntu 22.04 LTS & Docker:** All dependencies, migrations, pytest, and container health checks passed.
+  - **Apple iOS Client:** Swift 5.9 Linux SPM build and macOS simulator launch validation passing with fail-closed Security Keychain.
+  - **Windows Production Baseline:** Preserved at git tag `windows-baseline-v2.0` (commit `756e47a`).
 
 ---
 

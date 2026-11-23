@@ -153,9 +153,7 @@ def restore_sqlite_db(dump_path: Path, target_path: Path, dry_run: bool = False)
         conn.close()
 
 
-def restore_postgres_db(
-    dump_path: Path, url: str, dry_run: bool = False
-) -> None:
+def restore_postgres_db(dump_path: Path, url: str, dry_run: bool = False) -> None:
     """Restore PostgreSQL database using psql."""
     host, port, user, password, dbname = extract_credentials(url)
     if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
@@ -188,7 +186,19 @@ def restore_postgres_db(
 
     print("[2/4] Dropping existing database...")
     subprocess.run(
-        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", f"DROP DATABASE IF EXISTS {dbname};"],
+        [
+            str(pg_bin / "psql"),
+            "-h",
+            host,
+            "-p",
+            port,
+            "-U",
+            user,
+            "-d",
+            "postgres",
+            "-c",
+            f"DROP DATABASE IF EXISTS {dbname};",
+        ],
         env=env,
         capture_output=True,
         text=True,
@@ -196,7 +206,19 @@ def restore_postgres_db(
 
     print("[3/4] Creating fresh database...")
     subprocess.run(
-        [str(pg_bin / "psql"), "-h", host, "-p", port, "-U", user, "-d", "postgres", "-c", f"CREATE DATABASE {dbname};"],
+        [
+            str(pg_bin / "psql"),
+            "-h",
+            host,
+            "-p",
+            port,
+            "-U",
+            user,
+            "-d",
+            "postgres",
+            "-c",
+            f"CREATE DATABASE {dbname};",
+        ],
         env=env,
         capture_output=True,
         text=True,

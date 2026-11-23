@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-import pytest
 
 from app.amfr_engine import AMFRDecision, AMFREngine
-from app.deep_liveness import DeepLivenessDetector
-from app.liveness_detector import LivenessDetector, LivenessResult
+from app.liveness_detector import LivenessDetector
 import config.config as cfg
 
 
@@ -88,12 +86,12 @@ def test_screen_bezel_detection_flags_screen_spoof():
 
 def test_static_print_spoof_rejected_by_amfr():
     engine = AMFREngine()
-    print_spoof = _generate_synthetic_print_spoof()
+    _ = _generate_synthetic_print_spoof()
 
     # Pass zero liveness result to AMFR decision
     decision, risk, details = engine._decide(
         arcface_distance=0.15,  # even with a high face match distance
-        liveness_score=0.10,    # spoof level
+        liveness_score=0.10,  # spoof level
         quality_score=0.85,
         is_live=False,
         faiss_confidence=0.98,
@@ -114,10 +112,9 @@ def test_far_and_frr_measurement_and_confusion_matrix():
 
     # Create test datasets
     # 20 spoof samples (10 screen, 10 print)
-    spoof_samples = (
-        [_generate_synthetic_screen_spoof() for _ in range(10)]
-        + [_generate_synthetic_print_spoof() for _ in range(10)]
-    )
+    spoof_samples = [_generate_synthetic_screen_spoof() for _ in range(10)] + [
+        _generate_synthetic_print_spoof() for _ in range(10)
+    ]
 
     # 10 live simulated samples with simulated dynamic micro-motion
     live_samples = [_generate_synthetic_live_face() for _ in range(10)]
@@ -150,7 +147,7 @@ def test_far_and_frr_measurement_and_confusion_matrix():
     far = fp / total_spoofs if total_spoofs > 0 else 0.0
     frr = fn / total_live if total_live > 0 else 0.0
 
-    print(f"\n[LIVENESS BENCHMARK RESULTS]")
+    print("\n[LIVENESS BENCHMARK RESULTS]")
     print(f"  Confusion Matrix: TP={tp}, FP={fp}, TN={tn}, FN={fn}")
     print(f"  False Acceptance Rate (FAR): {far * 100:.2f}% (Target: < 5%)")
     print(f"  False Rejection Rate (FRR):  {frr * 100:.2f}%")

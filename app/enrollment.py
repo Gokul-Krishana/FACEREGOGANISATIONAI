@@ -392,24 +392,6 @@ class FaceEnrollment:
         logger.info("Removed %d embedding(s) for '%s' from FAISS index", removed, label)
         return True
 
-    def rename_by_employee_id(self, employee_id: str, new_name: str) -> bool:
-        """Rename embeddings matching a unique ``employee_id``."""
-        if not new_name or not new_name.strip():
-            return False
-        new_name = new_name.strip()
-        matched = 0
-        for m in self.metadata:
-            if m.get("employee_id") == employee_id:
-                m["name"] = new_name
-                matched += 1
-        if matched == 0:
-            return False
-        self._save()
-        logger.info(
-            "Renamed %d embedding(s) for employee_id '%s' → '%s' in FAISS", matched, employee_id, new_name
-        )
-        return True
-
     def rename(self, old_name: str, new_name: str) -> bool:
         """Rename all embeddings for a person in the FAISS metadata.
 
@@ -455,7 +437,12 @@ class FaceEnrollment:
         if renamed_count > 0:
             self._save()
             logger = logging.getLogger(__name__)
-            logger.info("Renamed employee_id '%s' → name '%s' in metadata (%d records)", employee_id, new_name, renamed_count)
+            logger.info(
+                "Renamed employee_id '%s' → name '%s' in metadata (%d records)",
+                employee_id,
+                new_name,
+                renamed_count,
+            )
             return True
         return False
 

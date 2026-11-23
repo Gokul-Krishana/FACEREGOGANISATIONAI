@@ -51,8 +51,7 @@ def load_labels(labels_path: Path) -> Dict[str, str]:
     with labels_path.open(encoding="utf-8") as handle:
         labels = json.load(handle)
     if not isinstance(labels, dict) or not all(
-        isinstance(filename, str) and isinstance(label, str)
-        for filename, label in labels.items()
+        isinstance(filename, str) and isinstance(label, str) for filename, label in labels.items()
     ):
         raise ValueError("Evaluation labels must be a JSON object of filename -> person name.")
     return labels
@@ -169,7 +168,9 @@ def validate_variant(
     per_class: Dict[str, Dict[str, float]] = {}
     for label in labels:
         support = sum(actual == label for actual in ground_truth)
-        tp = sum(actual == label and predicted == label for actual, predicted in zip(ground_truth, predictions))
+        tp = sum(
+            actual == label and predicted == label for actual, predicted in zip(ground_truth, predictions)
+        )
         predicted_count = sum(predicted == label for predicted in predictions)
         precision_for_label = tp / predicted_count if predicted_count else 0.0
         recall_for_label = tp / support if support else 0.0
@@ -185,7 +186,9 @@ def validate_variant(
             "support": support,
         }
     total_support = max(sum(item["support"] for item in per_class.values()), 1)
-    weighted_precision = sum(item["precision"] * item["support"] for item in per_class.values()) / total_support
+    weighted_precision = (
+        sum(item["precision"] * item["support"] for item in per_class.values()) / total_support
+    )
     weighted_recall = sum(item["recall"] * item["support"] for item in per_class.values()) / total_support
     weighted_f1 = sum(item["f1"] * item["support"] for item in per_class.values()) / total_support
     accuracy = correct / max(n, 1)

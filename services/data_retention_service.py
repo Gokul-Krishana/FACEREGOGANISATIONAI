@@ -11,13 +11,13 @@ Implements automated data retention policies and GDPR/BIPA compliance:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict
 
 from sqlalchemy import and_
 
 from database.database import get_session
-from database.models import AuditAction, AuditLog, UnknownFace, _utcnow
+from database.models import AuditLog, UnknownFace, _utcnow
 from services.audit_service import AuditService
 from utils.biometric_crypto import shred_file
 

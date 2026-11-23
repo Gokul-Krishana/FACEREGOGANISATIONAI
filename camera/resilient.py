@@ -16,11 +16,10 @@ Provides industrial-grade camera reliability for 24/7 continuous operation:
 from __future__ import annotations
 
 import enum
-import logging
 import threading
 import time
-from dataclasses import dataclass, field
-from typing import Callable, Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import Callable, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -94,7 +93,10 @@ class FrozenFrameDetector:
             if self._first_frozen_time is None:
                 self._first_frozen_time = now
             frozen_duration = now - self._first_frozen_time
-            if self._identical_count >= self.max_identical_frames or frozen_duration >= self.frozen_timeout_sec:
+            if (
+                self._identical_count >= self.max_identical_frames
+                or frozen_duration >= self.frozen_timeout_sec
+            ):
                 return True
         else:
             self._identical_count = 0
@@ -250,7 +252,7 @@ class ResilientCameraSource(CameraSource):
             # 2. Reconnect if currently disconnected
             if self._inner_source is None or not self._inner_source.is_opened():
                 reconnected = self._attempt_reconnection()
-                if not reconnected:
+                if not reconnected or self._inner_source is None:
                     return False, None
 
             # 3. Read raw frame
@@ -432,4 +434,3 @@ class ResilientCameraSource(CameraSource):
             self._simulated_network_interruption = enabled
             if enabled:
                 self._metrics.state = CameraState.DISCONNECTED
-

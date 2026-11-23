@@ -88,3 +88,4 @@ Outputs:
 - Foreign key relationship check (`PRAGMA foreign_key_check`)
 - Table record count verification
 - FAISS vector count vs metadata length synchronization
+

@@ -11,20 +11,14 @@ Verifies:
 """
 
 import json
-import os
-import shutil
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from app.enrollment import FaceEnrollment
 from database.database import get_session
-from database.models import Employee, User, _utcnow
-from services.data_retention_service import DataRetentionService
+from database.models import Employee
 from services.employee_service import EmployeeService
 from utils.biometric_crypto import (
     decrypt_embedding,

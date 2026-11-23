@@ -532,7 +532,11 @@ class RecognitionService:
 
         # Biometric consent check: suppress recognition if consent has been withdrawn
         if emp is not None and not getattr(emp, "consent_given", True):
-            logger.info("Employee '%s' (%s) biometric consent withdrawn; suppressing recognition", emp.name, emp.employee_id)
+            logger.info(
+                "Employee '%s' (%s) biometric consent withdrawn; suppressing recognition",
+                emp.name,
+                emp.employee_id,
+            )
             return None
         return emp
 

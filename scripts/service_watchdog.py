@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import datetime
 import logging
 import os
 import subprocess
@@ -25,7 +24,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -73,7 +72,17 @@ def restart_service(service_name: str) -> None:
     if service_name == "fastapi":
         cmd = [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "127.0.0.1", "--port", "8000"]
     elif service_name == "streamlit":
-        cmd = [sys.executable, "-m", "streamlit", "run", "dashboard/app.py", "--server.port", "8501", "--server.headless", "true"]
+        cmd = [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            "dashboard/app.py",
+            "--server.port",
+            "8501",
+            "--server.headless",
+            "true",
+        ]
     else:
         logger.error("Unknown service: %s", service_name)
         return
@@ -103,7 +112,14 @@ def run_health_check(auto_restart: bool = False) -> Dict[str, dict]:
         healthy, code, msg = check_endpoint(url)
         results[name] = {"healthy": healthy, "code": code, "detail": msg, "url": url}
         status_symbol = "🟢" if healthy else "🔴"
-        logger.info("%s Service [%s]: %s (code: %d, detail: %s)", status_symbol, name, "HEALTHY" if healthy else "UNHEALTHY", code, msg)
+        logger.info(
+            "%s Service [%s]: %s (code: %d, detail: %s)",
+            status_symbol,
+            name,
+            "HEALTHY" if healthy else "UNHEALTHY",
+            code,
+            msg,
+        )
 
         if not healthy and auto_restart:
             restart_service(name)
